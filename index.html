@@ -204,6 +204,28 @@ input,select{font:inherit;color:inherit}
 .upload-knop.bezig{border-color:var(--grass);color:var(--grass);background:rgba(46,125,70,.06)}
 .club-knop{background:var(--pitch-ink);color:var(--fluo)}
 
+/* ---------- PDF-import preview ---------- */
+.preview-team{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow);border-left:3px solid var(--grass)}
+.preview-team.uit{opacity:.45;border-left-color:var(--hair)}
+.preview-team-kop{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.preview-team-kop input[type="checkbox"]{width:18px;height:18px;accent-color:var(--grass)}
+.preview-team-kop .naam{font-weight:600;font-size:15px;flex:1}
+.preview-team-kop .meta{font-size:11.5px;font-weight:600;color:var(--ink-2);background:#E3E8E0;padding:2px 8px;border-radius:99px}
+.preview-spelers{display:flex;flex-wrap:wrap;gap:5px}
+.preview-spelers .speler{display:inline-flex;align-items:center;gap:4px;background:#F0F4ED;padding:4px 8px 4px 10px;border-radius:99px;font-size:13px}
+.preview-spelers .speler input{border:none;background:transparent;font:inherit;width:auto;padding:0;color:var(--ink);font-size:13px;min-width:50px}
+.preview-spelers .speler input:focus{outline:none;background:#fff}
+.preview-spelers .speler button{width:18px;height:18px;border-radius:50%;background:var(--hair);color:var(--ink-2);font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center}
+.preview-spelers .dubbel input{color:var(--uit);font-weight:600;background:#FFE5E5}
+.preview-spelers .toevoeg{background:rgba(46,125,70,.1);color:var(--grass);font-weight:600;cursor:pointer;border:1px dashed var(--grass)}
+.link-rij{background:var(--card);border-radius:11px;padding:11px 13px;margin-bottom:8px;box-shadow:var(--shadow)}
+.link-rij-kop{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.link-rij .titel{font-weight:600;font-size:14.5px;flex:1}
+.link-rij .meta{font-size:11.5px;color:var(--ink-2)}
+.link-rij .link-actie{display:flex;gap:6px}
+.link-rij .link-actie button{padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:600;background:var(--card);box-shadow:var(--shadow)}
+.link-rij .link-actie .wa{background:var(--fluo);color:var(--pitch-ink)}
+
 /* ---------- Bank / wissels ---------- */
 .bank{background:var(--pitch-ink);border-radius:var(--radius);padding:12px;margin-top:12px;box-shadow:var(--shadow)}
 .bank .bank-kop{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -322,13 +344,13 @@ input,select{font:inherit;color:inherit}
    (Firebase Console → Project settings → Your apps → Web app)
 ==================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyDl3MJqSFX8YfRQkZYizNoFpXKWAMg_68Y",
-  authDomain: "asv33-21865.firebaseapp.com",
-  projectId: "asv33-21865",
-  storageBucket: "asv33-21865.firebasestorage.app",
-  messagingSenderId: "1094227590441",
-  appId: "1:1094227590441:web:ac11b2cb22665f46c8cb38",
-  measurementId: "G-VNL88C72KX"
+  apiKey: "AIzaSyAeq2hEgZR4l-RVTUBlrUXtnB_GcYJ7F98",
+  authDomain: "wedstrijdje-70ad8.firebaseapp.com",
+  projectId: "wedstrijdje-70ad8",
+  storageBucket: "wedstrijdje-70ad8.firebasestorage.app",
+  messagingSenderId: "527844663627",
+  appId: "1:527844663627:web:4defd8c537a1fd936388ce",
+  measurementId: "G-2DL597E3ZJ"
 };
 
 /* ==================== IMPORTS & INIT ==================== */
@@ -861,7 +883,11 @@ async function renderClub(){
 
 function htmlClubTeams(teams){
   return `
-    <button class="knop vol" id="clubNieuwTeam" style="margin-bottom:14px">+ Team aanmaken voor deze club</button>
+    <button class="knop vol" id="clubNieuwTeam" style="margin-bottom:8px">+ Team aanmaken voor deze club</button>
+    <div class="rij" style="margin-bottom:14px">
+      <button class="knop licht vol" id="clubImporteerPDF">📥 Importeren uit PDF</button>
+      ${teams.length ? `<button class="knop licht vol" id="clubAlleLinks">🔗 Alle uitnodigingen</button>` : ''}
+    </div>
     ${teams.length ? teams.map(t => `
       <button class="lijst-item" data-open-team="${t.id}">
         <div class="mini-shirt" style="width:40px;height:40px;border-radius:50%;background:var(--grass);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:16px">${esc(t.format)}v${esc(t.format)}</div>
@@ -870,7 +896,7 @@ function htmlClubTeams(teams){
         <button class="actie" data-uitnodig-team="${t.id}" data-code="${esc(t.code)}" title="Coach uitnodigen">📨</button>
         <span class="pijl">›</span>
       </button>`).join('')
-    : `<div class="kaart leeg">Nog geen teams in deze club.<br>Maak je eerste team aan om trainingen te kunnen delen.</div>`}`;
+    : `<div class="kaart leeg">Nog geen teams in deze club.<br>Maak een eerste team aan, of importeer een PDF met de teamindeling.</div>`}`;
 }
 
 function htmlClubTrainingen(teams, trainingen){
@@ -913,6 +939,10 @@ function htmlClubInstel(){
 function koppelClubTab(v, tab, teams, trainingen){
   if (tab === 'teams'){
     v.querySelector('#clubNieuwTeam').onclick = () => modalNieuwTeam(S.clubId);
+    const impBtn = v.querySelector('#clubImporteerPDF');
+    if (impBtn) impBtn.onclick = modalImporteerPDF;
+    const linkBtn = v.querySelector('#clubAlleLinks');
+    if (linkBtn) linkBtn.onclick = () => modalAlleLinks(teams);
     v.querySelectorAll('[data-open-team]').forEach(b => b.onclick = e => {
       if (e.target.closest('[data-uitnodig-team]')) return;
       openTeam(b.dataset.openTeam);
@@ -977,6 +1007,235 @@ function modalUitnodig(team){
   $('#mUitnodigWa').onclick = () => {
     const tekst = `Je bent uitgenodigd als coach voor ${team.naam}. Open deze link:\n${link}`;
     window.open('https://wa.me/?text=' + encodeURIComponent(tekst), '_blank');
+  };
+}
+
+/* ==================== PDF-IMPORT TEAMS ==================== */
+function detecteerCategorie(teamnaam){
+  const m = teamnaam.toUpperCase().match(/^(JO|MO)(\d+)/);
+  if (!m) return null;
+  const cat = m[1] + m[2];
+  return catInfo(cat) ? cat : null;
+}
+function voornaam(volledig){
+  /* eerste woord; "Rodrigo Manuel Cardoso Santos" → "Rodrigo", "Ci-Jay Thijs" → "Ci-Jay" */
+  return volledig.trim().split(/\s+/)[0];
+}
+
+async function parseTeamsUitPDF(file){
+  const url = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+  const workerUrl = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  const pdfjs = await import(url);
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({data: buf}).promise;
+
+  const teams = [];
+  const teamRegex = /^(JO|MO)\d+(-\d+)?(JM)?$/i;
+  const skipRegex = /^(UITLEG|COÖRDINATOREN|MINI'S|JEUGD|2025|2026)$/i;
+
+  for (let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const items = tc.items.filter(it => it.str.trim()).map(it => ({
+      str: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0,
+    }));
+    const headers = items.filter(it => teamRegex.test(it.str.trim()));
+
+    for (const h of headers){
+      /* items in dezelfde kolom (x binnen ±60) en onder de header */
+      const kolom = items.filter(it => Math.abs(it.x - h.x) < 60 && it.y < h.y && it.y > 30);
+      /* groeperen per regel (y) en stukjes binnen één regel slim samenvoegen */
+      const perRegel = {};
+      for (const it of kolom){
+        const k = Math.round(it.y);
+        (perRegel[k] ||= []).push(it);
+      }
+      const regels = Object.keys(perRegel).map(Number).sort((a,b) => b - a);
+      const spelers = [];
+      for (const y of regels){
+        const stk = perRegel[y].sort((a,b) => a.x - b.x);
+        let s = '';
+        for (let i = 0; i < stk.length; i++){
+          if (i > 0){
+            const vorigEnd = stk[i-1].x + stk[i-1].w;
+            const gap = stk[i].x - vorigEnd;
+            s += gap > 1.5 ? ' ' : '';                    // groot gat = woordafstand
+          }
+          s += stk[i].str;
+        }
+        s = s.trim();
+        if (/BEGELEIDING|VACATURE/i.test(s)) break;
+        if (teamRegex.test(s)) break;
+        if (s.length < 2) continue;
+        if (skipRegex.test(s)) continue;
+        spelers.push(s);
+      }
+      if (spelers.length){
+        teams.push({
+          naam: h.str.trim().toUpperCase(),
+          categorie: detecteerCategorie(h.str),
+          spelers: spelers.map(voornaam),
+        });
+      }
+    }
+  }
+  return teams;
+}
+
+function modalImporteerPDF(){
+  openModal(`
+    <h2>📥 Teams importeren uit PDF</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px">Upload een PDF met de teamindeling. De app leest de teamnamen en spelersnamen uit, daarna kun je alles controleren voordat je de teams aanmaakt.</p>
+    <label class="upload-knop" for="mPDFFile">📄 Kies PDF-bestand
+      <input type="file" id="mPDFFile" accept="application/pdf" style="display:none"></label>
+    <div id="mPDFStatus" style="font-size:13px;color:var(--ink-2);text-align:center"></div>`);
+  $('#mPDFFile').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    $('#mPDFStatus').textContent = '⏳ PDF wordt gelezen, even geduld...';
+    try {
+      const teams = await parseTeamsUitPDF(file);
+      if (!teams.length){
+        $('#mPDFStatus').textContent = '❌ Geen teams gevonden in deze PDF. Controleer of de teamnamen in de vorm JO11-1, MO13-1 e.d. erin staan.';
+        return;
+      }
+      sluitModal();
+      modalImportPreview(teams);
+    } catch (err) {
+      console.error(err);
+      $('#mPDFStatus').textContent = '❌ Kon de PDF niet lezen: ' + err.message;
+    }
+  };
+}
+
+function modalImportPreview(geparseerd){
+  /* state: bewerkbare kopie + voor elk team standaard "importeren" aan */
+  const teams = geparseerd.map(t => ({...t, aan: true, spelers: [...t.spelers]}));
+  const render = () => {
+    /* dubbele voornamen per team detecteren */
+    const blokjes = teams.map((t, ti) => {
+      const tellingen = {};
+      t.spelers.forEach(s => tellingen[s.toLowerCase()] = (tellingen[s.toLowerCase()]||0) + 1);
+      return `
+        <div class="preview-team ${t.aan?'':'uit'}" data-ti="${ti}">
+          <div class="preview-team-kop">
+            <input type="checkbox" data-aan="${ti}" ${t.aan?'checked':''}>
+            <span class="naam">${esc(t.naam)}</span>
+            <span class="meta">${t.categorie ? esc(t.categorie) : 'GEEN CAT.'}</span>
+            <span class="meta">${t.spelers.length}</span>
+          </div>
+          <div class="preview-spelers">
+            ${t.spelers.map((s,si) => `
+              <span class="speler ${tellingen[s.toLowerCase()]>1?'dubbel':''}" title="${tellingen[s.toLowerCase()]>1?'Dubbele voornaam — pas aan om uniek te maken':''}">
+                <input data-ti="${ti}" data-si="${si}" value="${esc(s)}" size="${Math.max(s.length, 5)}">
+                <button data-weg="${ti}-${si}" title="Verwijderen">✕</button>
+              </span>`).join('')}
+            <span class="speler toevoeg" data-toevoeg="${ti}">+ Speler</span>
+          </div>
+        </div>`;
+    }).join('');
+    $('#mPrevInhoud').innerHTML = blokjes;
+    const aantalAan = teams.filter(t => t.aan).length;
+    const aantalSp  = teams.filter(t => t.aan).reduce((a,t) => a + t.spelers.length, 0);
+    $('#mPrevSamenvat').textContent = `${aantalAan} team${aantalAan===1?'':'s'} · ${aantalSp} speler${aantalSp===1?'':'s'} worden aangemaakt`;
+    koppelPreview();
+  };
+  const koppelPreview = () => {
+    $$('[data-aan]').forEach(c => c.onchange = () => {
+      teams[Number(c.dataset.aan)].aan = c.checked; render();
+    });
+    $$('.preview-spelers input').forEach(i => i.oninput = () => {
+      teams[Number(i.dataset.ti)].spelers[Number(i.dataset.si)] = i.value;
+    });
+    $$('.preview-spelers input').forEach(i => i.onblur = () => {
+      /* fix-width bij verlaten */
+      i.size = Math.max(i.value.length, 5);
+    });
+    $$('[data-weg]').forEach(b => b.onclick = () => {
+      const [ti, si] = b.dataset.weg.split('-').map(Number);
+      teams[ti].spelers.splice(si,1); render();
+    });
+    $$('[data-toevoeg]').forEach(b => b.onclick = () => {
+      const ti = Number(b.dataset.toevoeg);
+      const naam = prompt('Voornaam:');
+      if (naam && naam.trim()){ teams[ti].spelers.push(naam.trim()); render(); }
+    });
+  };
+  openModal(`
+    <h2>Controleren & aanpassen</h2>
+    <p style="font-size:13px;color:var(--ink-2)">Vink teams uit die je niet wilt aanmaken, klik op een naam om aan te passen, en let op de <span style="color:var(--uit);font-weight:600">rood gekleurde</span> dubbele voornamen.</p>
+    <div id="mPrevSamenvat" style="font-size:12.5px;font-weight:600;color:var(--grass);text-align:center;margin:10px 0"></div>
+    <div id="mPrevInhoud" style="max-height:50vh;overflow-y:auto;margin-bottom:14px"></div>
+    <button class="knop vol" id="mPrevOk">✓ Teams aanmaken</button>
+    <button class="knop licht vol" id="mPrevAnnuleer" style="margin-top:8px">Annuleren</button>`);
+  render();
+  $('#mPrevAnnuleer').onclick = sluitModal;
+  $('#mPrevOk').onclick = async () => {
+    const teLijken = teams.filter(t => t.aan && t.spelers.length);
+    if (!teLijken.length) return meld('Geen teams om aan te maken');
+    $('#mPrevOk').disabled = true;
+    $('#mPrevOk').textContent = 'Bezig...';
+    let aangemaakt = 0;
+    for (const t of teLijken){
+      const cat = t.categorie || 'JO11';                // fallback
+      const format = catInfo(cat).format;
+      const geslacht = cat.startsWith('M') ? 'm' : 'j';
+      const teamRef = await addDoc(collection(db,'teams'), {
+        naam: t.naam, categorie: cat, geslacht, format, code: nieuweCode(),
+        club: S.clubId, clubNaam: S.club.naam,
+        leden: {[S.user.uid]: true},
+        ledenInfo: {[S.user.uid]: {naam: S.user.displayName || S.user.email}},
+        gemaakt: serverTimestamp(),
+      });
+      await updateDoc(doc(db,'clubs',S.clubId), {['teams.'+teamRef.id]: true});
+      /* spelers toevoegen */
+      for (let i = 0; i < t.spelers.length; i++){
+        await addDoc(collection(db,'teams',teamRef.id,'spelers'), {
+          naam: t.spelers[i], nummer: i+1,
+        });
+      }
+      aangemaakt++;
+    }
+    sluitModal();
+    meld(`✓ ${aangemaakt} team${aangemaakt===1?'':'s'} aangemaakt`);
+    renderClub();
+  };
+}
+
+/* ==================== ALLE UITNODIGINGSLINKS ==================== */
+function modalAlleLinks(teams){
+  const link = t => location.origin + location.pathname + '?team=' + t.code;
+  openModal(`
+    <h2>🔗 Alle uitnodigingslinks</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">Per team kun je hier snel de uitnodiging delen. Aantal gekoppelde coaches staat erbij.</p>
+    <div style="max-height:60vh;overflow-y:auto;margin-bottom:14px">
+      ${teams.map(t => `
+        <div class="link-rij">
+          <div class="link-rij-kop">
+            <div><div class="titel">${esc(t.naam)}</div>
+              <div class="meta">${Object.keys(t.leden||{}).length} coach(es) · code ${esc(t.code)}</div></div>
+          </div>
+          <div class="uitnodig-link">${esc(link(t))}</div>
+          <div class="link-actie" style="margin-top:8px">
+            <button data-kopieer="${esc(link(t))}">Kopieer</button>
+            <button class="wa" data-wa="${t.id}">📲 WhatsApp</button>
+          </div>
+        </div>`).join('')}
+    </div>
+    <button class="knop vol" id="mLinksKopieerAlle">📋 Kopieer alles als lijst</button>`);
+  $$('#modalInhoud [data-kopieer]').forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(b.dataset.kopieer); meld('Link gekopieerd'); }
+    catch { meld('Kon niet kopiëren'); }
+  });
+  $$('#modalInhoud [data-wa]').forEach(b => b.onclick = () => {
+    const t = teams.find(x => x.id === b.dataset.wa);
+    const tekst = `Je bent uitgenodigd als coach voor ${t.naam}. Open deze link:\n${link(t)}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(tekst), '_blank');
+  });
+  $('#mLinksKopieerAlle').onclick = async () => {
+    const tekst = teams.map(t => `${t.naam}: ${link(t)}`).join('\n');
+    try { await navigator.clipboard.writeText(tekst); meld('Alle links gekopieerd'); }
+    catch { meld('Kon niet kopiëren'); }
   };
 }
 
@@ -1213,7 +1472,8 @@ function htmlHandleiding(){
     <p>Werk je als hoofdtrainer voor meerdere teams? Maak op het startscherm een <b>club</b> aan. Daarmee kun je:</p>
     <ul>
       <li>Teams aanmaken die bij jouw club horen (de coaches ervan komen direct in het juiste team).</li>
-      <li>Coaches uitnodigen met een persoonlijke link (via WhatsApp), zodat ze niet eerst een teamcode hoeven te krijgen.</li>
+      <li><b>📥 PDF importeren</b>: upload een PDF met de teamindeling en de app leest de teams en spelers automatisch uit. Controleer in de preview, klik "Aanmaken" en alle teams + spelers staan klaar.</li>
+      <li>Coaches uitnodigen met een persoonlijke link (via WhatsApp), zodat ze niet eerst een teamcode hoeven te krijgen. Met <b>🔗 Alle uitnodigingen</b> krijg je in één overzicht alle links voor alle teams.</li>
       <li>PDF-trainingen uploaden en aangeven voor welke teams ze beschikbaar zijn. De trainers zien ze in het 📄 Training-tabblad van hun team.</li>
       <li>Een 🔴 stip op het training-tabblad waarschuwt coaches voor nieuwe, ongelezen trainingen.</li>
     </ul>
@@ -2338,7 +2598,7 @@ function koppelSleep(v){
   veld.querySelectorAll('.slot').forEach(slot => {
     slot.addEventListener('click', ev => {
       if (!S.geselecteerd) return;
-      if (ev.target.closest('[data-chip]')) return;       // chips regelen zichzelf    
+      if (ev.target.closest('[data-chip]')) return;       // chips regelen zichzelf
       plaats(S.geselecteerd.pid, slot.dataset.slot);
     });
   });
