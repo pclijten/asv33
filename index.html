@@ -327,6 +327,19 @@ input,select{font:inherit;color:inherit}
   </div>
 </div>
 
+<div id="uitnodiging" class="login" style="display:none">
+  <div class="bord">
+    <h1 id="uitnodigTitel">Welkom!</h1>
+    <p id="uitnodigSubtitel">Je bent uitgenodigd als coach. Vul je naam in om door te gaan.</p>
+    <div style="text-align:left;margin-top:6px">
+      <div class="veldgroep"><label style="color:rgba(255,255,255,.6)">Je naam</label>
+        <input class="invoer donker" id="uitnodigNaam" placeholder="Bijv. Paul" autocomplete="name"></div>
+      <button class="knop fluo vol" id="uitnodigOk">Aansluiten</button>
+      <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:14px;line-height:1.5;text-align:center">Niet de juiste persoon? <button id="uitnodigAnders" style="color:var(--fluo);text-decoration:underline;font-weight:600">Gebruik een ander account</button></p>
+    </div>
+  </div>
+</div>
+
 <div class="app" id="app" style="display:none">
   <div id="view-teams" class="view"></div>
   <div id="view-team" class="view"></div>
@@ -344,13 +357,13 @@ input,select{font:inherit;color:inherit}
    (Firebase Console → Project settings → Your apps → Web app)
 ==================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyDl3MJqSFX8YfRQkZYizNoFpXKWAMg_68Y",
-  authDomain: "asv33-21865.firebaseapp.com",
-  projectId: "asv33-21865",
-  storageBucket: "asv33-21865.firebasestorage.app",
-  messagingSenderId: "1094227590441",
-  appId: "1:1094227590441:web:ac11b2cb22665f46c8cb38",
-  measurementId: "G-VNL88C72KX"
+  apiKey: "AIzaSyAeq2hEgZR4l-RVTUBlrUXtnB_GcYJ7F98",
+  authDomain: "wedstrijdje-70ad8.firebaseapp.com",
+  projectId: "wedstrijdje-70ad8",
+  storageBucket: "wedstrijdje-70ad8.firebasestorage.app",
+  messagingSenderId: "527844663627",
+  appId: "1:527844663627:web:4defd8c537a1fd936388ce",
+  measurementId: "G-2DL597E3ZJ"
 };
 
 /* ==================== IMPORTS & INIT ==================== */
@@ -575,10 +588,66 @@ async function joinMetCode(code){
   return t;
 }
 
+/* uitnodigingsscherm: als de URL ?team=CODE bevat, tonen we direct het simpele naam-formulier */
+let pendingTeamInfo = null;     // {code, naam} — gevuld voordat anonieme login gebeurt
+async function checkUitnodiging(){
+  const p = new URLSearchParams(location.search);
+  const code = (p.get('team') || '').toUpperCase();
+  if (!code) return false;
+  /* team alvast opzoeken zodat we de naam kunnen tonen */
+  try {
+    const snap = await getDocs(query(collection(db,'teams'), where('code','==',code)));
+    if (snap.empty){
+      $('#uitnodigTitel').textContent = 'Uitnodiging ongeldig';
+      $('#uitnodigSubtitel').textContent = 'Deze link werkt niet meer. Vraag een nieuwe link aan je coach.';
+      $('#uitnodigOk').style.display = 'none';
+      $('#uitnodigNaam').style.display = 'none';
+    } else {
+      const team = snap.docs[0].data();
+      $('#uitnodigTitel').textContent = '🏟 ' + team.naam;
+      $('#uitnodigSubtitel').textContent = team.clubNaam
+        ? 'Je bent uitgenodigd als coach bij ' + team.clubNaam + '. Vul je naam in om door te gaan.'
+        : 'Je bent uitgenodigd als coach. Vul je naam in om door te gaan.';
+      $('#uitnodigOk').style.display = '';
+      $('#uitnodigNaam').style.display = '';
+      pendingTeamInfo = {code, teamNaam: team.naam};
+    }
+  } catch(e){
+    $('#uitnodigSubtitel').textContent = 'Kon de uitnodiging niet ophalen: ' + e.code;
+  }
+  return true;
+}
+
+$('#uitnodigOk').addEventListener('click', async () => {
+  const naam = $('#uitnodigNaam').value.trim();
+  if (naam.length < 2) return meld('Vul je naam in');
+  $('#uitnodigOk').disabled = true;
+  $('#uitnodigOk').textContent = 'Bezig...';
+  try {
+    pendingJoin = {code: pendingTeamInfo.code, naam};
+    const cred = await signInAnonymously(auth);
+    await updateProfile(cred.user, {displayName: naam});
+  } catch(e){
+    pendingJoin = null;
+    $('#uitnodigOk').disabled = false;
+    $('#uitnodigOk').textContent = 'Aansluiten';
+    meld('Aansluiten mislukt: ' + e.code);
+  }
+});
+$('#uitnodigAnders').addEventListener('click', () => {
+  /* doorklikken naar het normale loginscherm met de teamcode al ingevuld */
+  $('#uitnodiging').style.display = 'none';
+  $('#login').style.display = '';
+  $('#codeLoginForm').style.display = '';
+  if (pendingTeamInfo) $('#loginCode').value = pendingTeamInfo.code;
+  $('#loginNaam').focus();
+});
+
 onAuthStateChanged(auth, async user => {
   S.user = user;
   if (user){
     $('#login').style.display = 'none';
+    $('#uitnodiging').style.display = 'none';
     $('#app').style.display = '';
     startTeams();
     if (pendingJoin){
@@ -587,9 +656,18 @@ onAuthStateChanged(auth, async user => {
       if (t){ meld('Welkom bij ' + t.data().naam); openTeam(t.id); }
     }
   } else {
-    $('#login').style.display = '';
     $('#app').style.display = 'none';
     stopUnsubs('teams','spelers','wedstrijden','wedstrijd');
+    /* uitnodiging-link? toon dat scherm, anders normaal login */
+    const heeftUitnodiging = await checkUitnodiging();
+    if (heeftUitnodiging){
+      $('#login').style.display = 'none';
+      $('#uitnodiging').style.display = '';
+      setTimeout(() => $('#uitnodigNaam').focus(), 100);
+    } else {
+      $('#login').style.display = '';
+      $('#uitnodiging').style.display = 'none';
+    }
   }
 });
 
@@ -630,10 +708,13 @@ async function verwerkDeeplink(){
   const teamCode = p.get('team');
   const clubCode = p.get('club');
   if (teamCode){
+    /* afgehandeld via uitnodigingsscherm vóór login; voor reeds ingelogde gebruikers koppelen we ook nog */
     deeplinkVerwerkt = true;
     history.replaceState(null,'',location.pathname);
-    const t = await joinMetCode(teamCode.toUpperCase());
-    if (t){ meld('Welkom bij ' + t.data().naam); openTeam(t.id); }
+    if (!S.teams.find(t => t.code === teamCode.toUpperCase())){
+      const t = await joinMetCode(teamCode.toUpperCase());
+      if (t){ meld('Welkom bij ' + t.data().naam); openTeam(t.id); }
+    }
   } else if (clubCode){
     deeplinkVerwerkt = true;
     history.replaceState(null,'',location.pathname);
