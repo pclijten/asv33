@@ -1,0 +1,2353 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10271A">
+<title>Opstelling — Coach je team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --grass:#2E7D46;
+  --grass-2:#28713F;
+  --pitch-ink:#10271A;
+  --line:rgba(255,255,255,.82);
+  --paper:#EFF2EC;
+  --card:#FFFFFF;
+  --ink:#16241C;
+  --ink-2:#5B6B60;
+  --hair:#DDE3DA;
+  --fluo:#D6FB41;          /* wisselbord */
+  --in:#3FB950;
+  --uit:#E5484D;
+  --keeper:#F2A33C;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(16,39,26,.08), 0 4px 14px rgba(16,39,26,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font:inherit;color:inherit}
+.cond{font-family:'Barlow Condensed',sans-serif}
+
+.app{max-width:540px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+.view{flex:1;padding:16px 16px 96px;display:none}
+.view.actief{display:block}
+
+/* ---------- Kop ---------- */
+.kop{display:flex;align-items:center;gap:10px;margin-bottom:16px;min-height:40px}
+.kop h1{font-family:'Barlow Condensed';font-weight:700;font-size:26px;letter-spacing:.3px;text-transform:uppercase;flex:1;line-height:1.05}
+.kop .sub{font-size:13px;color:var(--ink-2);font-family:'Inter';text-transform:none;letter-spacing:0;font-weight:500;display:block;margin-top:2px}
+.terug{width:38px;height:38px;border-radius:10px;background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+
+/* ---------- Knoppen ---------- */
+.knop{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:11px;padding:11px 18px;font-weight:600;font-size:15px;background:var(--pitch-ink);color:#fff;box-shadow:var(--shadow)}
+.knop.vol{width:100%}
+.knop.licht{background:var(--card);color:var(--ink)}
+.knop.fluo{background:var(--fluo);color:var(--pitch-ink)}
+.knop.klein{padding:7px 12px;font-size:13px;border-radius:9px}
+.knop.gevaar{background:#fff;color:var(--uit)}
+.knop:disabled{opacity:.45;cursor:default}
+
+/* ---------- Kaarten / lijsten ---------- */
+.kaart{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:12px}
+.lijst-item{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:10px;width:100%;text-align:left}
+.lijst-item .titel{font-weight:600;font-size:15px}
+.lijst-item .meta{font-size:12.5px;color:var(--ink-2);margin-top:1px}
+.lijst-item .pijl{margin-left:auto;color:var(--ink-2)}
+.leeg{padding:34px 20px;text-align:center;color:var(--ink-2);font-size:14px;line-height:1.55}
+.leeg b{color:var(--ink)}
+
+/* ---------- Formulieren ---------- */
+.veldgroep{margin-bottom:14px}
+.veldgroep label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
+.invoer{width:100%;padding:11px 13px;border:1.5px solid var(--hair);border-radius:11px;background:#fff;font-size:15px}
+.invoer:focus{outline:none;border-color:var(--grass)}
+.rij{display:flex;gap:10px}
+.rij>*{flex:1}
+
+/* ---------- Segment (formaat, kwarten) ---------- */
+.segment{display:flex;background:#E3E8E0;border-radius:11px;padding:3px;gap:3px}
+.segment.wrap{flex-wrap:wrap}
+.segment.wrap button{flex:1 1 30%;min-width:80px}
+.segment button{flex:1;padding:9px 4px;border-radius:9px;font-weight:600;font-size:14px;color:var(--ink-2)}
+.segment button.actief{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(16,39,26,.15)}
+
+/* ---------- Geplande wissels ---------- */
+.plan-lijst{margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:10px}
+.plan-kop{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:8px}
+.plan-item{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.07);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px;color:#fff}
+.plan-item .nr{font-family:'Barlow Condensed';font-weight:700;font-size:20px;line-height:1}
+.plan-item .nr.in{color:var(--in)}
+.plan-item .nr.uit{color:var(--uit)}
+.plan-item .min{margin-left:auto;font-family:'Barlow Condensed';font-weight:700;font-size:17px;color:var(--fluo)}
+.plan-item .pk{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.plan-item .pk.ok{background:var(--fluo);color:var(--pitch-ink)}
+.plan-item .pk.weg{color:rgba(255,255,255,.5)}
+.plan-item.nu{outline:2px solid var(--fluo);animation:planPuls 1.1s ease-in-out infinite}
+@keyframes planPuls{0%,100%{box-shadow:0 0 0 0 rgba(214,251,65,.45)}50%{box-shadow:0 0 0 7px rgba(214,251,65,0)}}
+.plan-toevoegen{width:100%;margin-top:4px;padding:9px;border:1.5px dashed rgba(255,255,255,.3);border-radius:10px;color:rgba(255,255,255,.65);font-size:13px;font-weight:600}
+
+/* ---------- Kwart-tabs ---------- */
+.kwarten{display:flex;gap:6px;margin-bottom:12px}
+.kwarten button{flex:1;padding:10px 0;border-radius:11px;background:var(--card);box-shadow:var(--shadow);font-family:'Barlow Condensed';font-weight:700;font-size:18px;letter-spacing:.5px;color:var(--ink-2)}
+.kwarten button.actief{background:var(--pitch-ink);color:var(--fluo)}
+
+/* ---------- Het veld ---------- */
+.veld-wrap{position:relative;border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.veld{
+  position:relative;aspect-ratio:3/4;width:100%;
+  background:repeating-linear-gradient(0deg,var(--grass) 0 12.5%,var(--grass-2) 12.5% 25%);
+  touch-action:none;
+}
+.veld .lijn{position:absolute;border:2px solid var(--line)}
+.veld .midden{left:0;right:0;top:50%;border-width:1px 0 0}
+.veld .cirkel{left:50%;top:50%;width:24%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%}
+.veld .zestien-b{left:22%;right:22%;bottom:-2px;height:13%;border-bottom:none}
+.veld .zestien-o{left:22%;right:22%;top:-2px;height:13%;border-top:none}
+.veld .vijf-b{left:36%;right:36%;bottom:-2px;height:5.5%;border-bottom:none}
+.veld .vijf-o{left:36%;right:36%;top:-2px;height:5.5%;border-top:none}
+
+/* posities en chips */
+.slot{position:absolute;transform:translate(-50%,-50%);width:64px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.slot .ring{width:46px;height:46px;border-radius:50%;border:2px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:600;font-size:14px;color:rgba(255,255,255,.75);letter-spacing:.5px}
+.slot.doel ring{border-color:rgba(242,163,60,.8)}
+.chip{display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:none;user-select:none;-webkit-user-select:none}
+.chip .shirt{
+  width:46px;height:46px;border-radius:50%;
+  background:#fff;color:var(--pitch-ink);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed';font-weight:700;font-size:21px;
+  box-shadow:0 2px 6px rgba(0,0,0,.28);
+  border:2.5px solid #fff;
+}
+.chip.keeper .shirt{background:var(--keeper);border-color:var(--keeper);color:#fff}
+.chip .naam{font-size:10.5px;font-weight:600;color:#fff;background:rgba(16,39,26,.78);padding:2px 7px;border-radius:99px;max-width:78px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.geselecteerd .shirt{border-color:var(--fluo);box-shadow:0 0 0 4px rgba(214,251,65,.45)}
+.slot.doelwit .ring{border-color:var(--fluo);border-style:solid;background:rgba(214,251,65,.18)}
+.chip.sleept{opacity:.35}
+
+/* sleep-kloon */
+#sleepKloon{position:fixed;z-index:99;pointer-events:none;transform:translate(-50%,-60%)}
+
+/* ---------- Kwart-stippen (gespeeld/bank historie) ---------- */
+.dots{display:flex;gap:2.5px;margin-top:2px;justify-content:center}
+.dot{width:5px;height:5px;border-radius:50%}
+.dot.s{background:var(--in)}
+.dot.b{background:var(--uit)}
+
+/* ---------- Scorebord ---------- */
+.scorebord{background:var(--pitch-ink);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow)}
+.scorebord .sb-team{flex:1;font-family:'Barlow Condensed';font-weight:600;font-size:14px;letter-spacing:.5px;color:rgba(255,255,255,.75);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.scorebord .sb-cijfers{font-family:'Barlow Condensed';font-weight:700;font-size:34px;letter-spacing:2px;color:var(--fluo);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scorebord .sb-goal{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.1);font-size:17px;flex-shrink:0}
+.goal-kies{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;padding:8px 0 4px}
+.goal-kies .chip .naam{color:var(--ink);background:#E3E8E0}
+.log .goal-bal{font-size:18px;min-width:30px;text-align:center}
+
+/* ---------- Aanvoerdersband ---------- */
+.aanvoerder-band{position:absolute;top:-3px;right:-3px;width:18px;height:18px;border-radius:50%;background:var(--fluo);color:var(--pitch-ink);font-family:'Barlow Condensed';font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);z-index:2}
+.chip .shirt{position:relative}
+
+/* ---------- Kaarten / straffen ---------- */
+.kaart-knop{background:rgba(255,255,255,.1);color:#fff;font-size:14px}
+.kaart-icoon{display:inline-block;width:13px;height:17px;border-radius:2px;vertical-align:-3px;margin-right:4px;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.kaart-icoon.geel{background:#F5C400}
+.kaart-icoon.rood{background:#E5484D}
+.kaart-icoon.tijd{background:#F5C400;position:relative}
+.kaart-icoon.tijd::after{content:'⏱';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:11px;color:#000}
+.log .log-item.kaart{border-left:3px solid #F5C400}
+.log .log-item.kaart.rood{border-left-color:#E5484D}
+
+/* ---------- Handleiding ---------- */
+.hl{font-size:14px;line-height:1.6;color:var(--ink)}
+.hl h3{font-family:'Barlow Condensed';font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.5px;color:var(--grass);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.hl h3:first-child{margin-top:0}
+.hl p{margin-bottom:10px}
+.hl ul{margin:0 0 12px 0;padding-left:4px;list-style:none}
+.hl ul li{padding:6px 0 6px 26px;position:relative}
+.hl ul li::before{content:'→';position:absolute;left:4px;top:6px;color:var(--grass);font-weight:700}
+.hl b{color:var(--pitch-ink)}
+.hl .tip{background:#FFF3CD;border-left:3px solid #F5C400;padding:10px 12px;border-radius:8px;margin:10px 0;font-size:13.5px}
+.hl .tip b{color:#8B6F00}
+.hl kbd{display:inline-block;background:var(--card);border:1px solid var(--hair);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12.5px;font-weight:600;font-family:inherit;color:var(--ink)}
+
+/* ---------- Club & trainingen ---------- */
+.club-badge{display:inline-flex;align-items:center;gap:5px;background:var(--fluo);color:var(--pitch-ink);font-family:'Barlow Condensed';font-weight:700;font-size:12px;padding:3px 8px;border-radius:99px;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0}
+.club-badge.licht{background:rgba(214,251,65,.18);color:var(--grass)}
+.tablabel{position:relative}
+.tablabel .puntje{position:absolute;top:-2px;right:-10px;width:8px;height:8px;border-radius:50%;background:var(--uit)}
+.uitnodig-link{font-family:'Barlow Condensed';font-weight:600;font-size:13px;background:#0F1E14;color:var(--fluo);padding:9px 12px;border-radius:10px;word-break:break-all;letter-spacing:.3px;line-height:1.5}
+.training-rij{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:11px;padding:11px 13px;margin-bottom:8px;box-shadow:var(--shadow)}
+.training-rij .ico{width:38px;height:38px;border-radius:10px;background:rgba(229,72,77,.12);color:var(--uit);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;font-weight:700;font-family:'Barlow Condensed'}
+.training-rij .t{flex:1;min-width:0}
+.training-rij .t-titel{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.training-rij .t-meta{font-size:12px;color:var(--ink-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.training-rij .acties{display:flex;gap:4px;flex-shrink:0}
+.training-rij button{width:34px;height:34px;border-radius:8px;color:var(--ink-2);font-size:15px}
+.training-rij.ongelezen{border-left:3px solid var(--uit)}
+.training-rij.ongelezen .ico{background:var(--uit);color:#fff}
+.team-chip-kies{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.team-chip-kies label{display:inline-flex;align-items:center;gap:6px;background:var(--card);padding:7px 11px;border-radius:99px;font-size:13px;font-weight:500;cursor:pointer;box-shadow:var(--shadow);border:1.5px solid transparent}
+.team-chip-kies label.aan{border-color:var(--grass);background:rgba(46,125,70,.08);color:var(--grass);font-weight:600}
+.team-chip-kies input{display:none}
+.upload-knop{display:block;width:100%;padding:18px;border:2px dashed var(--hair);border-radius:12px;background:#FAFBF9;color:var(--ink-2);font-size:14px;font-weight:500;text-align:center;cursor:pointer;margin-bottom:14px}
+.upload-knop.bezig{border-color:var(--grass);color:var(--grass);background:rgba(46,125,70,.06)}
+.club-knop{background:var(--pitch-ink);color:var(--fluo)}
+
+/* ---------- Bank / wissels ---------- */
+.bank{background:var(--pitch-ink);border-radius:var(--radius);padding:12px;margin-top:12px;box-shadow:var(--shadow)}
+.bank .bank-kop{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.bank .bank-kop .t{font-family:'Barlow Condensed';font-weight:700;font-size:17px;letter-spacing:1px;color:var(--fluo);text-transform:uppercase}
+.bank .bank-kop .n{font-size:12px;color:rgba(255,255,255,.6);font-weight:500}
+.bank-chips{display:flex;gap:12px;flex-wrap:wrap;min-height:74px;align-items:flex-start}
+.bank .chip .naam{background:rgba(255,255,255,.12)}
+.bank .leeg-bank{color:rgba(255,255,255,.45);font-size:13px;padding:18px 6px}
+.bank.doelwit{outline:2px solid var(--fluo);outline-offset:-2px}
+
+/* ---------- Klok / wisselbord ---------- */
+.klok{background:var(--pitch-ink);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+.klok .tijd{font-family:'Barlow Condensed';font-weight:700;font-size:38px;letter-spacing:2px;color:var(--fluo);line-height:1;min-width:108px;font-variant-numeric:tabular-nums}
+.klok .label{font-size:11px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:3px}
+.klok .acties{margin-left:auto;display:flex;gap:8px}
+.klok .acties button{width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font-size:16px}
+.klok .acties button.primair{background:var(--fluo);color:var(--pitch-ink)}
+
+/* ---------- Wissel-log ---------- */
+.log{margin-top:12px}
+.log .log-item{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:11px;padding:9px 12px;margin-bottom:7px;box-shadow:var(--shadow);font-size:13.5px}
+.log .nr{font-family:'Barlow Condensed';font-weight:700;font-size:22px;min-width:30px;text-align:center;line-height:1}
+.log .nr.in{color:var(--in)}
+.log .nr.uit{color:var(--uit)}
+.log .min{margin-left:auto;font-family:'Barlow Condensed';font-weight:600;font-size:16px;color:var(--ink-2)}
+.log .verwijder{color:var(--ink-2);font-size:15px;padding:4px}
+
+/* ---------- Speler-rijen ---------- */
+.speler-rij{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:11px;padding:10px 12px;margin-bottom:8px;box-shadow:var(--shadow)}
+.speler-rij .mini-shirt{width:36px;height:36px;border-radius:50%;background:var(--pitch-ink);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:17px;flex-shrink:0}
+.speler-rij .n{font-weight:600;font-size:14.5px;flex:1}
+.speler-rij .actie{color:var(--ink-2);padding:6px;font-size:15px}
+
+/* ---------- Statistiek-tabel ---------- */
+.stat-tabel{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);font-size:13px}
+.stat-tabel th{font-family:'Barlow Condensed';font-weight:600;font-size:14px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-2);padding:10px 8px;border-bottom:1.5px solid var(--hair);text-align:center}
+.stat-tabel th:first-child,.stat-tabel td:first-child{text-align:left;padding-left:14px}
+.stat-tabel td{padding:10px 8px;border-bottom:1px solid var(--hair);text-align:center;font-variant-numeric:tabular-nums}
+.stat-tabel tr:last-child td{border-bottom:none}
+.stat-tabel .naam-cel{font-weight:600}
+.stat-tabel .tijd-cel{font-family:'Barlow Condensed';font-weight:700;font-size:16px}
+
+/* ---------- Onderbalk ---------- */
+.onderbalk{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:540px;background:var(--card);border-top:1px solid var(--hair);display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:20}
+.onderbalk button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;font-size:10.5px;font-weight:600;color:var(--ink-2);border-radius:10px}
+.onderbalk button.actief{color:var(--grass)}
+.onderbalk .ico{font-size:19px;line-height:1}
+
+/* ---------- Modal ---------- */
+.modal-achter{position:fixed;inset:0;background:rgba(16,39,26,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.modal-achter.open{display:flex}
+.modal{background:var(--paper);width:100%;max-width:540px;border-radius:20px 20px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));max-height:86dvh;overflow-y:auto}
+.modal h2{font-family:'Barlow Condensed';font-weight:700;font-size:22px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px}
+.modal .sluitbalk{width:42px;height:4px;border-radius:2px;background:var(--hair);margin:0 auto 14px}
+
+/* ---------- Login ---------- */
+.login{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;background:
+  repeating-linear-gradient(0deg,var(--grass) 0 12.5%,var(--grass-2) 12.5% 25%)}
+.login .bord{background:var(--pitch-ink);border-radius:20px;padding:30px 26px;max-width:340px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.login h1{font-family:'Barlow Condensed';font-weight:700;font-size:34px;letter-spacing:1px;color:var(--fluo);text-transform:uppercase;line-height:1}
+.login p{color:rgba(255,255,255,.65);font-size:13.5px;margin:10px 0 22px;line-height:1.5}
+.login .of{display:flex;align-items:center;gap:10px;margin:14px 0;color:rgba(255,255,255,.4);font-size:12px}
+.login .of::before,.login .of::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.18)}
+.invoer.donker{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
+.invoer.donker::placeholder{color:rgba(255,255,255,.35)}
+.invoer.donker:focus{border-color:var(--fluo)}
+.code-invoer{text-transform:uppercase;text-align:center;font-family:'Barlow Condensed';font-size:22px;letter-spacing:5px}
+
+/* ---------- Klein spul ---------- */
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:#E3E8E0;color:var(--ink-2);letter-spacing:.3px}
+.teamcode{font-family:'Barlow Condensed';font-weight:700;font-size:30px;letter-spacing:6px;text-align:center;background:var(--pitch-ink);color:var(--fluo);border-radius:12px;padding:12px;margin:8px 0}
+.melding{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--pitch-ink);color:#fff;font-size:13.5px;font-weight:500;padding:10px 18px;border-radius:99px;box-shadow:var(--shadow);z-index:99;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%}
+.melding.zichtbaar{opacity:1}
+.sectie-kop{font-family:'Barlow Condensed';font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-2);margin:18px 0 10px}
+.uitklap{margin-top:12px}
+.uitklap summary{cursor:pointer;font-weight:600;font-size:14px;padding:12px 14px;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);list-style:none;display:flex;align-items:center}
+.uitklap summary::after{content:'▾';margin-left:auto;color:var(--ink-2)}
+.uitklap[open] summary::after{content:'▴'}
+.uitklap .inhoud{margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="login" class="login" style="display:none">
+  <div class="bord">
+    <h1>Opstelling</h1>
+    <p>Maak per kwart je opstelling, sleep wissels het veld in en zie precies wie hoeveel speelt.</p>
+    <button class="knop fluo vol" id="googleLogin">Inloggen met Google</button>
+    <div class="of"><span>of</span></div>
+    <button class="knop licht vol" id="codeLoginToon">Inloggen met teamcode</button>
+    <div id="codeLoginForm" style="display:none;margin-top:14px;text-align:left">
+      <div class="veldgroep"><label style="color:rgba(255,255,255,.6)">Je naam</label>
+        <input class="invoer donker" id="loginNaam" placeholder="Bijv. Paul" autocomplete="off"></div>
+      <div class="veldgroep"><label style="color:rgba(255,255,255,.6)">Teamcode</label>
+        <input class="invoer donker code-invoer" id="loginCode" placeholder="ABC123" maxlength="6"></div>
+      <button class="knop fluo vol" id="codeLoginOk">Aansluiten bij team</button>
+      <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:10px;line-height:1.5">Je login is gekoppeld aan dit apparaat. Opnieuw inloggen kan altijd met dezelfde teamcode.</p>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+  <div id="view-teams" class="view"></div>
+  <div id="view-team" class="view"></div>
+  <div id="view-wedstrijd" class="view"></div>
+  <div id="view-club" class="view"></div>
+</div>
+
+<div id="sleepKloon" style="display:none"></div>
+<div class="modal-achter" id="modalAchter"><div class="modal" id="modalInhoud"></div></div>
+<div class="melding" id="melding"></div>
+
+<script type="module">
+/* ====================================================================
+   FIREBASE CONFIG — vervang door je eigen project-config
+   (Firebase Console → Project settings → Your apps → Web app)
+==================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAeq2hEgZR4l-RVTUBlrUXtnB_GcYJ7F98",
+  authDomain: "wedstrijdje-70ad8.firebaseapp.com",
+  projectId: "wedstrijdje-70ad8",
+  storageBucket: "wedstrijdje-70ad8.firebasestorage.app",
+  messagingSenderId: "527844663627",
+  appId: "1:527844663627:web:4defd8c537a1fd936388ce",
+  measurementId: "G-2DL597E3ZJ"
+};
+
+/* ==================== IMPORTS & INIT ==================== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
+         getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const storage = getStorage(app);
+
+/* ==================== KNVB-CATEGORIEËN ====================
+   Bron: KNVB wedstrijdvormen & speeltijden (knvb.nl)
+   Pupillen spelen officieel 2 helften met een time-out halverwege
+   elke helft — in de praktijk dus 4 kwarten. Junioren/senioren: 2 helften. */
+const CATEGORIEEN = {
+  'JO7':  {format:'4',  periodes:4, duur:10,   knvb:'4 tegen 4 · geen keeper · 2×20 min'},
+  'JO8':  {format:'6',  periodes:4, duur:10,   knvb:'6 tegen 6 · 2×20 min, time-out per helft'},
+  'JO9':  {format:'6',  periodes:4, duur:10,   knvb:'6 tegen 6 · 2×20 min, time-out per helft'},
+  'JO10': {format:'6',  periodes:4, duur:12.5, knvb:'6 tegen 6 · 2×25 min, time-out per helft'},
+  'JO11': {format:'8',  periodes:4, duur:15,   knvb:'8 tegen 8 · 2×30 min, time-out per helft'},
+  'JO12': {format:'8',  periodes:4, duur:15,   knvb:'8 tegen 8 · 2×30 min, time-out per helft'},
+  'JO13': {format:'11', periodes:2, duur:30,   knvb:'11 tegen 11 · 2×30 min'},
+  'JO14': {format:'11', periodes:2, duur:35,   knvb:'11 tegen 11 · 2×35 min'},
+  'JO15': {format:'11', periodes:2, duur:35,   knvb:'11 tegen 11 · 2×35 min'},
+  'JO16': {format:'11', periodes:2, duur:40,   knvb:'11 tegen 11 · 2×40 min'},
+  'JO17': {format:'11', periodes:2, duur:40,   knvb:'11 tegen 11 · 2×40 min'},
+  'JO19': {format:'11', periodes:2, duur:45,   knvb:'11 tegen 11 · 2×45 min'},
+  'Senioren': {format:'11', periodes:2, duur:45, knvb:'11 tegen 11 · 2×45 min'},
+};
+const CATEGORIEEN_MEIDEN = {
+  'MO7':  {format:'4',  periodes:4, duur:10,   knvb:'4 tegen 4 · geen keeper · 2×20 min'},
+  'MO8':  {format:'6',  periodes:4, duur:10,   knvb:'6 tegen 6 · 2×20 min, time-out per helft'},
+  'MO9':  {format:'6',  periodes:4, duur:10,   knvb:'6 tegen 6 · 2×20 min, time-out per helft'},
+  'MO10': {format:'6',  periodes:4, duur:12.5, knvb:'6 tegen 6 · 2×25 min, time-out per helft'},
+  'MO11': {format:'8',  periodes:4, duur:15,   knvb:'8 tegen 8 · 2×30 min, time-out per helft'},
+  'MO12': {format:'8',  periodes:4, duur:15,   knvb:'8 tegen 8 · 2×30 min, time-out per helft'},
+  'MO13': {format:'9',  periodes:2, duur:30,   knvb:'9 tegen 9 · 2×30 min'},
+  'MO15': {format:'9',  periodes:2, duur:35,   knvb:'9 tegen 9 · 2×35 min'},
+  'MO17': {format:'9',  periodes:2, duur:40,   knvb:'9 tegen 9 · 2×40 min'},
+  'MO20': {format:'9',  periodes:2, duur:45,   knvb:'9 tegen 9 · 2×45 min'},
+  'Vrouwen': {format:'11', periodes:2, duur:45, knvb:'11 tegen 11 · 2×45 min'},
+};
+function catInfo(naam){ return CATEGORIEEN[naam] || CATEGORIEEN_MEIDEN[naam] || null; }
+
+function isToernooi(w){ return w.type === 'toernooi'; }
+
+/* tijdstraf in seconden — KNVB: 5 min pupillen (t/m JO/MO15), 10 min junioren+/senioren */
+function tijdstrafSec(){
+  const cat = S.team?.categorie || '';
+  const m = cat.match(/^[JM]O(\d+)$/);
+  if (m && Number(m[1]) >= 16) return 600;
+  if (cat === 'Senioren' || cat === 'Vrouwen') return 600;
+  return 300;
+}
+const KAART_ICOON = {geel:'🟨', rood:'🟥', tijd:'⏱'};
+const KAART_NAAM  = {geel:'gele kaart', rood:'rode kaart', tijd:'tijdstraf'};
+function periodeNaam(w){
+  if (isToernooi(w)) return w.toernooi.helften === 1 ? 'Wedstrijd' : 'Helft';
+  return (w.periodes||4) === 2 ? 'Helft' : 'Kwart';
+}
+function periodeNrs(w){ return Array.from({length: w.periodes||4}, (_,i) => String(i+1)); }
+function periodeLabel(w, nr){
+  if (isToernooi(w)){
+    const h = w.toernooi.helften;
+    return h === 1 ? 'W'+nr : 'W'+Math.ceil(nr/h)+'.'+(((nr-1)%h)+1);
+  }
+  return ((w.periodes||4) === 2 ? 'H' : 'K') + nr;
+}
+function toernooiWnr(w, nr = S.kwart){ return Math.ceil(Number(nr) / w.toernooi.helften); }
+function periodeOmschrijving(w, nr = S.kwart){
+  if (isToernooi(w)){
+    const wnr = toernooiWnr(w, nr);
+    return w.toernooi.helften === 1 ? 'wedstrijd '+wnr : `wedstrijd ${wnr}, helft ${((Number(nr)-1)%w.toernooi.helften)+1}`;
+  }
+  return periodeNaam(w).toLowerCase()+' '+nr;
+}
+
+/* ==================== FORMATIES ==================== */
+/* [x%, y%, lijn]  — keeper wordt automatisch toegevoegd op (50, 90),
+   behalve bij 4 tegen 4 (JO7): daar speelt niemand op doel. */
+const FORMATIES = {
+  '4': {
+    '1-2-1': [[50,76,'V'],[24,50,'M'],[76,50,'M'],[50,24,'A']],
+    '2-2':   [[30,68,'V'],[70,68,'V'],[30,32,'A'],[70,32,'A']],
+    '1-1-2': [[50,76,'V'],[50,50,'M'],[30,26,'A'],[70,26,'A']],
+  },
+  '6': {
+    '2-1-2': [[30,72,'V'],[70,72,'V'],[50,49,'M'],[30,26,'A'],[70,26,'A']],
+    '1-2-2': [[50,73,'V'],[30,49,'M'],[70,49,'M'],[30,26,'A'],[70,26,'A']],
+    '2-2-1': [[30,72,'V'],[70,72,'V'],[30,47,'M'],[70,47,'M'],[50,24,'A']],
+    '1-3-1': [[50,73,'V'],[20,49,'M'],[50,46,'M'],[80,49,'M'],[50,24,'A']],
+    '3-1-1': [[22,72,'V'],[50,75,'V'],[78,72,'V'],[50,48,'M'],[50,24,'A']],
+  },
+  '8': {
+    '3-3-1': [[22,73,'V'],[50,76,'V'],[78,73,'V'],[22,48,'M'],[50,45,'M'],[78,48,'M'],[50,23,'A']],
+    '2-3-2': [[32,74,'V'],[68,74,'V'],[20,48,'M'],[50,45,'M'],[80,48,'M'],[32,23,'A'],[68,23,'A']],
+    '3-2-2': [[22,73,'V'],[50,76,'V'],[78,73,'V'],[32,47,'M'],[68,47,'M'],[32,23,'A'],[68,23,'A']],
+    '2-4-1': [[32,74,'V'],[68,74,'V'],[14,48,'M'],[38,45,'M'],[62,45,'M'],[86,48,'M'],[50,23,'A']],
+    '1-3-3': [[50,75,'V'],[22,49,'M'],[50,46,'M'],[78,49,'M'],[22,24,'A'],[50,21,'A'],[78,24,'A']],
+    '1-4-2': [[50,75,'V'],[14,49,'M'],[38,46,'M'],[62,46,'M'],[86,49,'M'],[32,23,'A'],[68,23,'A']],
+  },
+  '9': {
+    '3-3-2': [[22,74,'V'],[50,77,'V'],[78,74,'V'],[22,49,'M'],[50,46,'M'],[78,49,'M'],[32,23,'A'],[68,23,'A']],
+    '3-2-3': [[22,74,'V'],[50,77,'V'],[78,74,'V'],[32,48,'M'],[68,48,'M'],[20,24,'A'],[50,21,'A'],[80,24,'A']],
+    '2-4-2': [[32,75,'V'],[68,75,'V'],[14,49,'M'],[38,46,'M'],[62,46,'M'],[86,49,'M'],[32,23,'A'],[68,23,'A']],
+    '4-3-1': [[14,73,'V'],[38,77,'V'],[62,77,'V'],[86,73,'V'],[25,47,'M'],[50,44,'M'],[75,47,'M'],[50,21,'A']],
+  },
+  '11': {
+    '4-3-3': [[14,75,'V'],[38,78,'V'],[62,78,'V'],[86,75,'V'],[27,52,'M'],[50,48,'M'],[73,52,'M'],[19,25,'A'],[50,21,'A'],[81,25,'A']],
+    '4-4-2': [[14,75,'V'],[38,78,'V'],[62,78,'V'],[86,75,'V'],[14,49,'M'],[38,46,'M'],[62,46,'M'],[86,49,'M'],[35,23,'A'],[65,23,'A']],
+    '3-4-3': [[25,76,'V'],[50,78,'V'],[75,76,'V'],[14,49,'M'],[38,46,'M'],[62,46,'M'],[86,49,'M'],[19,25,'A'],[50,21,'A'],[81,25,'A']],
+    '4-2-3-1': [[14,77,'V'],[38,80,'V'],[62,80,'V'],[86,77,'V'],[36,58,'M'],[64,58,'M'],[20,38,'M'],[50,35,'M'],[80,38,'M'],[50,17,'A']],
+    '4-1-4-1': [[14,77,'V'],[38,80,'V'],[62,80,'V'],[86,77,'V'],[50,60,'M'],[14,40,'M'],[38,37,'M'],[62,37,'M'],[86,40,'M'],[50,17,'A']],
+    '3-5-2': [[25,77,'V'],[50,79,'V'],[75,77,'V'],[10,46,'M'],[32,48,'M'],[50,52,'M'],[68,48,'M'],[90,46,'M'],[35,21,'A'],[65,21,'A']],
+    '5-3-2': [[10,72,'V'],[30,78,'V'],[50,80,'V'],[70,78,'V'],[90,72,'V'],[27,48,'M'],[50,45,'M'],[73,48,'M'],[35,21,'A'],[65,21,'A']],
+  },
+};
+const LIJN_NAAM = {K:'Keeper', V:'Verdediging', M:'Middenveld', A:'Aanval'};
+
+function bouwSlots(format, formatie){
+  const def = (FORMATIES[format] && FORMATIES[format][formatie])
+           || Object.values(FORMATIES[format])[0];
+  const slots = format === '4' ? [] : [{id:'K', x:50, y:90, lijn:'K'}];
+  const tel = {V:0, M:0, A:0};
+  for (const [x,y,l] of def){ tel[l]++; slots.push({id:l+tel[l], x, y, lijn:l}); }
+  return slots;
+}
+const slotLijn = id => id[0];
+
+/* ==================== STATE & HELPERS ==================== */
+const S = {
+  user:null, teams:[], team:null, teamId:null,
+  spelers:[], wedstrijden:[],
+  wedstrijd:null, wedstrijdId:null, kwart:'1',
+  teamTab:'wedstrijden', geselecteerd:null,
+  clubs:[], club:null, clubId:null, clubTab:'teams', clubTeams:[], clubTrainingen:[],
+  trainingen:[], trainingenGelezen:{},
+  unsub:{}, klokInterval:null, saveTimer:null, lokaalTot:0,
+};
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function meld(t){
+  const m = $('#melding'); m.textContent = t; m.classList.add('zichtbaar');
+  clearTimeout(meld._t); meld._t = setTimeout(()=>m.classList.remove('zichtbaar'), 2600);
+}
+function mmss(sec){
+  sec = Math.max(0, Math.round(sec));
+  return String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
+}
+function uurMin(sec){
+  const m = Math.round(sec/60);
+  return m >= 60 ? Math.floor(m/60)+'u'+String(m%60).padStart(2,'0') : m+' min';
+}
+function datumNL(d){
+  try { return new Date(d+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}); }
+  catch { return d; }
+}
+function nieuweCode(){
+  const t = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6}, () => t[Math.floor(Math.random()*t.length)]).join('');
+}
+function speler(pid){ return S.spelers.find(p => p.id === pid); }
+function spelerNaam(pid){ const p = speler(pid); return p ? p.naam : '—'; }
+function spelerNr(pid){ const p = speler(pid); return p && p.nummer != null && p.nummer !== '' ? p.nummer : '·'; }
+
+/* ---------- Modal ---------- */
+function openModal(html){ $('#modalInhoud').innerHTML = '<div class="sluitbalk"></div>' + html; $('#modalAchter').classList.add('open'); }
+function sluitModal(){ $('#modalAchter').classList.remove('open'); }
+$('#modalAchter').addEventListener('click', e => { if (e.target.id === 'modalAchter') sluitModal(); });
+
+/* ---------- Navigatie ---------- */
+function toon(viewId){
+  $$('.view').forEach(v => v.classList.remove('actief'));
+  $('#view-'+viewId).classList.add('actief');
+  window.scrollTo(0,0);
+}
+function stopUnsubs(...keys){
+  for (const k of keys){ if (S.unsub[k]){ S.unsub[k](); delete S.unsub[k]; } }
+}
+
+/* ==================== AUTH ==================== */
+$('#googleLogin').addEventListener('click', async () => {
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch(e){ meld('Inloggen mislukt: ' + e.code); }
+});
+
+let pendingJoin = null;
+$('#codeLoginToon').addEventListener('click', () => {
+  const f = $('#codeLoginForm');
+  f.style.display = f.style.display === 'none' ? '' : 'none';
+  if (f.style.display === '') $('#loginNaam').focus();
+});
+$('#codeLoginOk').addEventListener('click', async () => {
+  const naam = $('#loginNaam').value.trim();
+  const code = $('#loginCode').value.trim().toUpperCase();
+  if (naam.length < 2) return meld('Vul je naam in');
+  if (code.length !== 6) return meld('Een teamcode bestaat uit 6 tekens');
+  try {
+    pendingJoin = {code, naam};
+    const cred = await signInAnonymously(auth);
+    await updateProfile(cred.user, {displayName: naam});
+  } catch(e){ pendingJoin = null; meld('Inloggen mislukt: ' + e.code); }
+});
+
+async function joinMetCode(code){
+  const snap = await getDocs(query(collection(db,'teams'), where('code','==',code)));
+  if (snap.empty){ meld('Geen team gevonden met code ' + code); return null; }
+  const t = snap.docs[0];
+  await updateDoc(t.ref, {
+    ['leden.'+S.user.uid]: true,
+    ['ledenInfo.'+S.user.uid]: {naam: S.user.displayName || S.user.email || 'Coach'},
+  });
+  return t;
+}
+
+onAuthStateChanged(auth, async user => {
+  S.user = user;
+  if (user){
+    $('#login').style.display = 'none';
+    $('#app').style.display = '';
+    startTeams();
+    if (pendingJoin){
+      const {code} = pendingJoin; pendingJoin = null;
+      const t = await joinMetCode(code);
+      if (t){ meld('Welkom bij ' + t.data().naam); openTeam(t.id); }
+    }
+  } else {
+    $('#login').style.display = '';
+    $('#app').style.display = 'none';
+    stopUnsubs('teams','spelers','wedstrijden','wedstrijd');
+  }
+});
+
+/* ==================== TEAMS ==================== */
+function startTeams(){
+  stopUnsubs('teams','clubs','trainingen');
+  /* lid van teams */
+  const q1 = query(collection(db,'teams'), where('leden.'+S.user.uid, '==', true));
+  S.unsub.teams = onSnapshot(q1, snap => {
+    S.teams = snap.docs.map(d => ({id:d.id, ...d.data()}))
+                       .sort((a,b) => (a.naam||'').localeCompare(b.naam||''));
+    if (!S.teamId && !S.clubId) renderTeams();
+    laadTrainingenVoorTeams();
+  });
+  /* admin van clubs */
+  const q2 = query(collection(db,'clubs'), where('admins.'+S.user.uid, '==', true));
+  S.unsub.clubs = onSnapshot(q2, snap => {
+    S.clubs = snap.docs.map(d => ({id:d.id, ...d.data()}))
+                       .sort((a,b) => (a.naam||'').localeCompare(b.naam||''));
+    if (!S.teamId && !S.clubId) renderTeams();
+  });
+  /* gelezen-status van trainingen */
+  const q3 = query(collection(db,'gebruikers',S.user.uid,'gelezen'));
+  S.unsub.gelezen = onSnapshot(q3, snap => {
+    S.trainingenGelezen = {};
+    snap.docs.forEach(d => S.trainingenGelezen[d.id] = true);
+    if (S.team) renderTeam();
+  });
+  renderTeams(); toon('teams');
+  /* eventuele deep-link na inloggen verwerken */
+  setTimeout(verwerkDeeplink, 800);
+}
+
+let deeplinkVerwerkt = false;
+async function verwerkDeeplink(){
+  if (deeplinkVerwerkt) return;
+  const p = new URLSearchParams(location.search);
+  const teamCode = p.get('team');
+  const clubCode = p.get('club');
+  if (teamCode){
+    deeplinkVerwerkt = true;
+    history.replaceState(null,'',location.pathname);
+    const t = await joinMetCode(teamCode.toUpperCase());
+    if (t){ meld('Welkom bij ' + t.data().naam); openTeam(t.id); }
+  } else if (clubCode){
+    deeplinkVerwerkt = true;
+    history.replaceState(null,'',location.pathname);
+    const snap = await getDocs(query(collection(db,'clubs'), where('code','==',clubCode.toUpperCase())));
+    if (snap.empty) return meld('Clubcode niet gevonden');
+    const c = snap.docs[0];
+    await updateDoc(c.ref, {['leden.'+S.user.uid]: true,
+      ['ledenInfo.'+S.user.uid]: {naam: S.user.displayName || S.user.email || 'Coach'}});
+    meld('Gekoppeld aan ' + c.data().naam);
+  }
+}
+
+/* trainingen voor de teams waar de coach lid van is */
+let trainingenUnsub = null;
+function laadTrainingenVoorTeams(){
+  if (trainingenUnsub) trainingenUnsub();
+  const teamIds = S.teams.map(t => t.id);
+  if (!teamIds.length){ S.trainingen = []; return; }
+  /* Firestore in-clausule max 30 ids — we splitsen indien nodig */
+  const chunks = [];
+  for (let i = 0; i < teamIds.length; i += 30) chunks.push(teamIds.slice(i, i+30));
+  S.trainingen = [];
+  chunks.forEach(c => {
+    const q = query(collection(db,'trainingen'), where('teams','array-contains-any', c));
+    onSnapshot(q, snap => {
+      /* vervang per chunk */
+      const ids = new Set(snap.docs.map(d => d.id));
+      S.trainingen = S.trainingen.filter(t => !c.some(tid => (t.teams||[]).includes(tid)) || ids.has(t.id));
+      snap.docs.forEach(d => {
+        const i = S.trainingen.findIndex(t => t.id === d.id);
+        const data = {id:d.id, ...d.data()};
+        if (i >= 0) S.trainingen[i] = data; else S.trainingen.push(data);
+      });
+      S.trainingen.sort((a,b) => (b.week||'').localeCompare(a.week||'') || (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
+      if (S.team && S.teamTab === 'trainingen') renderTeam();
+      else if (S.team) renderTeam();
+    });
+  });
+}
+
+function renderTeams(){
+  const v = $('#view-teams');
+  const aantalOngelezen = S.trainingen.filter(t =>
+    (t.teams||[]).some(tid => S.teams.find(x => x.id === tid)) && !S.trainingenGelezen[t.id]).length;
+  v.innerHTML = `
+    <div class="kop"><h1>Mijn teams<span class="sub">${esc(S.user.displayName || S.user.email || '')}</span></h1>
+      <button class="terug" id="uitloggen" title="Uitloggen">⏻</button></div>
+
+    ${S.clubs.length ? `<div class="sectie-kop" style="margin-top:0">Clubs die je beheert</div>
+      ${S.clubs.map(c => `
+        <button class="lijst-item" data-open-club="${c.id}">
+          <div class="mini-shirt" style="width:40px;height:40px;border-radius:50%;background:var(--pitch-ink);color:var(--fluo);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:14px">🏛</div>
+          <div><div class="titel">${esc(c.naam)} <span class="club-badge">admin</span></div>
+          <div class="meta">${Object.keys(c.teams||{}).length} teams</div></div>
+          <span class="pijl">›</span>
+        </button>`).join('')}` : ''}
+
+    ${S.teams.length ? `<div class="sectie-kop">Mijn teams</div>
+      ${S.teams.map(t => `
+        <button class="lijst-item" data-open-team="${t.id}">
+          <div class="mini-shirt" style="width:40px;height:40px;border-radius:50%;background:var(--grass);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:16px">${esc(t.format)}v${esc(t.format)}</div>
+          <div><div class="titel">${esc(t.naam)}${t.club ? ' <span class="club-badge licht">'+esc(t.clubNaam||'club')+'</span>' : ''}</div>
+          <div class="meta">${Object.keys(t.leden||{}).length} coach(es) · code ${esc(t.code)}</div></div>
+          <span class="pijl">›</span>
+        </button>`).join('')}`
+      : !S.clubs.length ? `<div class="kaart leeg">Nog geen teams.<br><b>Maak een team aan</b>, sluit je aan met een teamcode, of <b>start een club</b> om meerdere teams te beheren.</div>` : ''}
+
+    ${aantalOngelezen ? `<div class="kaart" style="background:rgba(229,72,77,.08);border-left:3px solid var(--uit);font-size:13.5px;color:var(--ink);margin-top:12px">📄 <b>${aantalOngelezen}</b> nieuwe training${aantalOngelezen>1?'en':''} — open je team om te bekijken.</div>` : ''}
+
+    <div class="rij" style="margin-top:14px">
+      <button class="knop vol" id="nieuwTeam">+ Nieuw team</button>
+      <button class="knop licht vol" id="joinTeam">Code invoeren</button>
+    </div>
+    <button class="knop club-knop vol" id="nieuwClub" style="margin-top:8px">🏛 Nieuwe club aanmaken</button>`;
+
+  v.querySelector('#uitloggen').onclick = () => {
+    if (S.user.isAnonymous && !confirm('Je bent ingelogd zonder account. Na uitloggen kun je opnieuw inloggen met je teamcode. Doorgaan?')) return;
+    signOut(auth);
+  };
+  v.querySelectorAll('[data-open-team]').forEach(b => b.onclick = () => openTeam(b.dataset.openTeam));
+  v.querySelectorAll('[data-open-club]').forEach(b => b.onclick = () => openClub(b.dataset.openClub));
+  v.querySelector('#nieuwTeam').onclick = () => modalNieuwTeam();
+  v.querySelector('#joinTeam').onclick = modalJoinTeam;
+  v.querySelector('#nieuwClub').onclick = modalNieuwClub;
+}
+
+function modalNieuwTeam(clubId = null){
+  const clubT = clubId ? S.clubs.find(c => c.id === clubId) : null;
+  const subOpties = Array.from({length:12}, (_,i) => `<option value="${i+1}">${i+1}</option>`).join('');
+  openModal(`
+    <h2>${clubT ? 'Nieuw team voor '+esc(clubT.naam) : 'Nieuw team'}</h2>
+    <div class="veldgroep"><label>Jongens of meiden</label>
+      <div class="segment" id="mTeamGeslacht">
+        <button data-g="j" class="actief">Jongens (JO)</button>
+        <button data-g="m">Meiden (MO)</button>
+      </div></div>
+    <div class="rij">
+      <div class="veldgroep" style="flex:2"><label>Categorie</label>
+        <select class="invoer" id="mTeamCat"></select></div>
+      <div class="veldgroep" style="flex:1"><label>Team</label>
+        <select class="invoer" id="mTeamSub">${subOpties}</select></div>
+    </div>
+    <div class="veldgroep"><label>Teamnaam</label>
+      <input class="invoer" id="mTeamNaam" autocomplete="off"></div>
+    <div class="kaart" style="margin-bottom:14px"><p style="font-size:13px;color:var(--ink-2)" id="mTeamKnvb"></p></div>
+    <button class="knop vol" id="mTeamOk">Team aanmaken</button>`);
+  let geslacht = 'j';
+  const vulCategorieen = () => {
+    const lijst = geslacht === 'j' ? CATEGORIEEN : CATEGORIEEN_MEIDEN;
+    $('#mTeamCat').innerHTML = Object.keys(lijst).map(c => `<option value="${c}">${c}</option>`).join('');
+  };
+  const werkBij = () => {
+    const cat = $('#mTeamCat').value;
+    const c = catInfo(cat);
+    const sub = $('#mTeamSub').value;
+    $('#mTeamNaam').value =
+      cat === 'Senioren' ? (sub === '1' ? 'Eerste elftal' : 'Senioren '+sub) :
+      cat === 'Vrouwen'  ? (sub === '1' ? 'Vrouwen 1' : 'Vrouwen '+sub) :
+      cat + '-' + sub;
+    $('#mTeamKnvb').innerHTML = `<b>KNVB ${esc(cat)}:</b> ${esc(c.knvb)}<br>De app stelt automatisch ${c.periodes === 2 ? '2 helften' : '4 kwarten'} van ${String(c.duur).replace('.',',')} minuten in. Per wedstrijd aan te passen.`;
+  };
+  $$('#mTeamGeslacht button').forEach(b => b.onclick = () => {
+    $$('#mTeamGeslacht button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief');
+    geslacht = b.dataset.g; vulCategorieen(); werkBij();
+  });
+  $('#mTeamCat').onchange = werkBij;
+  $('#mTeamSub').onchange = werkBij;
+  vulCategorieen(); werkBij();
+  $('#mTeamOk').onclick = async () => {
+    const naam = $('#mTeamNaam').value.trim();
+    if (!naam) return meld('Geef het team een naam');
+    const cat = $('#mTeamCat').value;
+    const data = {
+      naam, categorie: cat, geslacht, format: catInfo(cat).format, code: nieuweCode(),
+      leden: {[S.user.uid]: true},
+      ledenInfo: {[S.user.uid]: {naam: S.user.displayName || S.user.email}},
+      gemaakt: serverTimestamp(),
+    };
+    if (clubT){ data.club = clubT.id; data.clubNaam = clubT.naam; }
+    const ref = await addDoc(collection(db,'teams'), data);
+    if (clubT) await updateDoc(doc(db,'clubs',clubT.id), {['teams.'+ref.id]: true});
+    sluitModal();
+    if (clubT) openClub(clubT.id);
+    else openTeam(ref.id);
+  };
+}
+
+function modalJoinTeam(){
+  openModal(`
+    <h2>Aansluiten bij team</h2>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Vraag de teamcode aan een coach van het team (te vinden onder het tabblad Team).</p>
+    <div class="veldgroep"><input class="invoer" id="mCode" placeholder="ABC123" maxlength="6"
+      style="text-transform:uppercase;text-align:center;font-family:'Barlow Condensed';font-size:24px;letter-spacing:5px"></div>
+    <button class="knop vol" id="mCodeOk">Aansluiten</button>`);
+  $('#mCodeOk').onclick = async () => {
+    const code = $('#mCode').value.trim().toUpperCase();
+    if (code.length !== 6) return meld('Code bestaat uit 6 tekens');
+    const t = await joinMetCode(code);
+    if (t){ sluitModal(); meld('Aangesloten bij ' + t.data().naam); openTeam(t.id); }
+  };
+}
+
+/* ==================== CLUBS ==================== */
+function modalNieuwClub(){
+  openModal(`
+    <h2>🏛 Nieuwe club</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px">Als club-admin maak jij teams aan en deel je trainingen voor alle teams. Coaches nodig je uit met een persoonlijke teamlink.</p>
+    <div class="veldgroep"><label>Clubnaam</label>
+      <input class="invoer" id="mClubNaam" placeholder="Bijv. RKVV Mifano" autocomplete="off"></div>
+    <button class="knop vol" id="mClubOk">Club aanmaken</button>`);
+  $('#mClubOk').onclick = async () => {
+    const naam = $('#mClubNaam').value.trim();
+    if (!naam) return meld('Vul een clubnaam in');
+    const ref = await addDoc(collection(db,'clubs'), {
+      naam, code: nieuweCode(),
+      admins: {[S.user.uid]: true},
+      adminsInfo: {[S.user.uid]: {naam: S.user.displayName || S.user.email}},
+      leden: {[S.user.uid]: true},
+      teams: {},
+      gemaakt: serverTimestamp(),
+    });
+    sluitModal(); openClub(ref.id);
+  };
+}
+
+function openClub(clubId){
+  S.clubId = clubId; S.clubTab = 'teams'; S.teamId = null;
+  stopUnsubs('club','clubTeams','clubTrainingen');
+  S.unsub.club = onSnapshot(doc(db,'clubs',clubId), snap => {
+    if (!snap.exists()){ verlaatClubView(); return; }
+    S.club = {id:snap.id, ...snap.data()};
+    renderClub();
+  });
+  /* Bezig met dynamisch laden van team-namen onder deze club */
+  toon('club');
+}
+
+function verlaatClubView(){
+  stopUnsubs('club');
+  S.clubId = null; S.club = null;
+  renderTeams(); toon('teams');
+}
+
+async function clubTeamsOphalen(clubId){
+  const ids = Object.keys(S.club.teams || {});
+  if (!ids.length) return [];
+  /* in batches van 30 vanwege Firestore limiet */
+  const result = [];
+  for (let i = 0; i < ids.length; i += 30){
+    const chunk = ids.slice(i, i+30);
+    const snap = await getDocs(query(collection(db,'teams'), where(documentId(), 'in', chunk)));
+    snap.docs.forEach(d => result.push({id:d.id, ...d.data()}));
+  }
+  return result.sort((a,b) => (a.naam||'').localeCompare(b.naam||''));
+}
+
+async function clubTrainingenOphalen(clubId){
+  const snap = await getDocs(query(collection(db,'trainingen'), where('club','==',clubId)));
+  return snap.docs.map(d => ({id:d.id, ...d.data()}))
+    .sort((a,b) => (b.week||'').localeCompare(a.week||'') || (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
+}
+
+async function renderClub(){
+  if (!S.club) return;
+  const v = $('#view-club');
+  const teams = await clubTeamsOphalen(S.clubId);
+  S.clubTeams = teams;
+  const trainingen = await clubTrainingenOphalen(S.clubId);
+  S.clubTrainingen = trainingen;
+  const tab = S.clubTab;
+  let inhoud = '';
+  if (tab === 'teams')      inhoud = htmlClubTeams(teams);
+  if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
+  if (tab === 'instel')     inhoud = htmlClubInstel();
+  v.innerHTML = `
+    <div class="kop"><button class="terug" id="naarTeams">‹</button>
+      <h1>🏛 ${esc(S.club.naam)}<span class="sub">${Object.keys(S.club.teams||{}).length} teams · clubcode ${esc(S.club.code)}</span></h1></div>
+    ${inhoud}
+    <nav class="onderbalk">
+      ${[['teams','👥','Teams'],['trainingen','📄','Trainingen'],['instel','⚙️','Club']]
+        .map(([id,ico,naam]) => `<button data-ctab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span>${naam}</button>`).join('')}
+    </nav>`;
+  v.querySelector('#naarTeams').onclick = verlaatClubView;
+  v.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { S.clubTab = b.dataset.ctab; renderClub(); });
+  koppelClubTab(v, tab, teams, trainingen);
+}
+
+function htmlClubTeams(teams){
+  return `
+    <button class="knop vol" id="clubNieuwTeam" style="margin-bottom:14px">+ Team aanmaken voor deze club</button>
+    ${teams.length ? teams.map(t => `
+      <button class="lijst-item" data-open-team="${t.id}">
+        <div class="mini-shirt" style="width:40px;height:40px;border-radius:50%;background:var(--grass);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:16px">${esc(t.format)}v${esc(t.format)}</div>
+        <div><div class="titel">${esc(t.naam)}</div>
+        <div class="meta">${esc(t.categorie || '—')} · ${Object.keys(t.leden||{}).length} coach(es)</div></div>
+        <button class="actie" data-uitnodig-team="${t.id}" data-code="${esc(t.code)}" title="Coach uitnodigen">📨</button>
+        <span class="pijl">›</span>
+      </button>`).join('')
+    : `<div class="kaart leeg">Nog geen teams in deze club.<br>Maak je eerste team aan om trainingen te kunnen delen.</div>`}`;
+}
+
+function htmlClubTrainingen(teams, trainingen){
+  return `
+    <button class="upload-knop" id="trainingUpload">📄 PDF-training toevoegen voor één of meer teams
+      <input type="file" id="trainingFile" accept="application/pdf" style="display:none"></button>
+    ${trainingen.length ? trainingen.map(t => {
+      const teamNamen = (t.teams||[]).map(tid => (teams.find(x => x.id === tid)?.naam) || '?').join(', ');
+      return `
+      <div class="training-rij">
+        <div class="ico">PDF</div>
+        <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
+          <div class="t-meta">${esc(t.week || '')}${t.week?' · ':''}${esc(teamNamen)}</div></div>
+        <div class="acties">
+          <button data-tdownload="${esc(t.url)}" title="Openen">↗</button>
+          <button data-tshare="${t.id}" title="Delen naar WhatsApp">📤</button>
+          <button data-tweg="${t.id}" data-tpath="${esc(t.path||'')}" title="Verwijderen" style="color:var(--uit)">🗑</button>
+        </div>
+      </div>`;
+    }).join('')
+    : `<div class="kaart leeg">Nog geen trainingen geüpload.<br>Upload een PDF en kies voor welke teams hij beschikbaar is.</div>`}`;
+}
+
+function htmlClubInstel(){
+  const admins = Object.values(S.club.adminsInfo || {}).map(a => esc(a.naam)).join(', ');
+  return `
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Club-uitnodiging</div>
+      <p style="font-size:13.5px;color:var(--ink-2)">Stuur deze link naar mede-admins. Zij worden dan ook beheerder van de club.</p>
+      <div class="uitnodig-link" id="clubLink">${esc(location.origin + location.pathname + '?club=' + S.club.code)}</div>
+      <button class="knop licht vol" id="kopieerClubLink" style="margin-top:8px">Link kopiëren</button>
+    </div>
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Club-admins</div>
+      <p style="font-size:14px">${admins || '—'}</p>
+    </div>
+    <button class="knop gevaar vol" id="verwijderClub">Club opheffen</button>`;
+}
+
+function koppelClubTab(v, tab, teams, trainingen){
+  if (tab === 'teams'){
+    v.querySelector('#clubNieuwTeam').onclick = () => modalNieuwTeam(S.clubId);
+    v.querySelectorAll('[data-open-team]').forEach(b => b.onclick = e => {
+      if (e.target.closest('[data-uitnodig-team]')) return;
+      openTeam(b.dataset.openTeam);
+    });
+    v.querySelectorAll('[data-uitnodig-team]').forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const team = teams.find(t => t.id === b.dataset.uitnodigTeam);
+      modalUitnodig(team);
+    });
+  }
+  if (tab === 'trainingen'){
+    const knop = v.querySelector('#trainingUpload');
+    const input = v.querySelector('#trainingFile');
+    knop.onclick = () => input.click();
+    input.onchange = e => {
+      const file = e.target.files[0]; if (!file) return;
+      modalNieuweTraining(file, teams);
+    };
+    v.querySelectorAll('[data-tdownload]').forEach(b => b.onclick = () => window.open(b.dataset.tdownload, '_blank'));
+    v.querySelectorAll('[data-tshare]').forEach(b => b.onclick = () => {
+      const t = trainingen.find(x => x.id === b.dataset.tshare);
+      const tekst = `📄 Training ${t.titel || ''}\n${t.week || ''}\n${t.url}`;
+      const wa = 'https://wa.me/?text=' + encodeURIComponent(tekst);
+      window.open(wa, '_blank');
+    });
+    v.querySelectorAll('[data-tweg]').forEach(b => b.onclick = async () => {
+      const t = trainingen.find(x => x.id === b.dataset.tweg);
+      if (!confirm(`Training "${t.titel || t.bestandsnaam}" verwijderen?`)) return;
+      try { if (t.path) await deleteObject(sRef(storage, t.path)); } catch(e){}
+      await deleteDoc(doc(db,'trainingen',t.id));
+      meld('Training verwijderd'); renderClub();
+    });
+  }
+  if (tab === 'instel'){
+    v.querySelector('#kopieerClubLink').onclick = async () => {
+      try { await navigator.clipboard.writeText($('#clubLink').textContent); meld('Link gekopieerd'); }
+      catch { meld('Link: ' + $('#clubLink').textContent); }
+    };
+    v.querySelector('#verwijderClub').onclick = async () => {
+      if (!confirm('Club opheffen? Teams en trainingen blijven bestaan, maar zijn niet meer aan deze club gekoppeld.')) return;
+      await deleteDoc(doc(db,'clubs',S.clubId));
+      verlaatClubView();
+    };
+  }
+}
+
+function modalUitnodig(team){
+  const link = location.origin + location.pathname + '?team=' + team.code;
+  openModal(`
+    <h2>Coach uitnodigen voor ${esc(team.naam)}</h2>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Stuur deze persoonlijke link naar de coach. Hij of zij klikt erop, logt in (Google óf met de teamcode) en zit direct in dit team.</p>
+    <div class="uitnodig-link" id="uitnodigLink">${esc(link)}</div>
+    <div class="rij" style="margin-top:12px">
+      <button class="knop vol" id="mUitnodigKopieer">Link kopiëren</button>
+      <button class="knop fluo vol" id="mUitnodigWa">📲 WhatsApp</button>
+    </div>
+    <p style="font-size:12px;color:var(--ink-2);margin-top:12px">Of geef de teamcode mondeling door: <b>${esc(team.code)}</b></p>`);
+  $('#mUitnodigKopieer').onclick = async () => {
+    try { await navigator.clipboard.writeText(link); meld('Link gekopieerd'); }
+    catch { meld('Link: ' + link); }
+  };
+  $('#mUitnodigWa').onclick = () => {
+    const tekst = `Je bent uitgenodigd als coach voor ${team.naam}. Open deze link:\n${link}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(tekst), '_blank');
+  };
+}
+
+function modalNieuweTraining(file, teams){
+  const vandaag = new Date();
+  const weekNr = isoWeek(vandaag);
+  openModal(`
+    <h2>Training uploaden</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px">Bestand: <b>${esc(file.name)}</b> (${(file.size/1024).toFixed(0)} KB)</p>
+    <div class="veldgroep"><label>Titel</label>
+      <input class="invoer" id="mTrTitel" value="Week ${weekNr} - training 1" autocomplete="off"></div>
+    <div class="veldgroep"><label>Week / periode</label>
+      <input class="invoer" id="mTrWeek" value="Week ${weekNr}" autocomplete="off"></div>
+    <div class="veldgroep"><label>Voor welke teams?</label>
+      <div class="team-chip-kies" id="mTrTeams">
+        ${teams.length ? teams.map(t => `<label data-pid="${t.id}"><input type="checkbox" data-tid="${t.id}"><span>${esc(t.naam)}</span></label>`).join('')
+        : '<p style="font-size:13px;color:var(--ink-2)">Maak eerst teams aan in deze club.</p>'}
+      </div>
+      <div class="rij" style="margin-top:8px">
+        <button class="knop licht klein" id="mTrAlle">Alle teams</button>
+        <button class="knop licht klein" id="mTrGeen">Geen</button>
+      </div>
+    </div>
+    <button class="knop vol" id="mTrOk">Uploaden en delen</button>`);
+  /* checkbox-label aan/uit visualiseren */
+  const sync = () => $$('#mTrTeams label').forEach(l => {
+    l.classList.toggle('aan', l.querySelector('input').checked);
+  });
+  $$('#mTrTeams input').forEach(c => c.onchange = sync);
+  $('#mTrAlle').onclick = () => { $$('#mTrTeams input').forEach(c => c.checked = true); sync(); };
+  $('#mTrGeen').onclick = () => { $$('#mTrTeams input').forEach(c => c.checked = false); sync(); };
+  $('#mTrOk').onclick = async () => {
+    const gekozen = $$('#mTrTeams input').filter(c => c.checked).map(c => c.dataset.tid);
+    if (!gekozen.length) return meld('Kies minstens één team');
+    const titel = $('#mTrTitel').value.trim() || file.name;
+    const week  = $('#mTrWeek').value.trim();
+    const knop = $('.upload-knop');
+    knop.classList.add('bezig'); knop.textContent = 'Uploaden...';
+    sluitModal();
+    try {
+      const ts = Date.now();
+      const veiligeNaam = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path = `clubs/${S.clubId}/trainingen/${ts}_${veiligeNaam}`;
+      const r = sRef(storage, path);
+      await uploadBytes(r, file, {contentType:'application/pdf'});
+      const url = await getDownloadURL(r);
+      await addDoc(collection(db,'trainingen'), {
+        club: S.clubId, clubNaam: S.club.naam,
+        titel, week, bestandsnaam: file.name, path, url,
+        teams: gekozen,
+        gemaakt: serverTimestamp(),
+        door: S.user.displayName || S.user.email || '',
+      });
+      meld('Training geüpload'); renderClub();
+    } catch(e){
+      console.error(e); meld('Upload mislukt — staat Firebase Storage aan?');
+      knop.classList.remove('bezig'); knop.textContent = '📄 PDF-training toevoegen voor één of meer teams';
+    }
+  };
+}
+
+function isoWeek(d){
+  const date = new Date(d.getTime());
+  date.setHours(0,0,0,0);
+  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+  const week1 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+
+/* ==================== TEAM ==================== */
+function openTeam(teamId){
+  S.teamId = teamId; S.teamTab = 'wedstrijden';
+  stopUnsubs('team','spelers','wedstrijden');
+  S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
+    if (!snap.exists()){ verlaatTeamView(); return; }
+    S.team = {id:snap.id, ...snap.data()};
+    if (!S.wedstrijdId) renderTeam();
+  });
+  S.unsub.spelers = onSnapshot(collection(db,'teams',teamId,'spelers'), snap => {
+    S.spelers = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (a.nummer ?? 999) - (b.nummer ?? 999) || a.naam.localeCompare(b.naam));
+    if (!S.wedstrijdId) renderTeam(); else renderWedstrijd();
+  });
+  S.unsub.wedstrijden = onSnapshot(collection(db,'teams',teamId,'wedstrijden'), snap => {
+    S.wedstrijden = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+    if (!S.wedstrijdId) renderTeam();
+  });
+  toon('team');
+}
+function verlaatTeamView(){
+  stopUnsubs('team','spelers','wedstrijden');
+  S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = [];
+  renderTeams(); toon('teams');
+}
+
+function renderTeam(){
+  if (!S.team) return;
+  const v = $('#view-team');
+  const tab = S.teamTab;
+  let inhoud = '';
+  if (tab === 'wedstrijden') inhoud = htmlWedstrijden();
+  if (tab === 'spelers')     inhoud = htmlSpelers();
+  if (tab === 'stats')       inhoud = htmlStats();
+  if (tab === 'trainingen')  inhoud = htmlTeamTrainingen();
+  if (tab === 'instellingen')inhoud = htmlInstellingen();
+  if (tab === 'help')        inhoud = htmlHandleiding();
+
+  const teamTrainingen = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
+  const ongelezen = teamTrainingen.filter(t => !S.trainingenGelezen[t.id]).length;
+
+  v.innerHTML = `
+    <div class="kop"><button class="terug" id="naarTeams">‹</button>
+      <h1>${esc(S.team.naam)}<span class="sub">${S.team.categorie ? esc(S.team.categorie)+' · ' : ''}${esc(S.team.format)} tegen ${esc(S.team.format)}</span></h1>
+      <button class="terug" id="teamInstel" title="Teaminstellingen">⚙️</button></div>
+    ${inhoud}
+    <nav class="onderbalk">
+      ${[['wedstrijden','📋','Wedstrijden'],['spelers','👕','Spelers'],['trainingen','📄','Training'],['stats','⏱','Stats'],['help','❓','Help']]
+        .map(([id,ico,naam]) => `<button data-tab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span><span class="tablabel">${naam}${id==='trainingen' && ongelezen ? '<span class="puntje"></span>' : ''}</span></button>`).join('')}
+    </nav>`;
+
+  v.querySelector('#naarTeams').onclick = verlaatTeamView;
+  v.querySelector('#teamInstel').onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
+  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.teamTab = b.dataset.tab; renderTeam(); });
+  koppelTeamTab(v, tab);
+}
+
+/* ---------- Tab: wedstrijden ---------- */
+function htmlWedstrijden(){
+  return `
+    <button class="knop vol" id="nieuweWedstrijd" style="margin-bottom:14px">+ Nieuwe wedstrijd</button>
+    ${S.wedstrijden.length ? S.wedstrijden.map(w => {
+      const voor = (w.goals||[]).filter(g => g.type==='voor').length;
+      const tegen = (w.goals||[]).filter(g => g.type==='tegen').length;
+      const uitslag = (w.goals||[]).length || analyseWedstrijd(w).kwarten
+        ? (w.thuis ? `${voor}–${tegen}` : `${tegen}–${voor}`) : '';
+      const titel = w.type === 'toernooi'
+        ? '🏆 ' + esc(w.tegenstander)
+        : (w.thuis ? esc(S.team.naam)+' – '+esc(w.tegenstander) : esc(w.tegenstander)+' – '+esc(S.team.naam));
+      const meta = w.type === 'toernooi'
+        ? `${datumNL(w.datum)} · ${w.toernooi.wedstrijden} wedstrijden · ${esc(w.format)}v${esc(w.format)}`
+        : `${datumNL(w.datum)} · ${esc(w.format)}v${esc(w.format)} · ${esc(w.formatie)}`;
+      return `
+      <button class="lijst-item" data-open-w="${w.id}">
+        <div><div class="titel">${titel}</div>
+        <div class="meta">${meta}</div></div>
+        ${uitslag ? `<span class="badge" style="font-family:'Barlow Condensed';font-size:15px;font-weight:700">${uitslag}</span>` : ''}
+        <span class="pijl">›</span></button>`;
+    }).join('')
+    : `<div class="kaart leeg">Nog geen wedstrijden.<br>Maak je eerste wedstrijd aan en zet de opstelling per kwart klaar.</div>`}`;
+}
+
+/* ---------- Tab: spelers ---------- */
+function htmlSpelers(){
+  return `
+    <button class="knop vol" id="nieuweSpeler" style="margin-bottom:14px">+ Speler toevoegen</button>
+    ${S.spelers.length ? S.spelers.map(p => `
+      <div class="speler-rij">
+        <div class="mini-shirt">${esc(p.nummer ?? '·')}</div>
+        <div class="n">${esc(p.naam)}</div>
+        <button class="actie" data-bewerk-p="${p.id}">✏️</button>
+        <button class="actie" data-weg-p="${p.id}">🗑</button>
+      </div>`).join('')
+    : `<div class="kaart leeg">Nog geen spelers.<br>Voeg je selectie toe — naam en rugnummer is genoeg.</div>`}`;
+}
+
+/* ---------- Tab: handleiding ---------- */
+function htmlHandleiding(){
+  return `<div class="hl">
+    <h3>👋 Welkom bij Opstelling</h3>
+    <p>Een app om voor je voetbalteam de opstelling te maken, wissels te beheren, speeltijd eerlijk te verdelen en de wedstrijd te loggen. Alles werkt realtime, dus collega-coaches zien direct dezelfde informatie.</p>
+
+    <h3>🚀 Snel beginnen</h3>
+    <ul>
+      <li>Voeg je <b>spelers</b> toe onder het tabblad 👕 — naam en rugnummer is genoeg.</li>
+      <li>Maak een <b>nieuwe wedstrijd</b> aan onder 📋. Kies competitie of toernooi.</li>
+      <li>Sleep spelers van de bank naar het veld of tik ze aan en tik daarna een positie.</li>
+      <li>Start de klok ▶ zodra de wedstrijd begint. Wissels tijdens het spel worden automatisch gelogd met tijdstip.</li>
+    </ul>
+
+    <h3>⚽ Spelers slepen & wisselen</h3>
+    <p>Op het veld werk je met spelersbolletjes (de <b>chips</b>):</p>
+    <ul>
+      <li><b>Slepen</b>: houd een speler vast en sleep hem naar een andere positie, een lege plek, of naar de bank.</li>
+      <li><b>Tikken</b>: één tik selecteert (gele rand). Tik daarna een doel om de speler daar neer te zetten.</li>
+      <li><b>Positie ruilen</b>: sleep een veldspeler naar een andere veldspeler — ze wisselen van positie.</li>
+      <li><b>Loopt de klok?</b> Dan wordt elke bank→veld of veld→bank actie geregistreerd als wissel met tijdstip in het log.</li>
+    </ul>
+    <div class="tip"><b>Tip:</b> de bank is gesorteerd op minste speeltijd — wie aan de beurt is, staat vooraan.</div>
+
+    <h3>🟢 Stippen onder spelers</h3>
+    <p>Onder elke chip verschijnen vanaf het tweede kwart kleine stippen — één per eerder kwart:</p>
+    <ul>
+      <li><b>Groen</b> = die periode gespeeld.</li>
+      <li><b>Rood</b> = die periode op de bank.</li>
+    </ul>
+    <p>Zo zie je in één oogopslag wie er nu echt aan de beurt is.</p>
+
+    <h3>⏱ Kwarten, helften & klok</h3>
+    <ul>
+      <li>De app stelt het juiste aantal periodes en de speeltijd in op basis van de KNVB-categorie van je team.</li>
+      <li>Tik op een periode-tab (<kbd>K1</kbd>, <kbd>K2</kbd> ... of <kbd>H1</kbd>, <kbd>H2</kbd>) om eraan te werken.</li>
+      <li>De klok stopt <b>automatisch</b> op de maximale speeltijd — je kunt hem dus niet vergeten.</li>
+      <li>Open je een leeg kwart, dan wordt de eindopstelling van het vorige kwart automatisch overgenomen.</li>
+      <li>Met ↺ zet je de klok terug op nul; wissels blijven staan.</li>
+    </ul>
+
+    <h3>📅 Wissels vooraf plannen</h3>
+    <p>Onder het wisselvak staat <b>+ Wissel plannen</b>: kies wie erin, wie eruit en na hoeveel minuten. Zodra de klok dat moment passeert, knippert de geplande wissel en trilt je telefoon. Tik op <kbd>✓</kbd> om hem door te voeren.</p>
+
+    <h3>⚽ Doelpunten registreren</h3>
+    <ul>
+      <li>Tik op de <b>⚽-knop</b> aan jouw kant van het scorebord en kies de speler die scoorde.</li>
+      <li>Tegendoelpunt: één tik op de andere ⚽-knop.</li>
+      <li>Doelpunten verschijnen in het log en in de seizoenstatistieken (topscorer).</li>
+    </ul>
+
+    <h3>🟨 Kaarten & straffen</h3>
+    <p>De gele knop naast het scorebord opent het kaartenmenu. Kies de speler en het type:</p>
+    <ul>
+      <li><b>🟨 Geel</b> — waarschuwing. Een tweede gele in dezelfde wedstrijd geeft <b>automatisch rood</b>.</li>
+      <li><b>⏱ Tijdstraf</b> — 5 minuten voor pupillen (t/m JO/MO15), 10 minuten voor JO/MO16+ en senioren.</li>
+      <li><b>🟥 Rood</b> — de speler wordt direct van het veld gehaald.</li>
+    </ul>
+
+    <h3>👑 Aanvoerder</h3>
+    <p>Onder ⚙️ in de wedstrijd kies je per wedstrijd de aanvoerder. Hij krijgt een geel <b>C</b>-bandje op zijn shirt. In de statistieken zie je hoe vaak iemand aanvoerder is geweest — handig om te rouleren.</p>
+
+    <h3>🏆 Toernooien</h3>
+    <p>Bij een nieuwe wedstrijd kies je <b>Toernooi</b>. Geef het aantal wedstrijden op en het aantal helften per wedstrijd. De tabs worden dan <kbd>W1</kbd>, <kbd>W2</kbd> ... De tegenstander per wedstrijd vul je in door op de naam in het scorebord te tikken (gestippeld onderstreept).</p>
+    <div class="tip"><b>Op één scherm:</b> alle wissels en speeltijden lopen over het hele toernooi door, zodat je in wedstrijd 4 ziet wie er bij wedstrijd 1, 2 en 3 al heeft gespeeld.</div>
+
+    <h3>🏛 Clubs & trainingen delen</h3>
+    <p>Werk je als hoofdtrainer voor meerdere teams? Maak op het startscherm een <b>club</b> aan. Daarmee kun je:</p>
+    <ul>
+      <li>Teams aanmaken die bij jouw club horen (de coaches ervan komen direct in het juiste team).</li>
+      <li>Coaches uitnodigen met een persoonlijke link (via WhatsApp), zodat ze niet eerst een teamcode hoeven te krijgen.</li>
+      <li>PDF-trainingen uploaden en aangeven voor welke teams ze beschikbaar zijn. De trainers zien ze in het 📄 Training-tabblad van hun team.</li>
+      <li>Een 🔴 stip op het training-tabblad waarschuwt coaches voor nieuwe, ongelezen trainingen.</li>
+    </ul>
+
+    <h3>🎯 Wedstrijddoel</h3>
+    <p>Onder ⚙️ in de wedstrijd vul je het wedstrijddoel in (bijv. "Opbouw van achteruit"). Het verschijnt prominent bovenaan de wedstrijd en in het wedstrijdverslag.</p>
+
+    <h3>📋 Wedstrijdverslag</h3>
+    <p>Onderaan elke wedstrijd staat <b>📋 Wedstrijdverslag</b>. De app maakt automatisch een leesbare tekst met uitslag, doelpunten, speeltijd, wissels, kaarten en aanvoerder. Pas hem aan en deel via de knop met WhatsApp, mail of klembord.</p>
+
+    <h3>👥 Meerdere coaches in één team</h3>
+    <p>Onder ⚙️ <b>Team</b> vind je de 6-letterige <b>teamcode</b>. Deel die met collega-coaches:</p>
+    <ul>
+      <li>Ze openen de app en kiezen op het startscherm <b>"Inloggen met teamcode"</b>.</li>
+      <li>Daarna zien ze direct dezelfde wedstrijden, spelers en statistieken.</li>
+      <li>Wijzigingen lopen realtime door — handig als de assistent-coach langs de lijn de wissels bijhoudt en de hoofdcoach de score.</li>
+    </ul>
+
+    <h3>📐 Format en formatie wijzigen</h3>
+    <p>Onder ⚙️ in een wedstrijd pas je het format (6×6, 8×8, 9×9, 11×11, 4×4) en de formatie aan. Spelers blijven zoveel mogelijk op hun plek staan; slots die wegvallen worden netjes opgeschoond.</p>
+
+    <h3>📊 Statistieken</h3>
+    <p>Onder ⏱ vind je het seizoensoverzicht: speeltijd, doelpunten, aanvoerdersbeurten, keeperbeurten en kaarten per speler. Sorteert vanzelf op meeste speeltijd.</p>
+
+    <h3>💡 Praktische tips</h3>
+    <ul>
+      <li>Voeg de app als <b>snelkoppeling op je startscherm</b> toe (browsermenu → "Toevoegen aan beginscherm") voor app-gevoel.</li>
+      <li>Werkt zonder problemen als de telefoon op slot gaat — de klok loopt door op de juiste tijd.</li>
+      <li>Met een powerbank langs de lijn ben je verzekerd van een hele wedstrijd.</li>
+    </ul>
+
+    <p style="font-size:12.5px;color:var(--ink-2);text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid var(--hair)">
+      Vragen of ideeën? Geef ze door aan je hoofdcoach.<br>Veel succes langs de lijn! ⚽
+    </p>
+  </div>`;
+}
+
+/* ---------- Tab: trainingen ---------- */
+function htmlTeamTrainingen(){
+  const lijst = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
+  if (!lijst.length) return `<div class="kaart leeg">Nog geen trainingen.<br>Vraag je clubadmin om trainingen te delen met dit team.</div>`;
+  return lijst.map(t => {
+    const ongelezen = !S.trainingenGelezen[t.id];
+    const datum = t.gemaakt?.seconds ? new Date(t.gemaakt.seconds*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) : '';
+    return `
+    <div class="training-rij ${ongelezen?'ongelezen':''}" data-open-training="${t.id}" data-url="${esc(t.url)}" style="cursor:pointer">
+      <div class="ico">PDF</div>
+      <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
+        <div class="t-meta">${esc(t.week || '')}${t.week && datum?' · ':''}${esc(datum)}${t.clubNaam?' · '+esc(t.clubNaam):''}</div></div>
+      <div class="acties"><button title="Openen">↗</button></div>
+    </div>`;
+  }).join('');
+}
+
+function koppelTeamTrainingen(v){
+  v.querySelectorAll('[data-open-training]').forEach(r => r.onclick = async () => {
+    const id = r.dataset.openTraining;
+    window.open(r.dataset.url, '_blank');
+    /* markeer als gelezen */
+    if (!S.trainingenGelezen[id]){
+      try { await setDoc(doc(db,'gebruikers',S.user.uid,'gelezen',id), {tijd: serverTimestamp()}); } catch(e){}
+    }
+  });
+}
+
+function htmlInstellingen(){
+  const leden = Object.values(S.team.ledenInfo || {}).map(l => esc(l.naam)).join(', ');
+  return `
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Teamcode voor coaches</div>
+      <p style="font-size:13.5px;color:var(--ink-2)">Deel deze code met collega-coaches. Zij kiezen op het startscherm "Code invoeren" en zitten direct in dit team.</p>
+      <div class="teamcode">${esc(S.team.code)}</div>
+      <button class="knop licht vol" id="deelCode">Code kopiëren</button>
+    </div>
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Coaches</div>
+      <p style="font-size:14px">${leden || '—'}</p>
+    </div>
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Categorie & speelregels</div>
+      <select class="invoer" id="iCategorie" style="margin-bottom:8px">
+        <option value="">— geen categorie —</option>
+        <optgroup label="Jongens">${Object.keys(CATEGORIEEN).map(c => `<option value="${c}" ${S.team.categorie===c?'selected':''}>${c}</option>`).join('')}</optgroup>
+        <optgroup label="Meiden">${Object.keys(CATEGORIEEN_MEIDEN).map(c => `<option value="${c}" ${S.team.categorie===c?'selected':''}>${c}</option>`).join('')}</optgroup>
+      </select>
+      <p style="font-size:12.5px;color:var(--ink-2)" id="iCatInfo">${S.team.categorie && catInfo(S.team.categorie)
+        ? 'KNVB: ' + esc(catInfo(S.team.categorie).knvb) + '. Nieuwe wedstrijden krijgen automatisch de juiste speeltijd en periodes.'
+        : 'Kies de categorie zodat nieuwe wedstrijden automatisch de juiste KNVB-speeltijd en het juiste aantal helften/kwarten krijgen.'}</p>
+    </div>
+    <button class="knop gevaar vol" id="verlaatTeam">Team verlaten</button>`;
+}
+
+function koppelTeamTab(v, tab){
+  if (tab === 'trainingen'){ koppelTeamTrainingen(v); return; }
+  if (tab === 'wedstrijden'){
+    v.querySelector('#nieuweWedstrijd').onclick = modalNieuweWedstrijd;
+    v.querySelectorAll('[data-open-w]').forEach(b => b.onclick = () => openWedstrijd(b.dataset.openW));
+  }
+  if (tab === 'spelers'){
+    v.querySelector('#nieuweSpeler').onclick = () => modalSpeler();
+    v.querySelectorAll('[data-bewerk-p]').forEach(b => b.onclick = () => modalSpeler(speler(b.dataset.bewerkP)));
+    v.querySelectorAll('[data-weg-p]').forEach(b => b.onclick = async () => {
+      const p = speler(b.dataset.wegP);
+      if (confirm(`${p.naam} verwijderen uit de selectie?`))
+        await deleteDoc(doc(db,'teams',S.teamId,'spelers',p.id));
+    });
+  }
+  if (tab === 'instellingen'){
+    v.querySelector('#deelCode').onclick = async () => {
+      try { await navigator.clipboard.writeText(S.team.code); meld('Code gekopieerd'); }
+      catch { meld('Code: ' + S.team.code); }
+    };
+    v.querySelector('#iCategorie').onchange = async e => {
+      const cat = e.target.value;
+      const data = cat ? {categorie: cat, format: catInfo(cat).format} : {categorie: null};
+      await updateDoc(doc(db,'teams',S.teamId), data);
+      meld(cat ? cat + ' ingesteld' : 'Categorie verwijderd');
+    };
+    v.querySelector('#verlaatTeam').onclick = async () => {
+      if (!confirm('Weet je zeker dat je dit team wilt verlaten?')) return;
+      const leden = {...S.team.leden}; delete leden[S.user.uid];
+      const ledenInfo = {...(S.team.ledenInfo||{})}; delete ledenInfo[S.user.uid];
+      await updateDoc(doc(db,'teams',S.teamId), {leden, ledenInfo});
+      verlaatTeamView();
+    };
+  }
+}
+
+function modalSpeler(p){
+  openModal(`
+    <h2>${p ? 'Speler bewerken' : 'Speler toevoegen'}</h2>
+    <div class="rij">
+      <div class="veldgroep" style="flex:3"><label>Naam</label>
+        <input class="invoer" id="mSpNaam" value="${esc(p?.naam||'')}" placeholder="Voornaam" autocomplete="off"></div>
+      <div class="veldgroep" style="flex:1"><label>Nr.</label>
+        <input class="invoer" id="mSpNr" value="${esc(p?.nummer ?? '')}" inputmode="numeric" placeholder="7"></div>
+    </div>
+    <button class="knop vol" id="mSpOk">${p ? 'Opslaan' : 'Toevoegen'}</button>`);
+  const ok = async (sluiten) => {
+    const naam = $('#mSpNaam').value.trim();
+    if (!naam) return meld('Vul een naam in');
+    const nr = $('#mSpNr').value.trim();
+    const data = {naam, nummer: nr === '' ? null : Number(nr)};
+    if (p) await updateDoc(doc(db,'teams',S.teamId,'spelers',p.id), data);
+    else   await addDoc(collection(db,'teams',S.teamId,'spelers'), data);
+    if (sluiten) sluitModal();
+    else { $('#mSpNaam').value=''; $('#mSpNr').value=''; $('#mSpNaam').focus(); meld(naam+' toegevoegd'); }
+  };
+  $('#mSpOk').onclick = () => ok(!!p);
+  $('#mSpNaam').addEventListener('keydown', e => { if (e.key === 'Enter') ok(false); });
+}
+
+/* ==================== WEDSTRIJD: AANMAKEN ==================== */
+function leegKwart(){ return {lineup:{}, events:[], plan:[], klok:{base:0, running:false, start:0}}; }
+
+function modalNieuweWedstrijd(){
+  if (!S.spelers.length) return meld('Voeg eerst spelers toe onder het tabblad Spelers');
+  const vandaag = new Date().toISOString().slice(0,10);
+  const cat = catInfo(S.team.categorie) || null;
+  let type = 'normaal';
+  let periodes = cat ? cat.periodes : 4;
+  let format = cat ? cat.format : S.team.format;
+  let toernooiHelften = 1;
+  const stdDuur = cat ? cat.duur : 15;
+  openModal(`
+    <h2>Nieuwe wedstrijd</h2>
+    <div class="veldgroep"><label>Type</label>
+      <div class="segment" id="mWType">
+        <button data-ty="normaal" class="actief">Competitie</button>
+        <button data-ty="toernooi">🏆 Toernooi</button>
+      </div></div>
+    ${cat ? `<p style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px">KNVB ${esc(S.team.categorie)}: ${esc(cat.knvb)} — standaarden zijn ingevuld.</p>` : ''}
+
+    <div id="mWNormaal">
+      <div class="veldgroep"><label>Tegenstander</label>
+        <input class="invoer" id="mWTegen" placeholder="Bijv. ASV'33 ${esc(S.team.categorie || 'JO11')}-2" autocomplete="off"></div>
+      <div class="veldgroep"><label>Periodes</label>
+        <div class="segment" id="mWPeriodes">
+          <button data-p="2" class="${periodes===2?'actief':''}">2 helften</button>
+          <button data-p="4" class="${periodes===4?'actief':''}">4 kwarten</button>
+        </div></div>
+    </div>
+
+    <div id="mWToernooi" style="display:none">
+      <div class="veldgroep"><label>Naam toernooi</label>
+        <input class="invoer" id="mWToernooiNaam" placeholder="Bijv. Pinkstertoernooi Mifano" autocomplete="off"></div>
+      <div class="rij">
+        <div class="veldgroep"><label>Aantal wedstrijden</label>
+          <select class="invoer" id="mWAantal">${Array.from({length:9},(_,i)=>`<option value="${i+2}" ${i+2===4?'selected':''}>${i+2}</option>`).join('')}</select></div>
+        <div class="veldgroep"><label>Helften per wedstrijd</label>
+          <div class="segment" id="mWHelften">
+            <button data-h="1" class="actief">1</button><button data-h="2">2</button>
+          </div></div>
+      </div>
+    </div>
+
+    <div class="rij">
+      <div class="veldgroep"><label>Datum</label><input class="invoer" type="date" id="mWDatum" value="${vandaag}"></div>
+      <div class="veldgroep"><label id="mWDuurLabel">Minuten per ${periodes===2?'helft':'kwart'}</label><input class="invoer" id="mWDuur" inputmode="decimal" value="${String(stdDuur).replace('.',',')}"></div>
+    </div>
+    <div class="rij">
+      <div class="veldgroep" id="mWThuisWrap"><label>Thuis of uit</label>
+        <div class="segment" id="mWThuis"><button data-t="1" class="actief">Thuis</button><button data-t="0">Uit</button></div></div>
+      <div class="veldgroep"><label>Format</label>
+        <div class="segment" id="mWFormat">${['4','6','8','9','11'].map(f =>
+          `<button data-f="${f}" class="${format===f?'actief':''}">${f}</button>`).join('')}</div></div>
+    </div>
+    <button class="knop vol" id="mWOk">Aanmaken</button>`);
+
+  let thuis = true;
+  const duurLabel = () => {
+    $('#mWDuurLabel').textContent = type === 'toernooi'
+      ? (toernooiHelften === 1 ? 'Minuten per wedstrijd' : 'Minuten per helft')
+      : 'Minuten per ' + (periodes===2?'helft':'kwart');
+  };
+  $$('#mWType button').forEach(b => b.onclick = () => {
+    $$('#mWType button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief');
+    type = b.dataset.ty;
+    $('#mWNormaal').style.display = type === 'normaal' ? '' : 'none';
+    $('#mWToernooi').style.display = type === 'toernooi' ? '' : 'none';
+    $('#mWThuisWrap').style.display = type === 'normaal' ? '' : 'none';
+    if (type === 'toernooi') $('#mWDuur').value = '15';
+    else $('#mWDuur').value = String(stdDuur).replace('.',',');
+    duurLabel();
+  });
+  $$('#mWThuis button').forEach(b => b.onclick = () => { $$('#mWThuis button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief'); thuis = b.dataset.t==='1'; });
+  $$('#mWFormat button').forEach(b => b.onclick = () => { $$('#mWFormat button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief'); format = b.dataset.f; });
+  $$('#mWHelften button').forEach(b => b.onclick = () => { $$('#mWHelften button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief'); toernooiHelften = Number(b.dataset.h); duurLabel(); });
+  $$('#mWPeriodes button').forEach(b => b.onclick = () => {
+    $$('#mWPeriodes button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief');
+    periodes = Number(b.dataset.p);
+    duurLabel();
+    /* KNVB-totaal gelijk houden: 2×30 ↔ 4×15 */
+    const huidig = parseFloat(($('#mWDuur').value||'').replace(',','.'));
+    if (huidig) $('#mWDuur').value = String(periodes===2 ? huidig*2 : huidig/2).replace('.',',');
+  });
+
+  $('#mWOk').onclick = async () => {
+    const duur = parseFloat(($('#mWDuur').value||String(stdDuur)).replace(',','.')) || stdDuur;
+    let w;
+    if (type === 'toernooi'){
+      const aantal = Number($('#mWAantal').value);
+      w = {
+        type: 'toernooi',
+        tegenstander: $('#mWToernooiNaam').value.trim() || 'Toernooi',
+        thuis: true, format,
+        toernooi: {wedstrijden: aantal, helften: toernooiHelften},
+        tegenstanders: {},
+        periodes: aantal * toernooiHelften,
+      };
+    } else {
+      w = {
+        type: 'normaal',
+        tegenstander: $('#mWTegen').value.trim() || 'Tegenstander',
+        thuis, format, periodes,
+      };
+    }
+    const kwarten = {};
+    for (let i = 1; i <= w.periodes; i++) kwarten[i] = leegKwart();
+    Object.assign(w, {
+      formatie: Object.keys(FORMATIES[format])[0],
+      datum: $('#mWDatum').value || vandaag,
+      kwartduur: duur,
+      selectie: S.spelers.map(p => p.id),
+      goals: [],
+      kaarten: [],
+      kwarten,
+      gemaakt: serverTimestamp(),
+    });
+    const ref = await addDoc(collection(db,'teams',S.teamId,'wedstrijden'), w);
+    sluitModal(); openWedstrijd(ref.id);
+  };
+}
+
+/* ==================== WEDSTRIJD: OPENEN & OPSLAAN ==================== */
+function openWedstrijd(wid){
+  S.wedstrijdId = wid; S.kwart = '1'; S.geselecteerd = null;
+  stopUnsubs('wedstrijd');
+  S.unsub.wedstrijd = onSnapshot(doc(db,'teams',S.teamId,'wedstrijden',wid), snap => {
+    if (!snap.exists()){ sluitWedstrijd(); return; }
+    if (snap.metadata.hasPendingWrites) return;            // eigen schrijfactie
+    if (Date.now() - S.lokaalTot < 1800) return;           // lokale wijziging onderweg
+    S.wedstrijd = snap.data(); renderWedstrijd();
+  });
+  toon('wedstrijd');
+}
+function sluitWedstrijd(){
+  stopUnsubs('wedstrijd');
+  clearInterval(S.klokInterval); S.klokInterval = null;
+  S.wedstrijd = null; S.wedstrijdId = null;
+  renderTeam(); toon('team');
+}
+function bewaarWedstrijd(){
+  S.lokaalTot = Date.now();
+  clearTimeout(S.saveTimer);
+  S.saveTimer = setTimeout(() => {
+    setDoc(doc(db,'teams',S.teamId,'wedstrijden',S.wedstrijdId), S.wedstrijd)
+      .catch(e => meld('Opslaan mislukt: ' + e.code));
+  }, 600);
+}
+
+/* ==================== KLOK ==================== */
+const huidigKwart = () => S.wedstrijd.kwarten[S.kwart];
+function klokSec(k){ return k.klok.base + (k.klok.running ? (Date.now() - k.klok.start)/1000 : 0); }
+function kwartLive(k){ return k.klok.running || k.klok.base > 0; }
+function kwartDuurSec(w,k){ const e = klokSec(k); return e > 5 ? Math.round(e) : Math.round(w.kwartduur*60); }
+
+function klokStartPauze(){
+  const k = huidigKwart();
+  if (k.klok.running){ k.klok.base = klokSec(k); k.klok.running = false; }
+  else { k.klok.start = Date.now(); k.klok.running = true; }
+  bewaarWedstrijd(); renderWedstrijd();
+}
+function klokReset(){
+  const k = huidigKwart();
+  if (!confirm('Klok van deze periode op nul zetten?' + (k.events.length ? '\nGeregistreerde wissels blijven staan.' : ''))) return;
+  k.klok = {base:0, running:false, start:0};
+  bewaarWedstrijd(); renderWedstrijd();
+}
+function tikKlok(){
+  const w = S.wedstrijd; if (!w) return;
+  const k = huidigKwart();
+  /* automatische stop op de maximale speeltijd */
+  if (k.klok.running && klokSec(k) >= w.kwartduur*60){
+    k.klok.base = Math.round(w.kwartduur*60);
+    k.klok.running = false;
+    bewaarWedstrijd();
+    if (navigator.vibrate) navigator.vibrate([300,120,300,120,300]);
+    meld(`⏱ Einde ${periodeOmschrijving(w)} — klok gestopt op ${mmss(w.kwartduur*60)}`);
+    renderWedstrijd();
+    return;
+  }
+  const el = $('#klokTijd'); if (el) el.textContent = mmss(klokSec(k));
+  /* geplande wissels laten oplichten zodra hun moment daar is */
+  const sec = klokSec(k);
+  (k.plan||[]).forEach((p,i) => {
+    const item = $(`[data-plan-i="${i}"]`);
+    if (!item) return;
+    if (sec >= p.min*60 && !item.classList.contains('nu')){
+      item.classList.add('nu');
+      if (navigator.vibrate) navigator.vibrate([180,90,180]);
+      meld(`Geplande wissel: ${spelerNaam(p.in)} erin voor ${spelerNaam(p.uit)}`);
+    }
+  });
+}
+
+/* ==================== GEPLANDE WISSELS ==================== */
+function modalPlanWissel(){
+  const k = huidigKwart();
+  const l = effectieveLineup(k);
+  const veldSpelers = Object.values(l).filter(pid => speler(pid));
+  const bankSpelers = (S.wedstrijd.selectie||[]).filter(pid => !Object.values(l).includes(pid) && speler(pid));
+  if (!veldSpelers.length) return meld('Zet eerst een opstelling neer voor deze periode');
+  if (!bankSpelers.length) return meld('Er staat niemand op de bank om in te brengen');
+  const optie = pid => `<option value="${pid}">${esc(spelerNr(pid))} · ${esc(spelerNaam(pid))}</option>`;
+  openModal(`
+    <h2>Wissel plannen — ${esc(periodeOmschrijving(S.wedstrijd))}</h2>
+    <div class="veldgroep"><label>Erin (van de bank)</label>
+      <select class="invoer" id="mPlanIn">${bankSpelers.map(optie).join('')}</select></div>
+    <div class="veldgroep"><label>Eruit (van het veld)</label>
+      <select class="invoer" id="mPlanUit">${veldSpelers.map(optie).join('')}</select></div>
+    <div class="veldgroep"><label>Na hoeveel minuten</label>
+      <input class="invoer" id="mPlanMin" inputmode="decimal" value="${Math.round(S.wedstrijd.kwartduur/2)}"></div>
+    <button class="knop vol" id="mPlanOk">Wissel inplannen</button>
+    <p style="font-size:12.5px;color:var(--ink-2);margin-top:10px;line-height:1.5">Zodra de kwartklok dit moment passeert, licht de wissel op in het wisselvak. Tik dan op ✓ om hem door te voeren — de echte wisseltijd wordt geregistreerd.</p>`);
+  $('#mPlanOk').onclick = () => {
+    const min = parseFloat(($('#mPlanMin').value||'').replace(',','.'));
+    if (!(min >= 0)) return meld('Vul een geldig aantal minuten in');
+    const k2 = huidigKwart();
+    (k2.plan ||= []).push({in: $('#mPlanIn').value, uit: $('#mPlanUit').value, min});
+    k2.plan.sort((a,b) => a.min - b.min);
+    sluitModal(); bewaarWedstrijd(); renderWedstrijd();
+  };
+}
+
+function voerPlanUit(i){
+  const k = huidigKwart();
+  const p = (k.plan||[])[i];
+  if (!p) return;
+  const l = effectieveLineup(k);
+  const slot = Object.keys(l).find(s => l[s] === p.uit);
+  if (!slot) return meld(`${spelerNaam(p.uit)} staat niet (meer) op het veld`);
+  if (Object.values(l).includes(p.in)) return meld(`${spelerNaam(p.in)} staat al op het veld`);
+  if (kwartLive(k)){
+    const sec = Math.round(klokSec(k));
+    k.events.push({in: p.in, uit: p.uit, slot, sec});
+    meld(`${spelerNaam(p.in)} erin, ${spelerNaam(p.uit)} eruit · ${mmss(sec)}`);
+  } else {
+    /* klok nog niet gestart: direct in de startopstelling doorvoeren */
+    k.lineup[slot] = p.in;
+    for (const e of k.events) if (e.in === p.uit && e.slot === slot) e.in = p.in;
+  }
+  k.plan.splice(i,1);
+  bewaarWedstrijd(); renderWedstrijd();
+}
+
+/* ==================== DOELPUNTEN ==================== */
+function registreerGoal({type, pid = null}){
+  const w = S.wedstrijd;
+  const sec = Math.round(klokSec(huidigKwart()));
+  (w.goals ||= []).push({type, pid, kwart: S.kwart, sec});
+  if (navigator.vibrate) navigator.vibrate(type === 'voor' ? [90,60,90,60,200] : 120);
+  meld(type === 'voor' ? `⚽ GOAL! ${pid ? spelerNaam(pid) : S.team.naam}` : `Tegendoelpunt · ${mmss(sec)}`);
+  bewaarWedstrijd(); renderWedstrijd();
+}
+
+function modalGoalVoor(){
+  const k = huidigKwart();
+  const l = effectieveLineup(k);
+  const veldSpelers = Object.values(l).filter(pid => speler(pid));
+  if (!veldSpelers.length){ registreerGoal({type:'voor'}); return; }
+  openModal(`
+    <h2>⚽ Wie scoorde er?</h2>
+    <div class="goal-kies">${veldSpelers.map(pid => `
+      <div class="chip" data-goal-pid="${pid}" style="cursor:pointer">
+        <div class="shirt">${esc(spelerNr(pid))}</div>
+        <div class="naam">${esc(spelerNaam(pid))}</div>
+      </div>`).join('')}</div>
+    <button class="knop licht vol" id="mGoalOnbekend" style="margin-top:10px">Eigen doelpunt tegenstander / onbekend</button>`);
+  $$('#modalInhoud [data-goal-pid]').forEach(c => c.onclick = () => { sluitModal(); registreerGoal({type:'voor', pid: c.dataset.goalPid}); });
+  $('#mGoalOnbekend').onclick = () => { sluitModal(); registreerGoal({type:'voor'}); };
+}
+
+/* ==================== KAARTEN & STRAFFEN ==================== */
+function modalKaart(){
+  const w = S.wedstrijd;
+  const k = huidigKwart();
+  const l = effectieveLineup(k);
+  const veldSpelers = Object.values(l).filter(pid => speler(pid));
+  const bankSpelers = (w.selectie||[]).filter(pid => !Object.values(l).includes(pid) && speler(pid));
+  const alle = [...veldSpelers, ...bankSpelers];
+  if (!alle.length) return meld('Voeg eerst spelers toe aan de selectie');
+  const optie = pid => `<option value="${pid}">${esc(spelerNr(pid))} · ${esc(spelerNaam(pid))}${veldSpelers.includes(pid)?' (veld)':' (bank)'}</option>`;
+  const duur = tijdstrafSec();
+  openModal(`
+    <h2>Kaart of straf</h2>
+    <div class="veldgroep"><label>Speler</label>
+      <select class="invoer" id="mKSpeler">${alle.map(optie).join('')}</select></div>
+    <div class="veldgroep"><label>Type</label>
+      <div class="segment" id="mKType">
+        <button data-t="geel" class="actief">🟨 Geel</button>
+        <button data-t="tijd">⏱ Tijdstraf</button>
+        <button data-t="rood">🟥 Rood</button>
+      </div></div>
+    <p style="font-size:12.5px;color:var(--ink-2);margin-bottom:14px;line-height:1.5" id="mKUitleg">
+      <b>KNVB:</b> een gele kaart is een waarschuwing. Bij een tweede gele in dezelfde wedstrijd volgt rood. In de B-categorie geldt een tijdstrafregeling: ${Math.round(duur/60)} minuten voor deze leeftijd${duur===300?' (pupillen)':' (junioren/senioren)'}.
+    </p>
+    <button class="knop vol" id="mKOk">Registreren</button>`);
+  let type = 'geel';
+  $$('#mKType button').forEach(b => b.onclick = () => {
+    $$('#mKType button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief'); type = b.dataset.t;
+  });
+  $('#mKOk').onclick = () => {
+    const pid = $('#mKSpeler').value;
+    const sec = Math.round(klokSec(k));
+    const kaart = {pid, type, kwart: S.kwart, sec};
+    if (type === 'tijd') kaart.duur = duur;
+    (w.kaarten ||= []).push(kaart);
+    /* tweede geel in dezelfde wedstrijd = rood */
+    if (type === 'geel'){
+      const aantalGeel = w.kaarten.filter(c => c.pid === pid && c.type === 'geel').length;
+      if (aantalGeel >= 2){
+        w.kaarten.push({pid, type:'rood', kwart: S.kwart, sec, auto:true});
+        meld(`Tweede gele kaart → rode kaart voor ${spelerNaam(pid)}`);
+      }
+    }
+    /* bij rood: speler verlaat het veld */
+    if (type === 'rood' || w.kaarten[w.kaarten.length-1].type === 'rood'){
+      const lineup = effectieveLineup(k);
+      const slot = Object.keys(lineup).find(s => lineup[s] === pid);
+      if (slot){
+        if (kwartLive(k)) k.events.push({in: null, uit: pid, slot, sec});
+        else delete k.lineup[slot];
+      }
+    }
+    if (navigator.vibrate) navigator.vibrate(type==='rood' ? [300,100,300] : 180);
+    sluitModal(); bewaarWedstrijd(); renderWedstrijd();
+    meld(`${KAART_NAAM[type]} voor ${spelerNaam(pid)} geregistreerd`);
+  };
+}
+
+/* ==================== WEDSTRIJDVERSLAG ==================== */
+function genereerVerslag(){
+  const w = S.wedstrijd;
+  const voor = (w.goals||[]).filter(g => g.type==='voor').length;
+  const tegen = (w.goals||[]).filter(g => g.type==='tegen').length;
+  const uitslag = w.thuis ? `${voor}–${tegen}` : `${tegen}–${voor}`;
+  const wedstrijdtitel = isToernooi(w)
+    ? `🏆 ${w.tegenstander}`
+    : (w.thuis ? `${S.team.naam} – ${w.tegenstander}` : `${w.tegenstander} – ${S.team.naam}`);
+  const ww = voor > tegen ? 'gewonnen' : voor < tegen ? 'verloren' : 'gelijkgespeeld';
+
+  const lines = [];
+  lines.push(`${wedstrijdtitel}`);
+  lines.push(`${new Date(w.datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`);
+  lines.push('');
+  if (w.doel){
+    lines.push(`🎯 Wedstrijddoel: ${w.doel}`);
+    lines.push('');
+  }
+  if (voor + tegen > 0 || analyseWedstrijd(w).kwarten){
+    lines.push(`Eindstand: ${uitslag} (${ww})`);
+    lines.push('');
+  }
+
+  /* doelpuntenmakers */
+  const scorers = {};
+  for (const g of (w.goals||[])) if (g.type==='voor' && g.pid) scorers[g.pid] = (scorers[g.pid]||0)+1;
+  const top = Object.entries(scorers).sort((a,b) => b[1]-a[1]);
+  if (top.length){
+    lines.push('Doelpuntenmakers:');
+    for (const [pid, n] of top) lines.push(`• ${spelerNaam(pid)}${n>1?` (${n}×)`:''}`);
+    lines.push('');
+  }
+
+  /* aanvoerder */
+  if (w.aanvoerder) {
+    lines.push(`Aanvoerder: ${spelerNaam(w.aanvoerder)}`);
+    lines.push('');
+  }
+
+  /* speeltijd-overzicht */
+  const a = analyseWedstrijd(w);
+  if (a.kwarten){
+    lines.push('Speeltijd:');
+    const sorted = [...(w.selectie||[])].filter(pid => speler(pid) && a.tijd[pid])
+      .sort((x,y) => (a.tijd[y]||0) - (a.tijd[x]||0));
+    for (const pid of sorted){
+      const k = a.keeper[pid] ? ` (${a.keeper[pid]}× keeper)` : '';
+      lines.push(`• ${spelerNaam(pid)}: ${uurMin(a.tijd[pid])}${k}`);
+    }
+    const nietGespeeld = (w.selectie||[]).filter(pid => speler(pid) && !a.tijd[pid]);
+    if (nietGespeeld.length) lines.push(`• Niet ingezet: ${nietGespeeld.map(spelerNaam).join(', ')}`);
+    lines.push('');
+  }
+
+  /* wissels per periode */
+  const heeftWissels = periodeNrs(w).some(nr => (w.kwarten[nr]?.events||[]).length);
+  if (heeftWissels){
+    lines.push('Wissels:');
+    for (const nr of periodeNrs(w)){
+      const k = w.kwarten[nr];
+      if (!k.events?.length) continue;
+      lines.push(`  ${periodeLabel(w, nr)}:`);
+      for (const e of [...k.events].sort((a,b)=>a.sec-b.sec)){
+        const t = mmss(e.sec);
+        if (e.in && e.uit) lines.push(`  • ${t} — ${spelerNaam(e.in)} in voor ${spelerNaam(e.uit)}`);
+        else if (e.in)     lines.push(`  • ${t} — ${spelerNaam(e.in)} erin`);
+        else if (e.uit)    lines.push(`  • ${t} — ${spelerNaam(e.uit)} eruit`);
+      }
+    }
+    lines.push('');
+  }
+
+  /* kaarten */
+  if ((w.kaarten||[]).filter(c => !c.auto).length){
+    lines.push('Kaarten:');
+    for (const c of [...w.kaarten].filter(c => !c.auto).sort((a,b)=>a.sec-b.sec)){
+      const lbl = periodeLabel(w, String(c.kwart));
+      const txt = c.type === 'tijd' ? `tijdstraf ${Math.round(c.duur/60)} min` : KAART_NAAM[c.type];
+      lines.push(`• ${spelerNaam(c.pid)} — ${txt} (${lbl}, ${mmss(c.sec)})`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n').trim();
+}
+
+function modalVerslag(){
+  const tekst = genereerVerslag();
+  openModal(`
+    <h2>📋 Wedstrijdverslag</h2>
+    <textarea class="invoer" id="mVTekst" style="min-height:280px;font-family:inherit;line-height:1.55;resize:vertical;font-size:13.5px">${esc(tekst)}</textarea>
+    <p style="font-size:12px;color:var(--ink-2);margin:8px 0 14px">Je kunt de tekst nog aanpassen voordat je hem deelt.</p>
+    <button class="knop vol" id="mVDeel">📤 Delen / kopiëren</button>`);
+  $('#mVDeel').onclick = async () => {
+    const t = $('#mVTekst').value;
+    try {
+      if (navigator.share) await navigator.share({title:'Wedstrijdverslag', text:t});
+      else { await navigator.clipboard.writeText(t); meld('Verslag gekopieerd'); }
+    } catch { try { await navigator.clipboard.writeText(t); meld('Verslag gekopieerd'); } catch { meld('Kon niet kopiëren'); } }
+  };
+}
+
+/* ==================== OPSTELLING-LOGICA ==================== */
+/* k.lineup = startopstelling van het kwart; events bouwen daar live op voort */
+function effectieveLineup(k){
+  const l = {...k.lineup};
+  for (const e of [...k.events].sort((a,b) => a.sec - b.sec)){
+    if (e.in) l[e.slot] = e.in;
+    else delete l[e.slot];
+  }
+  return l;
+}
+function plaats(pid, slotId){
+  const k = huidigKwart(), live = kwartLive(k);
+  const l = effectieveLineup(k);
+  const huidigeSlot = Object.keys(l).find(s => l[s] === pid);     // staat pid al op het veld?
+  const bezet = l[slotId];
+
+  if (huidigeSlot === slotId) return;
+  if (huidigeSlot){                                                // veld → veld: positiewissel
+    delete k.lineup[huidigeSlot];
+    if (k.lineup[slotId] !== undefined || bezet){
+      // ruil in startopstelling (speeltijd verandert niet)
+      const ander = k.lineup[slotId];
+      if (ander !== undefined){ k.lineup[huidigeSlot] = ander; }
+      // events die naar deze slots verwijzen laten we staan; bij live ruilen we simpelweg de startposities
+      for (const e of k.events){ if (e.slot === slotId) e.slot = huidigeSlot; else if (e.slot === huidigeSlot) e.slot = slotId; }
+    }
+    k.lineup[slotId] = pid;
+  } else if (live){                                                // bank → veld tijdens het spel = wissel
+    const sec = Math.round(klokSec(k));
+    k.events.push({in: pid, uit: bezet || null, slot: slotId, sec});
+    if (bezet) meld(`${spelerNaam(pid)} erin, ${spelerNaam(bezet)} eruit · ${mmss(sec)}`);
+  } else {                                                         // vooraf klaarzetten
+    k.lineup[slotId] = pid;                                        // bezet schuift vanzelf naar de bank
+  }
+  S.geselecteerd = null;
+  bewaarWedstrijd(); renderWedstrijd();
+}
+function naarBank(pid){
+  const k = huidigKwart(), live = kwartLive(k);
+  const l = effectieveLineup(k);
+  const slot = Object.keys(l).find(s => l[s] === pid);
+  if (!slot) { S.geselecteerd = null; renderWedstrijd(); return; }
+  if (live){
+    const sec = Math.round(klokSec(k));
+    k.events.push({in: null, uit: pid, slot, sec});
+    meld(`${spelerNaam(pid)} eruit · ${mmss(sec)}`);
+  } else delete k.lineup[slot];
+  S.geselecteerd = null;
+  bewaarWedstrijd(); renderWedstrijd();
+}
+function verwijderEvent(i){
+  huidigKwart().events.splice(i,1);
+  bewaarWedstrijd(); renderWedstrijd();
+}
+function kopieerVorigKwart(){
+  const nr = Number(S.kwart);
+  if (nr === 1) return;
+  const vorig = S.wedstrijd.kwarten[nr-1];
+  huidigKwart().lineup = effectieveLineup(vorig);   // eindopstelling vorig kwart als start
+  bewaarWedstrijd(); renderWedstrijd();
+  meld('Eindopstelling van kwart ' + (nr-1) + ' overgenomen');
+}
+
+/* ==================== SPEELTIJD-BEREKENING ==================== */
+function kwartGespeeld(k){ return Object.keys(k.lineup||{}).length > 0 || (k.events||[]).length > 0; }
+
+function analyseKwart(w, k){
+  const res = {tijd:{}, keeper:new Set(), lijn:{}};                 // lijn: pid -> {V:n,M:n,A:n,K:n}
+  if (!kwartGespeeld(k)) return res;
+  const D = kwartDuurSec(w, k);
+  const aan = {};
+  const telLijn = (pid, l) => { (res.lijn[pid] ||= {}); res.lijn[pid][l] = (res.lijn[pid][l]||0) + 1; };
+  for (const [slot, pid] of Object.entries(k.lineup||{})){
+    aan[pid] = 0; telLijn(pid, slotLijn(slot));
+    if (slot === 'K') res.keeper.add(pid);
+  }
+  for (const e of [...(k.events||[])].sort((a,b) => a.sec - b.sec)){
+    const sec = Math.min(e.sec, D);
+    if (e.uit && aan[e.uit] != null){
+      res.tijd[e.uit] = (res.tijd[e.uit]||0) + Math.max(0, sec - aan[e.uit]);
+      delete aan[e.uit];
+    }
+    if (e.in){
+      aan[e.in] = sec; telLijn(e.in, slotLijn(e.slot));
+      if (e.slot === 'K') res.keeper.add(e.in);
+    }
+  }
+  for (const [pid, start] of Object.entries(aan))
+    res.tijd[pid] = (res.tijd[pid]||0) + Math.max(0, D - start);
+  return res;
+}
+function analyseWedstrijd(w){
+  const tot = {tijd:{}, keeper:{}, lijn:{}, kwarten:0};
+  for (const nr of periodeNrs(w)){
+    const k = w.kwarten[nr]; if (!k || !kwartGespeeld(k)) continue;
+    tot.kwarten++;
+    const a = analyseKwart(w, k);
+    for (const [pid, s] of Object.entries(a.tijd)) tot.tijd[pid] = (tot.tijd[pid]||0) + s;
+    for (const pid of a.keeper) tot.keeper[pid] = (tot.keeper[pid]||0) + 1;
+    for (const [pid, l] of Object.entries(a.lijn)){
+      tot.lijn[pid] ||= {};
+      for (const [ln, n] of Object.entries(l)) tot.lijn[pid][ln] = (tot.lijn[pid][ln]||0) + n;
+    }
+  }
+  return tot;
+}
+
+/* ==================== STATISTIEK-TAB ==================== */
+function htmlStats(){
+  if (!S.spelers.length) return `<div class="kaart leeg">Voeg eerst spelers toe.</div>`;
+  const tot = {tijd:{}, keeper:{}, lijn:{}, wedstrijden:{}, goals:{}, geel:{}, rood:{}, tijd_:{}, aanv:{}};
+  for (const w of S.wedstrijden){
+    for (const g of (w.goals||[])) if (g.type==='voor' && g.pid) tot.goals[g.pid] = (tot.goals[g.pid]||0) + 1;
+    for (const c of (w.kaarten||[])){
+      if (c.auto) continue;
+      if (c.type === 'geel') tot.geel[c.pid] = (tot.geel[c.pid]||0) + 1;
+      if (c.type === 'rood') tot.rood[c.pid] = (tot.rood[c.pid]||0) + 1;
+      if (c.type === 'tijd') tot.tijd_[c.pid] = (tot.tijd_[c.pid]||0) + 1;
+    }
+    if (w.aanvoerder) tot.aanv[w.aanvoerder] = (tot.aanv[w.aanvoerder]||0) + 1;
+    const a = analyseWedstrijd(w);
+    if (!a.kwarten) continue;
+    for (const [pid, s] of Object.entries(a.tijd)){
+      tot.tijd[pid] = (tot.tijd[pid]||0) + s;
+      tot.wedstrijden[pid] = (tot.wedstrijden[pid]||0) + 1;
+    }
+    for (const [pid, n] of Object.entries(a.keeper)) tot.keeper[pid] = (tot.keeper[pid]||0) + n;
+    for (const [pid, l] of Object.entries(a.lijn)){
+      tot.lijn[pid] ||= {};
+      for (const [ln, n] of Object.entries(l)) tot.lijn[pid][ln] = (tot.lijn[pid][ln]||0) + n;
+    }
+  }
+  const rijen = [...S.spelers].sort((a,b) => (tot.tijd[b.id]||0) - (tot.tijd[a.id]||0));
+  const heeftData = Object.keys(tot.tijd).length > 0;
+  return `
+    ${heeftData ? '' : `<div class="kaart leeg" style="margin-bottom:12px">Nog geen gespeelde wedstrijden.<br>Zodra je opstellingen maakt, verschijnt hier automatisch de speeltijd per speler.</div>`}
+    <table class="stat-tabel">
+      <thead><tr><th>Speler</th><th>Wed.</th><th>Speeltijd</th><th>⚽</th><th>C</th><th>K</th><th>🟨</th><th>🟥</th></tr></thead>
+      <tbody>${rijen.map(p => {
+        const l = tot.lijn[p.id] || {};
+        return `<tr>
+          <td class="naam-cel">${esc(p.naam)}</td>
+          <td>${tot.wedstrijden[p.id]||0}</td>
+          <td class="tijd-cel">${tot.tijd[p.id] ? uurMin(tot.tijd[p.id]) : '—'}</td>
+          <td style="font-weight:700">${tot.goals[p.id]||0}</td>
+          <td>${tot.aanv[p.id] ? tot.aanv[p.id]+'×' : ''}</td>
+          <td>${tot.keeper[p.id]||0}</td>
+          <td>${tot.geel[p.id]||0}</td>
+          <td>${tot.rood[p.id]||0}</td></tr>`;
+      }).join('')}</tbody>
+    </table>
+    <p style="font-size:12px;color:var(--ink-2);margin-top:10px;line-height:1.5">
+      ⚽ doelpunten · <b>C</b> aanvoerdersbeurten · <b>K</b> periodes als keeper · 🟨 gele kaarten · 🟥 rode kaarten.
+      Speeltijd komt van de kwartklok; zonder klok telt de ingestelde periodeduur.</p>`;
+}
+
+/* ==================== WEDSTRIJD: WEERGAVE ==================== */
+function renderWedstrijd(){
+  const w = S.wedstrijd; if (!w) return;
+  w.goals ||= [];
+  w.kaarten ||= [];
+  const k = huidigKwart();
+  const slots = bouwSlots(w.format, w.formatie);
+  const lineup = effectieveLineup(k);
+  const opVeld = new Set(Object.values(lineup));
+  const live = kwartLive(k);
+  const aKwart = analyseKwart(w, k);
+  const aWed = analyseWedstrijd(w);
+  const bank = (w.selectie||[]).filter(pid => !opVeld.has(pid) && speler(pid))
+    .sort((a,b) => (aWed.tijd[a]||0) - (aWed.tijd[b]||0));      // minst gespeeld vooraan
+
+  /* historie: per eerder gespeeld kwart — speelde (groen) of bank (rood) */
+  const historie = {};
+  for (let nr = 1; nr < Number(S.kwart); nr++){
+    const kk = w.kwarten[nr];
+    if (!kk || !kwartGespeeld(kk)) continue;
+    const a = analyseKwart(w, kk);
+    for (const pid of (w.selectie||[]))
+      (historie[pid] ||= []).push({nr, speelde: (a.tijd[pid]||0) > 0});
+  }
+  const dotsHtml = pid => (historie[pid]||[]).length
+    ? `<div class="dots">${historie[pid].map(h =>
+        `<span class="dot ${h.speelde?'s':'b'}" title="${esc(periodeLabel(w, String(h.nr)))}: ${h.speelde?'gespeeld':'bank'}"></span>`).join('')}</div>`
+    : '';
+
+  const chipHtml = (pid, bron, slotId='') => {
+    const sel = S.geselecteerd?.pid === pid;
+    const aanv = w.aanvoerder === pid;
+    return `<div class="chip ${slotId==='K'?'keeper':''} ${sel?'geselecteerd':''}"
+      data-chip="${pid}" data-bron="${bron}" data-chipslot="${slotId}">
+      <div class="shirt">${esc(spelerNr(pid))}${aanv ? '<span class="aanvoerder-band">C</span>' : ''}</div>
+      <div class="naam">${esc(spelerNaam(pid))}</div>${dotsHtml(pid)}</div>`;
+  };
+
+  /* score */
+  /* score: bij een toernooi telt alleen de huidige wedstrijd mee */
+  const inHuidigeW = g => !isToernooi(w) || toernooiWnr(w, g.kwart) === toernooiWnr(w);
+  const voor = w.goals.filter(g => g.type==='voor' && inHuidigeW(g)).length;
+  const tegen = w.goals.filter(g => g.type==='tegen' && inHuidigeW(g)).length;
+  const tegenNaam = isToernooi(w)
+    ? ((w.tegenstanders||{})[toernooiWnr(w)] || 'Tegenstander '+toernooiWnr(w))
+    : w.tegenstander;
+  const sbLinks  = w.thuis ? {naam:S.team.naam, n:voor, knop:'goalVoor'}  : {naam:tegenNaam, n:tegen, knop:'goalTegen'};
+  const sbRechts = w.thuis ? {naam:tegenNaam, n:tegen, knop:'goalTegen'} : {naam:S.team.naam, n:voor, knop:'goalVoor'};
+
+  const v = $('#view-wedstrijd');
+  v.innerHTML = `
+    <div class="kop"><button class="terug" id="naarTeam">‹</button>
+      <h1>${isToernooi(w)
+        ? '🏆 '+esc(w.tegenstander)
+        : (w.thuis ? esc(S.team.naam)+' – '+esc(w.tegenstander) : esc(w.tegenstander)+' – '+esc(S.team.naam))}
+      <span class="sub">${datumNL(w.datum)} · ${isToernooi(w) ? w.toernooi.wedstrijden+' wedstrijden · ' : ''}${esc(w.formatie)}</span></h1>
+      <button class="terug" id="wInstellingen" title="Wedstrijdinstellingen">⚙️</button></div>
+    ${w.doel ? `<div class="kaart" style="background:rgba(214,251,65,.18);border-left:3px solid var(--grass);font-size:13.5px;color:var(--ink);padding:9px 12px;margin-bottom:10px"><b>🎯 Doel:</b> ${esc(w.doel)}</div>` : ''}
+
+    <div class="scorebord">
+      <button class="sb-goal" id="${sbLinks.knop}" title="Doelpunt ${esc(sbLinks.naam)}">⚽</button>
+      <span class="sb-team" ${!w.thuis && isToernooi(w) ? 'id="sbTegenNaam" style="text-decoration:underline dotted;cursor:pointer"' : ''}>${esc(sbLinks.naam)}</span>
+      <span class="sb-cijfers">${sbLinks.n} – ${sbRechts.n}</span>
+      <span class="sb-team" ${w.thuis && isToernooi(w) ? 'id="sbTegenNaam" style="text-decoration:underline dotted;cursor:pointer"' : ''}>${esc(sbRechts.naam)}</span>
+      <button class="sb-goal" id="${sbRechts.knop}" title="Doelpunt ${esc(sbRechts.naam)}">⚽</button>
+      <button class="sb-goal kaart-knop" id="kaartKnop" title="Kaart of straf">🟨</button>
+    </div>
+
+    ${opVeld.size > 0 && opVeld.size < slots.length ? `<div class="kaart" style="background:#FFF3CD;color:#8B6F00;font-size:13px;padding:9px 12px;margin-bottom:10px">⚠️ Er staan ${opVeld.size} van ${slots.length} spelers op het veld — vul de opstelling aan.</div>` : ''}
+    ${(w.selectie||[]).filter(pid => speler(pid)).length < slots.length ? `<div class="kaart" style="background:#FFF3CD;color:#8B6F00;font-size:13px;padding:9px 12px;margin-bottom:10px">⚠️ Selectie heeft maar ${(w.selectie||[]).filter(pid => speler(pid)).length} spelers, je hebt er ${slots.length} nodig voor ${w.format} tegen ${w.format}.</div>` : ''}
+
+    <div class="kwarten" style="${(w.periodes||4) > 5 ? 'flex-wrap:wrap' : ''}">${periodeNrs(w).map(nr => {
+      const kk = w.kwarten[nr];
+      return `<button data-kwart="${nr}" style="${(w.periodes||4) > 5 ? 'font-size:14px;flex:1 1 20%;padding:8px 0' : ''}" class="${S.kwart===nr?'actief':''}">${periodeLabel(w, nr)}${kwartGespeeld(kk)?' •':''}</button>`;
+    }).join('')}</div>
+
+    <div class="klok">
+      <div><div class="tijd" id="klokTijd">${mmss(klokSec(k))}</div>
+        <div class="label">${esc(periodeOmschrijving(w))} · max ${String(w.kwartduur).replace('.',',')} min</div></div>
+      <div class="acties">
+        ${Number(S.kwart) > 1 && !kwartGespeeld(k) ? `<button id="kopieerKwart" title="Eindopstelling vorig kwart overnemen">⧉</button>` : ''}
+        <button id="klokReset" title="Klok terugzetten">↺</button>
+        <button id="klokStart" class="primair" title="${k.klok.running?'Pauze':'Start'}">${k.klok.running?'❚❚':'▶'}</button>
+      </div>
+    </div>
+
+    <div class="veld-wrap"><div class="veld" id="veld">
+      <div class="lijn midden"></div><div class="lijn cirkel"></div>
+      <div class="lijn zestien-o"></div><div class="lijn vijf-o"></div>
+      <div class="lijn zestien-b"></div><div class="lijn vijf-b"></div>
+      ${slots.map(s => `
+        <div class="slot ${s.id==='K'?'doel':''}" data-slot="${s.id}" style="left:${s.x}%;top:${s.y}%">
+          ${lineup[s.id] ? chipHtml(lineup[s.id], 'veld', s.id) : `<div class="ring">${s.id}</div>`}
+        </div>`).join('')}
+    </div></div>
+
+    <div class="bank" id="bank">
+      <div class="bank-kop"><span class="t">Wissels</span>
+        <span class="n">${bank.length} op de bank · <button id="kiesSelectie" style="color:var(--fluo);font-weight:600;font-size:12px;text-decoration:underline">selectie</button></span></div>
+      <div class="bank-chips">${bank.length ? bank.map(pid => chipHtml(pid, 'bank')).join('')
+        : `<div class="leeg-bank">Iedereen staat op het veld. Sleep een veldspeler hierheen om te wisselen.</div>`}</div>
+      <div class="plan-lijst">
+        ${(k.plan||[]).length ? `<div class="plan-kop">Geplande wissels</div>` : ''}
+        ${(k.plan||[]).map((p,i) => `
+          <div class="plan-item ${klokSec(k) >= p.min*60 ? 'nu' : ''}" data-plan-i="${i}">
+            <span class="nr in">▲${esc(spelerNr(p.in))}</span>
+            <span class="nr uit">▼${esc(spelerNr(p.uit))}</span>
+            <span>${esc(spelerNaam(p.in))} voor ${esc(spelerNaam(p.uit))}</span>
+            <span class="min">${String(p.min).replace('.',',')}'</span>
+            <button class="pk ok" data-plan-uitvoer="${i}" title="Wissel nu doorvoeren">✓</button>
+            <button class="pk weg" data-plan-weg="${i}" title="Geplande wissel verwijderen">✕</button>
+          </div>`).join('')}
+        <button class="plan-toevoegen" id="planWissel">+ Wissel plannen voor ${esc(periodeOmschrijving(w))}</button>
+      </div>
+    </div>
+
+    ${(() => {
+      const items = [
+        ...k.events.map((e,i) => ({soort:'wissel', ...e, i})),
+        ...w.goals.map((g,i) => ({soort:'goal', ...g, i})).filter(g => String(g.kwart) === S.kwart),
+        ...(w.kaarten||[]).map((c,i) => ({soort:'kaart', ...c, i})).filter(c => String(c.kwart) === S.kwart),
+      ].sort((a,b) => (a.sec||0) - (b.sec||0));
+      if (!items.length) return '';
+      return `<div class="log">
+        <div class="sectie-kop">Gebeurtenissen ${esc(periodeOmschrijving(w))}</div>
+        ${items.map(e => {
+          if (e.soort === 'wissel') return `
+            <div class="log-item">
+              ${e.in ? `<span class="nr in">▲${esc(spelerNr(e.in))}</span>` : ''}
+              ${e.uit ? `<span class="nr uit">▼${esc(spelerNr(e.uit))}</span>` : ''}
+              <span>${e.in ? esc(spelerNaam(e.in)) : ''}${e.in && e.uit ? ' ↔ ' : ''}${e.uit ? esc(spelerNaam(e.uit)) : ''}</span>
+              <span class="min">${mmss(e.sec)}</span>
+              <button class="verwijder" data-weg-ev="${e.i}" title="Wissel verwijderen">✕</button>
+            </div>`;
+          if (e.soort === 'goal') return `
+            <div class="log-item">
+              <span class="goal-bal">${e.type==='voor' ? '⚽' : '🥅'}</span>
+              <span><b>${e.type==='voor' ? (e.pid ? esc(spelerNaam(e.pid)) : 'Doelpunt') : 'Tegendoelpunt'}</b></span>
+              <span class="min">${mmss(e.sec)}</span>
+              <button class="verwijder" data-weg-goal="${e.i}" title="Doelpunt verwijderen">✕</button>
+            </div>`;
+          /* kaart */
+          return `
+            <div class="log-item kaart ${e.type==='rood'?'rood':''}">
+              <span class="goal-bal">${KAART_ICOON[e.type]}</span>
+              <span><b>${esc(spelerNaam(e.pid))}</b> · ${esc(KAART_NAAM[e.type])}${e.type==='tijd' ? ' ('+Math.round(e.duur/60)+' min)' : ''}</span>
+              <span class="min">${mmss(e.sec)}</span>
+              <button class="verwijder" data-weg-kaart="${e.i}" title="Verwijderen">✕</button>
+            </div>`;
+        }).join('')}
+      </div>`;
+    })()}
+
+    <details class="uitklap"><summary>Speeltijd deze wedstrijd</summary>
+      <div class="inhoud"><table class="stat-tabel">
+        <thead><tr><th>Speler</th><th>${periodeLabel(w, S.kwart)}</th><th>Totaal</th><th>Keeper</th></tr></thead>
+        <tbody>${(w.selectie||[]).filter(pid => speler(pid))
+          .sort((a,b) => (aWed.tijd[b]||0) - (aWed.tijd[a]||0)).map(pid => `
+          <tr><td class="naam-cel">${esc(spelerNaam(pid))}</td>
+            <td>${aKwart.tijd[pid] ? mmss(aKwart.tijd[pid]) : '—'}</td>
+            <td class="tijd-cel">${aWed.tijd[pid] ? uurMin(aWed.tijd[pid]) : '—'}</td>
+            <td>${aWed.keeper[pid] ? aWed.keeper[pid]+'×' : ''}</td></tr>`).join('')}
+        </tbody></table></div>
+    </details>
+
+    <button class="knop vol" id="toonVerslag" style="margin-top:16px">📋 Wedstrijdverslag</button>
+    <button class="knop gevaar vol" id="wegWedstrijd" style="margin-top:10px">Wedstrijd verwijderen</button>`;
+
+  /* ---- koppelingen ---- */
+  v.querySelector('#naarTeam').onclick = sluitWedstrijd;
+  v.querySelector('#wInstellingen').onclick = modalWedstrijdInstellingen;
+  v.querySelectorAll('[data-kwart]').forEach(b => b.onclick = () => {
+    S.kwart = b.dataset.kwart; S.geselecteerd = null;
+    /* leeg kwart? automatisch de eindopstelling van het vorige kwart overnemen */
+    const nr = Number(S.kwart);
+    const doel = huidigKwart();
+    const vorig = w.kwarten[nr-1];
+    if (nr > 1 && !kwartGespeeld(doel) && vorig && kwartGespeeld(vorig)){
+      doel.lineup = effectieveLineup(vorig);
+      bewaarWedstrijd();
+      meld(`Eindopstelling ${periodeOmschrijving(w, String(nr-1))} overgenomen — pas aan waar nodig`);
+    }
+    renderWedstrijd();
+  });
+  v.querySelector('#goalVoor').onclick = modalGoalVoor;
+  v.querySelector('#goalTegen').onclick = () => registreerGoal({type:'tegen'});
+  v.querySelector('#kaartKnop').onclick = modalKaart;
+  v.querySelector('#toonVerslag').onclick = modalVerslag;
+  v.querySelectorAll('[data-weg-kaart]').forEach(b => b.onclick = e => {
+    e.stopPropagation(); w.kaarten.splice(Number(b.dataset.wegKaart),1); bewaarWedstrijd(); renderWedstrijd();
+  });
+  const sbT = v.querySelector('#sbTegenNaam');
+  if (sbT) sbT.onclick = () => {
+    const wnr = toernooiWnr(w);
+    const naam = prompt('Tegenstander voor wedstrijd ' + wnr + ':', (w.tegenstanders||{})[wnr] || '');
+    if (naam === null) return;
+    (w.tegenstanders ||= {})[wnr] = naam.trim();
+    bewaarWedstrijd(); renderWedstrijd();
+  };
+  v.querySelectorAll('[data-weg-goal]').forEach(b => b.onclick = e => {
+    e.stopPropagation(); w.goals.splice(Number(b.dataset.wegGoal),1); bewaarWedstrijd(); renderWedstrijd();
+  });
+  v.querySelector('#klokStart').onclick = klokStartPauze;
+  v.querySelector('#klokReset').onclick = klokReset;
+  const kp = v.querySelector('#kopieerKwart'); if (kp) kp.onclick = kopieerVorigKwart;
+  v.querySelector('#kiesSelectie').onclick = modalSelectie;
+  v.querySelector('#planWissel').onclick = modalPlanWissel;
+  v.querySelectorAll('[data-plan-uitvoer]').forEach(b => b.onclick = e => { e.stopPropagation(); voerPlanUit(Number(b.dataset.planUitvoer)); });
+  v.querySelectorAll('[data-plan-weg]').forEach(b => b.onclick = e => { e.stopPropagation(); (huidigKwart().plan||[]).splice(Number(b.dataset.planWeg),1); bewaarWedstrijd(); renderWedstrijd(); });
+  v.querySelectorAll('[data-weg-ev]').forEach(b => b.onclick = e => { e.stopPropagation(); verwijderEvent(Number(b.dataset.wegEv)); });
+  v.querySelector('#wegWedstrijd').onclick = async () => {
+    if (!confirm('Deze wedstrijd en alle opstellingen verwijderen?')) return;
+    await deleteDoc(doc(db,'teams',S.teamId,'wedstrijden',S.wedstrijdId));
+    sluitWedstrijd();
+  };
+
+  /* tikken van de klok */
+  clearInterval(S.klokInterval);
+  if (k.klok.running) S.klokInterval = setInterval(tikKlok, 500);
+
+  koppelSleep(v);
+}
+
+/* ==================== WEDSTRIJDINSTELLINGEN & SELECTIE ==================== */
+function modalWedstrijdInstellingen(){
+  const w = S.wedstrijd;
+  openModal(`
+    <h2>Wedstrijdinstellingen</h2>
+    <div class="veldgroep"><label>${isToernooi(w) ? 'Naam toernooi' : 'Tegenstander'}</label>
+      <input class="invoer" id="mITegen" value="${esc(w.tegenstander)}"></div>
+    <div class="veldgroep"><label>🎯 Wedstrijddoel</label>
+      <input class="invoer" id="mIDoel" value="${esc(w.doel||'')}" placeholder="Bijv. opbouw van achteruit, durven schieten"></div>
+    <div class="rij">
+      <div class="veldgroep"><label>Datum</label><input class="invoer" type="date" id="mIDatum" value="${esc(w.datum)}"></div>
+      <div class="veldgroep"><label>Minuten per periode</label><input class="invoer" id="mIDuur" inputmode="decimal" value="${esc(w.kwartduur)}"></div>
+    </div>
+    <div class="veldgroep"><label>Format</label>
+      <div class="segment" id="mIFormat">${['4','6','8','9','11'].map(f =>
+        `<button data-f="${f}" class="${w.format===f?'actief':''}">${f}×${f}</button>`).join('')}</div></div>
+    <div class="veldgroep"><label>Formatie (excl. keeper)</label>
+      <div class="segment wrap" id="mIFormatie"></div>
+      <p style="font-size:12px;color:var(--ink-2);margin-top:6px">Wijzig je het format, dan past de app de formatie automatisch aan en blijven spelers zoveel mogelijk op hun plek.</p></div>
+    <div class="veldgroep"><label>Aanvoerder</label>
+      <select class="invoer" id="mIAanvoerder">
+        <option value="">— geen aanvoerder gekozen —</option>
+        ${(w.selectie||[]).map(pid => speler(pid)).filter(Boolean)
+          .map(p => `<option value="${p.id}" ${w.aanvoerder===p.id?'selected':''}>${esc(spelerNr(p.id))} · ${esc(p.naam)}</option>`).join('')}
+      </select></div>
+    <button class="knop vol" id="mIOk">Opslaan</button>`);
+
+  let format = w.format, formatie = w.formatie;
+  const vulFormaties = () => {
+    $('#mIFormatie').innerHTML = Object.keys(FORMATIES[format]).map(f =>
+      `<button data-f="${f}" class="${formatie===f?'actief':''}">${f}</button>`).join('');
+    $$('#mIFormatie button').forEach(b => b.onclick = () => {
+      $$('#mIFormatie button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief'); formatie = b.dataset.f;
+    });
+  };
+  vulFormaties();
+  $$('#mIFormat button').forEach(b => b.onclick = () => {
+    $$('#mIFormat button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief');
+    format = b.dataset.f;
+    if (!FORMATIES[format][formatie]) formatie = Object.keys(FORMATIES[format])[0];
+    vulFormaties();
+  });
+
+  $('#mIOk').onclick = () => {
+    w.tegenstander = $('#mITegen').value.trim() || w.tegenstander;
+    w.doel = $('#mIDoel').value.trim();
+    w.datum = $('#mIDatum').value || w.datum;
+    w.kwartduur = parseFloat(($('#mIDuur').value||'').replace(',','.')) || w.kwartduur;
+    const aanv = $('#mIAanvoerder').value;
+    w.aanvoerder = aanv || null;
+    if (format !== w.format || formatie !== w.formatie){
+      const nieuweIds = new Set(bouwSlots(format, formatie).map(s => s.id));
+      for (const k of Object.values(w.kwarten)){
+        for (const slot of Object.keys(k.lineup)) if (!nieuweIds.has(slot)) delete k.lineup[slot];
+        k.events = k.events.filter(e => nieuweIds.has(e.slot));
+      }
+      w.format = format; w.formatie = formatie;
+    }
+    sluitModal(); bewaarWedstrijd(); renderWedstrijd();
+  };
+}
+
+function modalSelectie(){
+  const w = S.wedstrijd;
+  const sel = new Set(w.selectie || []);
+  openModal(`
+    <h2>Selectie voor deze wedstrijd</h2>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Vink af wie er vandaag bij is. Afwezige spelers verschijnen niet op de bank.</p>
+    ${S.spelers.map(p => `
+      <label class="speler-rij" style="cursor:pointer">
+        <input type="checkbox" data-sel="${p.id}" ${sel.has(p.id)?'checked':''} style="width:19px;height:19px;accent-color:var(--grass)">
+        <div class="mini-shirt">${esc(p.nummer ?? '·')}</div><div class="n">${esc(p.naam)}</div>
+      </label>`).join('')}
+    <button class="knop vol" id="mSelOk" style="margin-top:6px">Klaar</button>`);
+  $('#mSelOk').onclick = () => {
+    w.selectie = $$('#modalInhoud [data-sel]').filter(c => c.checked).map(c => c.dataset.sel);
+    const toegestaan = new Set(w.selectie);
+    for (const k of Object.values(w.kwarten)){
+      for (const [slot, pid] of Object.entries(k.lineup)) if (!toegestaan.has(pid)) delete k.lineup[slot];
+      k.events = k.events.filter(e => (!e.in || toegestaan.has(e.in)) && (!e.uit || toegestaan.has(e.uit)));
+      k.plan = (k.plan||[]).filter(p => toegestaan.has(p.in) && toegestaan.has(p.uit));
+    }
+    w.kaarten = (w.kaarten||[]).filter(c => toegestaan.has(c.pid));
+    if (w.aanvoerder && !toegestaan.has(w.aanvoerder)) w.aanvoerder = null;
+    sluitModal(); bewaarWedstrijd(); renderWedstrijd();
+  };
+}
+
+/* ==================== SLEPEN & TIKKEN ==================== */
+function koppelSleep(v){
+  const veld = v.querySelector('#veld');
+  const bank = v.querySelector('#bank');
+  let drag = null;
+
+  const doelOnder = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    const slot = el.closest('.slot');
+    if (slot && veld.contains(slot)) return {type:'slot', id:slot.dataset.slot, el:slot};
+    if (el.closest('#bank')) return {type:'bank', el:bank};
+    return null;
+  };
+  const wisHighlight = () => { $$('.slot.doelwit').forEach(s => s.classList.remove('doelwit')); bank.classList.remove('doelwit'); };
+
+  v.querySelectorAll('[data-chip]').forEach(chip => {
+    chip.addEventListener('pointerdown', ev => {
+      ev.preventDefault();
+      drag = {pid: chip.dataset.chip, bron: chip.dataset.bron, chip,
+              x0: ev.clientX, y0: ev.clientY, actief: false};
+    });
+  });
+
+  const beweeg = ev => {
+    if (!drag) return;
+    const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
+    if (!drag.actief && Math.hypot(dx,dy) > 8){
+      drag.actief = true;
+      drag.chip.classList.add('sleept');
+      const kloon = $('#sleepKloon');
+      kloon.innerHTML = drag.chip.outerHTML.replace('sleept','');
+      kloon.style.display = '';
+    }
+    if (drag.actief){
+      const kloon = $('#sleepKloon');
+      kloon.style.left = ev.clientX + 'px';
+      kloon.style.top  = ev.clientY + 'px';
+      wisHighlight();
+      const d = doelOnder(ev.clientX, ev.clientY);
+      if (d?.type === 'slot') d.el.classList.add('doelwit');
+      if (d?.type === 'bank' && drag.bron === 'veld') bank.classList.add('doelwit');
+    }
+  };
+  const los = ev => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    $('#sleepKloon').style.display = 'none';
+    wisHighlight();
+    d.chip.classList.remove('sleept');
+    if (d.actief){
+      const doel = doelOnder(ev.clientX, ev.clientY);
+      if (doel?.type === 'slot') plaats(d.pid, doel.id);
+      else if (doel?.type === 'bank' && d.bron === 'veld') naarBank(d.pid);
+    } else {
+      /* tik: selecteren of actie uitvoeren */
+      if (S.geselecteerd && S.geselecteerd.pid !== d.pid){
+        const k = huidigKwart(), l = effectieveLineup(k);
+        const slot = Object.keys(l).find(s => l[s] === d.pid);
+        if (slot){ plaats(S.geselecteerd.pid, slot); return; }
+      }
+      S.geselecteerd = S.geselecteerd?.pid === d.pid ? null : {pid: d.pid, bron: d.bron};
+      renderWedstrijd();
+    }
+  };
+  document.onpointermove = beweeg;
+  document.onpointerup = los;
+  document.onpointercancel = los;
+
+  /* tik op lege positie of bank met geselecteerde speler */
+  veld.querySelectorAll('.slot').forEach(slot => {
+    slot.addEventListener('click', ev => {
+      if (!S.geselecteerd) return;
+      if (ev.target.closest('[data-chip]')) return;       // chips regelen zichzelf    
+      plaats(S.geselecteerd.pid, slot.dataset.slot);
+    });
+  });
+  bank.addEventListener('click', ev => {
+    if (!S.geselecteerd || S.geselecteerd.bron !== 'veld') return;
+    if (ev.target.closest('[data-chip],button')) return;
+    naarBank(S.geselecteerd.pid);
+  });
+}
+</script>
+</body>
+</html>
