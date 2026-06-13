@@ -126,6 +126,7 @@ function htmlClubTrainingen(teams, trainingen){
           <div class="t-meta">${esc(t.week || '')}${t.week?' · ':''}${esc(teamNamen)}</div></div>
         <div class="acties">
           <button data-tdownload="${esc(t.url)}" title="Openen">↗</button>
+          <button data-tbewerk="${t.id}" title="Teams en titel wijzigen">✏️</button>
           <button data-tshare="${t.id}" title="Delen naar WhatsApp">📤</button>
           <button data-tweg="${t.id}" title="Verwijderen" style="color:var(--uit)">🗑</button>
         </div>
@@ -176,6 +177,10 @@ function koppelClubTab(v, tab, teams, trainingen){
       modalNieuweTraining(file, teams);
     };
     v.querySelectorAll('[data-tdownload]').forEach(b => b.onclick = () => window.open(b.dataset.tdownload, '_blank'));
+    v.querySelectorAll('[data-tbewerk]').forEach(b => b.onclick = () => {
+      const t = trainingen.find(x => x.id === b.dataset.tbewerk);
+      modalBewerkTraining(t, teams);
+    });
     v.querySelectorAll('[data-tshare]').forEach(b => b.onclick = () => {
       const t = trainingen.find(x => x.id === b.dataset.tshare);
       const tekst = `📄 Training ${t.titel || ''}\n${t.week || ''}\n${t.url}`;
@@ -496,6 +501,47 @@ function modalNieuweTraining(file, teams){
     } catch(e){
       console.error(e); meld('Upload mislukt — staat Firebase Storage aan?');
       if (knop){ knop.classList.remove('bezig'); knop.textContent = '📄 PDF-training toevoegen voor één of meer teams'; }
+    }
+  };
+}
+
+/* Toewijzing (titel, week, teams) van een bestaande training achteraf aanpassen
+   — zonder het PDF-bestand opnieuw te uploaden. */
+function modalBewerkTraining(t, teams){
+  const huidig = new Set(t.teams || []);
+  openModal(`
+    <h2>Training aanpassen</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px">Bestand: <b>${esc(t.bestandsnaam || t.titel)}</b>${t.url ? ` · <a href="${esc(t.url)}" target="_blank" style="color:var(--grass);font-weight:600">openen ↗</a>` : ''}<br>Het PDF-bestand zelf blijft ongewijzigd.</p>
+    <div class="veldgroep"><label>Titel</label>
+      <input class="invoer" id="mTbTitel" value="${esc(t.titel || '')}" autocomplete="off"></div>
+    <div class="veldgroep"><label>Week / periode</label>
+      <input class="invoer" id="mTbWeek" value="${esc(t.week || '')}" autocomplete="off"></div>
+    <div class="veldgroep"><label>Voor welke teams?</label>
+      <div class="team-chip-kies" id="mTbTeams">
+        ${teams.length ? teams.map(team => `<label data-pid="${team.id}" class="${huidig.has(team.id)?'aan':''}"><input type="checkbox" data-tid="${team.id}" ${huidig.has(team.id)?'checked':''}><span>${esc(team.naam)}</span></label>`).join('')
+        : '<p style="font-size:13px;color:var(--ink-2)">Geen teams in deze club.</p>'}
+      </div>
+      <div class="rij" style="margin-top:8px">
+        <button class="knop licht klein" id="mTbAlle">Alle teams</button>
+        <button class="knop licht klein" id="mTbGeen">Geen</button>
+      </div>
+    </div>
+    <button class="knop vol" id="mTbOk">Wijzigingen opslaan</button>`);
+  const sync = () => $$('#mTbTeams label').forEach(l => l.classList.toggle('aan', l.querySelector('input').checked));
+  $$('#mTbTeams input').forEach(c => c.onchange = sync);
+  $('#mTbAlle').onclick = () => { $$('#mTbTeams input').forEach(c => c.checked = true); sync(); };
+  $('#mTbGeen').onclick = () => { $$('#mTbTeams input').forEach(c => c.checked = false); sync(); };
+  $('#mTbOk').onclick = async () => {
+    const gekozen = $$('#mTbTeams input').filter(c => c.checked).map(c => c.dataset.tid);
+    if (!gekozen.length) return meld('Kies minstens één team');
+    const titel = $('#mTbTitel').value.trim() || t.bestandsnaam || 'Training';
+    const week  = $('#mTbWeek').value.trim();
+    sluitModal();
+    try {
+      await updateDoc(doc(db,'trainingen',t.id), {teams: gekozen, titel, week});
+      meld('Training bijgewerkt'); renderClub();
+    } catch(e){
+      console.error(e); meld('Opslaan mislukt: ' + (e.code || e.message));
     }
   };
 }
