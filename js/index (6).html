@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10271A">
+<title>Opstelling — Coach je team</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="login" class="login" style="display:none">
+  <div class="bord">
+    <h1>Opstelling</h1>
+    <p>Maak per kwart je opstelling, sleep wissels het veld in en zie precies wie hoeveel speelt.</p>
+    <button class="knop fluo vol" id="googleLogin">Inloggen met Google</button>
+    <div class="of"><span>of</span></div>
+    <button class="knop licht vol" id="codeLoginToon">Inloggen met teamcode</button>
+    <div id="codeLoginForm" style="display:none;margin-top:14px;text-align:left">
+      <div class="veldgroep"><label style="color:rgba(255,255,255,.6)">Je naam</label>
+        <input class="invoer donker" id="loginNaam" placeholder="Bijv. Paul" autocomplete="off"></div>
+      <div class="veldgroep"><label style="color:rgba(255,255,255,.6)">Teamcode</label>
+        <input class="invoer donker code-invoer" id="loginCode" placeholder="ASVJO11-1" maxlength="20"></div>
+      <button class="knop fluo vol" id="codeLoginOk">Aansluiten bij team</button>
+      <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:10px;line-height:1.5">Je login is gekoppeld aan dit apparaat. Opnieuw inloggen kan altijd met dezelfde teamcode.</p>
+    </div>
+  </div>
+</div>
+
+<div id="uitnodiging" class="login" style="display:none">
+  <div class="bord">
+    <h1 id="uitnodigTitel">Welkom!</h1>
+    <p id="uitnodigSubtitel">Je bent uitgenodigd als coach. Vul je naam in om door te gaan.</p>
+    <div style="text-align:left;margin-top:6px">
+      <div class="veldgroep"><label style="color:rgba(255,255,255,.6)">Je naam</label>
+        <input class="invoer donker" id="uitnodigNaam" placeholder="Bijv. Paul" autocomplete="name"></div>
+      <button class="knop fluo vol" id="uitnodigOk">Aansluiten</button>
+      <div class="of"><span>of</span></div>
+      <button class="knop licht vol" id="uitnodigGoogle">Aansluiten met Google</button>
+      <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:14px;line-height:1.5;text-align:center">Niet de juiste persoon? <button id="uitnodigAnders" style="color:var(--fluo);text-decoration:underline;font-weight:600">Gebruik een ander account</button></p>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none">
+  <div id="view-teams" class="view"></div>
+  <div id="view-team" class="view"></div>
+  <div id="view-wedstrijd" class="view"></div>
+  <div id="view-club" class="view"></div>
+</div>
+
+<div id="sleepKloon" style="display:none"></div>
+<div class="modal-achter" id="modalAchter"><div class="modal" id="modalInhoud"></div></div>
+<div class="melding" id="melding"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
