@@ -83,13 +83,19 @@ export function initAuthUI(){
 export function doSignOut(){ signOut(auth); }
 
 /* koppel de ingelogde gebruiker aan een team op basis van de teamcode */
-export async function joinMetCode(code){
+export async function joinMetCode(code, naam = null){
   const snap = await getDocs(query(collection(db,'teams'), where('code','==',code)));
   if (snap.empty){ meld('Geen team gevonden met code ' + code); return null; }
   const t = snap.docs[0];
+  // Voorkeur: expliciet meegegeven naam (uit het invulveld), anders de
+  // accountnaam van de gebruiker (bij Google-login is dit de echte inlognaam).
+  const ledNaam = (naam && naam.trim())
+    || S.user.displayName
+    || S.user.email
+    || 'Coach';
   await updateDoc(t.ref, {
     ['leden.'+S.user.uid]: true,
-    ['ledenInfo.'+S.user.uid]: {naam: S.user.displayName || S.user.email || 'Coach'},
+    ['ledenInfo.'+S.user.uid]: {naam: ledNaam},
   });
   return t;
 }
@@ -136,12 +142,13 @@ export async function checkUitnodiging(){
    Geeft het team-document terug als er net is aangesloten, anders null. */
 export async function handelPendingJoin(){
   if (pendingJoin){
-    const {code} = pendingJoin; pendingJoin = null;
-    return await joinMetCode(code);
+    const {code, naam} = pendingJoin; pendingJoin = null;
+    return await joinMetCode(code, naam);
   }
   if (pendingJoinNaNormaleLogin){
     const code = pendingJoinNaNormaleLogin; pendingJoinNaNormaleLogin = null;
     if (!S.teams.find(t => (t.code||'').toUpperCase() === code.toUpperCase())){
+      // Google-login: geen expliciete naam → joinMetCode pakt de Google-accountnaam
       return await joinMetCode(code);
     }
   }

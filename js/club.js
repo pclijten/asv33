@@ -6,7 +6,7 @@ import {
 import {
   S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs
 } from './state.js';
-import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo } from './config.js';
+import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam } from './config.js';
 
 /* openTeam en modalNieuwTeam komen uit teams.js; om kringverwijzing te
    vermijden importeren we ze lui binnen de functies die ze nodig hebben. */
@@ -37,6 +37,7 @@ export function modalNieuwClub(){
 
 export function openClub(clubId){
   S.clubId = clubId; S.clubTab = 'teams'; S.teamId = null;
+  S.clubTrainBouw = S.clubTrainBouw || 'onder';
   stopUnsubs('club');
   S.unsub.club = onSnapshot(doc(db,'clubs',clubId), snap => {
     if (!snap.exists()){ verlaatClubView(); return; }
@@ -113,13 +114,33 @@ function htmlClubTeams(teams){
     : `<div class="kaart leeg">Nog geen teams in deze club.<br>Maak een eerste team aan, of importeer een PDF met de teamindeling.</div>`}`;
 }
 
+/* in welke bouwen valt een training? (op basis van de gekoppelde teams) */
+function bouwenVanTraining(t, teams){
+  const set = new Set();
+  for (const tid of (t.teams||[])){
+    const team = teams.find(x => x.id === tid);
+    set.add(bouwVanCategorie(team?.categorie));
+  }
+  return set;
+}
+
 function htmlClubTrainingen(teams, trainingen){
-  return `
-    <button class="upload-knop" id="trainingUpload">📄 PDF-training toevoegen voor één of meer teams
-      <input type="file" id="trainingFile" accept="application/pdf" style="display:none"></button>
-    ${trainingen.length ? trainingen.map(t => {
-      const teamNamen = (t.teams||[]).map(tid => (teams.find(x => x.id === tid)?.naam) || '?').join(', ');
-      return `
+  const actief = S.clubTrainBouw || 'onder';
+  // tellingen per bouw voor de badges
+  const telPerBouw = {onder:0, midden:0, boven:0};
+  for (const t of trainingen)
+    for (const b of bouwenVanTraining(t, teams)) telPerBouw[b]++;
+
+  const zichtbaar = trainingen.filter(t => bouwenVanTraining(t, teams).has(actief));
+
+  const segment = `
+    <div class="segment" id="bouwTabs" style="margin-bottom:14px">
+      ${BOUWEN.map(b => `<button data-bouw="${b.id}" class="${actief===b.id?'actief':''}">${b.kort}${telPerBouw[b.id]?` <span style="opacity:.6">(${telPerBouw[b.id]})</span>`:''}</button>`).join('')}
+    </div>`;
+
+  const lijst = zichtbaar.length ? zichtbaar.map(t => {
+    const teamNamen = (t.teams||[]).map(tid => (teams.find(x => x.id === tid)?.naam) || '?').join(', ');
+    return `
       <div class="training-rij">
         <div class="ico">PDF</div>
         <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
@@ -131,8 +152,14 @@ function htmlClubTrainingen(teams, trainingen){
           <button data-tweg="${t.id}" title="Verwijderen" style="color:var(--uit)">🗑</button>
         </div>
       </div>`;
-    }).join('')
-    : `<div class="kaart leeg">Nog geen trainingen geüpload.<br>Upload een PDF en kies voor welke teams hij beschikbaar is.</div>`}`;
+  }).join('')
+  : `<div class="kaart leeg">Nog geen trainingen voor de ${esc(bouwNaam(actief).toLowerCase())}.<br>Upload een PDF en koppel hem aan een team uit deze bouw.</div>`;
+
+  return `
+    <button class="upload-knop" id="trainingUpload">📄 PDF-training toevoegen voor één of meer teams
+      <input type="file" id="trainingFile" accept="application/pdf" style="display:none"></button>
+    ${segment}
+    ${lijst}`;
 }
 
 function htmlClubInstel(){
@@ -169,12 +196,15 @@ function koppelClubTab(v, tab, teams, trainingen){
     });
   }
   if (tab === 'trainingen'){
+    v.querySelectorAll('[data-bouw]').forEach(b => b.onclick = () => {
+      S.clubTrainBouw = b.dataset.bouw; renderClub();
+    });
     const knop = v.querySelector('#trainingUpload');
     const input = v.querySelector('#trainingFile');
     knop.onclick = () => input.click();
     input.onchange = e => {
       const file = e.target.files[0]; if (!file) return;
-      modalNieuweTraining(file, teams);
+      modalNieuweTraining(file, teams, S.clubTrainBouw);
     };
     v.querySelectorAll('[data-tdownload]').forEach(b => b.onclick = () => window.open(b.dataset.tdownload, '_blank'));
     v.querySelectorAll('[data-tbewerk]').forEach(b => b.onclick = () => {
@@ -455,8 +485,23 @@ function isoWeek(d){
   return 1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
 }
 
-function modalNieuweTraining(file, teams){
+function modalNieuweTraining(file, teams, voorBouw = null){
   const weekNr = isoWeek(new Date());
+  // teams groeperen per bouw
+  const perBouw = {onder:[], midden:[], boven:[]};
+  for (const t of teams) perBouw[bouwVanCategorie(t.categorie)].push(t);
+  const groepHtml = BOUWEN.map(b => {
+    const lijst = perBouw[b.id];
+    if (!lijst.length) return '';
+    return `
+      <div style="font-size:11.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-2);margin:10px 0 6px">${esc(b.naam)}</div>
+      <div class="team-chip-kies">
+        ${lijst.map(t => {
+          const aan = voorBouw ? b.id === voorBouw : false;
+          return `<label data-pid="${t.id}" class="${aan?'aan':''}"><input type="checkbox" data-tid="${t.id}" ${aan?'checked':''}><span>${esc(t.naam)}</span></label>`;
+        }).join('')}
+      </div>`;
+  }).join('');
   openModal(`
     <h2>Training uploaden</h2>
     <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px">Bestand: <b>${esc(file.name)}</b> (${(file.size/1024).toFixed(0)} KB)</p>
@@ -465,9 +510,8 @@ function modalNieuweTraining(file, teams){
     <div class="veldgroep"><label>Week / periode</label>
       <input class="invoer" id="mTrWeek" value="Week ${weekNr}" autocomplete="off"></div>
     <div class="veldgroep"><label>Voor welke teams?</label>
-      <div class="team-chip-kies" id="mTrTeams">
-        ${teams.length ? teams.map(t => `<label data-pid="${t.id}"><input type="checkbox" data-tid="${t.id}"><span>${esc(t.naam)}</span></label>`).join('')
-        : '<p style="font-size:13px;color:var(--ink-2)">Maak eerst teams aan in deze club.</p>'}
+      <div id="mTrTeams">
+        ${teams.length ? groepHtml : '<p style="font-size:13px;color:var(--ink-2)">Maak eerst teams aan in deze club.</p>'}
       </div>
       <div class="rij" style="margin-top:8px">
         <button class="knop licht klein" id="mTrAlle">Alle teams</button>
@@ -521,8 +565,16 @@ function modalBewerkTraining(t, teams){
     <div class="veldgroep"><label>Week / periode</label>
       <input class="invoer" id="mTbWeek" value="${esc(t.week || '')}" autocomplete="off"></div>
     <div class="veldgroep"><label>Voor welke teams?</label>
-      <div class="team-chip-kies" id="mTbTeams">
-        ${teams.length ? teams.map(team => `<label data-pid="${team.id}" class="${huidig.has(team.id)?'aan':''}"><input type="checkbox" data-tid="${team.id}" ${huidig.has(team.id)?'checked':''}><span>${esc(team.naam)}</span></label>`).join('')
+      <div id="mTbTeams">
+        ${teams.length ? BOUWEN.map(b => {
+          const lijst = teams.filter(team => bouwVanCategorie(team.categorie) === b.id);
+          if (!lijst.length) return '';
+          return `
+            <div style="font-size:11.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-2);margin:10px 0 6px">${esc(b.naam)}</div>
+            <div class="team-chip-kies">
+              ${lijst.map(team => `<label data-pid="${team.id}" class="${huidig.has(team.id)?'aan':''}"><input type="checkbox" data-tid="${team.id}" ${huidig.has(team.id)?'checked':''}><span>${esc(team.naam)}</span></label>`).join('')}
+            </div>`;
+        }).join('')
         : '<p style="font-size:13px;color:var(--ink-2)">Geen teams in deze club.</p>'}
       </div>
       <div class="rij" style="margin-top:8px">

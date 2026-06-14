@@ -4,7 +4,7 @@ export const S = {
   spelers:[], wedstrijden:[],
   wedstrijd:null, wedstrijdId:null, kwart:'1',
   teamTab:'wedstrijden', geselecteerd:null,
-  clubs:[], club:null, clubId:null, clubTab:'teams', clubTeams:[], clubTrainingen:[],
+  clubs:[], club:null, clubId:null, clubTab:'teams', clubTrainBouw:'onder', clubTeams:[], clubTrainingen:[],
   trainingen:[], trainingenGelezen:{},
   unsub:{}, klokInterval:null, saveTimer:null, lokaalTot:0,
 };

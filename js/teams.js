@@ -1,6 +1,6 @@
 import {
   db, collection, doc, addDoc, deleteDoc, updateDoc, deleteField,
-  setDoc, query, where, onSnapshot, serverTimestamp
+  setDoc, getDocs, query, where, onSnapshot, serverTimestamp
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen,
@@ -322,6 +322,16 @@ function htmlInstellingen(){
 
   return `
     <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Teamnaam</div>
+      <input class="invoer" id="iTeamNaam" value="${esc(S.team.naam)}" autocomplete="off" style="margin-bottom:10px">
+      <label class="lid-rij" style="cursor:pointer;margin-bottom:10px">
+        <input type="checkbox" id="iCodeVolgtNaam" checked style="width:19px;height:19px;accent-color:var(--grass)">
+        <div class="lid-naam" style="font-weight:500">Code aanpassen aan de nieuwe naam
+          <span style="display:block;font-size:11.5px;color:var(--ink-2);font-weight:400">Bijv. ASVJO10-2 — let op: oude uitnodigingslinks werken dan niet meer</span></div>
+      </label>
+      <button class="knop vol" id="iNaamOk">Naam opslaan</button>
+    </div>
+    <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Teamcode voor coaches</div>
       <p style="font-size:13.5px;color:var(--ink-2)">Deel deze code of een uitnodigingslink met collega-coaches. Zij vullen alleen hun naam in en zitten direct in dit team.</p>
       <div class="teamcode">${esc(S.team.code)}</div>
@@ -329,7 +339,7 @@ function htmlInstellingen(){
         <button class="knop licht vol" id="deelCode">Code kopiëren</button>
         <button class="knop fluo vol" id="deelLink">📲 Uitnodigen</button>
       </div>
-      <button class="knop licht vol" id="wijzigCode" style="margin-top:8px">✏️ Code wijzigen</button>
+      <button class="knop licht vol" id="wijzigCode" style="margin-top:8px">✏️ Code handmatig wijzigen</button>
     </div>
     <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Coaches (${ledenIds.length})</div>
@@ -490,6 +500,34 @@ function koppelTeamTab(v, tab){
     };
     v.querySelector('#deelLink').onclick = () => modalUitnodig(S.team);
     v.querySelector('#wijzigCode').onclick = () => modalWijzigCode();
+    v.querySelector('#iNaamOk').onclick = async () => {
+      const naam = $('#iTeamNaam').value.trim();
+      if (!naam) return meld('Geef het team een naam');
+      const codeMee = $('#iCodeVolgtNaam').checked;
+      const knop = $('#iNaamOk');
+      knop.disabled = true; knop.textContent = 'Opslaan...';
+      const data = {naam};
+      try {
+        if (codeMee){
+          const afk = S.team.clubNaam ? clubAfkorting(S.team.clubNaam) : '';
+          // bestaande codes ophalen om botsing te vermijden (eigen code uitgezonderd)
+          let bestaande = [];
+          try {
+            const snap = await getDocs(collection(db,'teams'));
+            bestaande = snap.docs.map(d => d.data().code).filter(c => c && c !== S.team.code);
+          } catch(e){ /* lukt het lezen niet, dan toch proberen met lokale kennis */
+            bestaande = S.teams.map(t => t.code).filter(c => c && c !== S.team.code);
+          }
+          data.code = teamCode(naam, afk, bestaande);
+        }
+        await updateDoc(doc(db,'teams',S.teamId), data);
+        meld(codeMee ? `Naam opgeslagen · code is nu ${data.code}` : 'Naam opgeslagen');
+      } catch(e){
+        meld('Opslaan mislukt: ' + (e.code || e.message));
+      } finally {
+        knop.disabled = false; knop.textContent = 'Naam opslaan';
+      }
+    };
     v.querySelectorAll('[data-lid-weg]').forEach(b => b.onclick = async () => {
       const uid = b.dataset.lidWeg;
       const naam = b.dataset.lidNaam;

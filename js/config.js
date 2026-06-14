@@ -119,3 +119,25 @@ export function bouwSlots(format, formatie){
   return slots;
 }
 export const slotLijn = id => id[0];
+
+/* ==================== BOUW-INDELING (voor trainingen) ====================
+   Onderbouw  : JO7–JO11  / MO7–MO11
+   Middenbouw : JO12–JO15 / MO12–MO15
+   Bovenbouw  : JO16–JO19 / MO17–MO20, plus Senioren/Vrouwen en onbekend. */
+export const BOUWEN = [
+  {id:'onder',  naam:'Onderbouw',  kort:'Onder'},
+  {id:'midden', naam:'Middenbouw', kort:'Midden'},
+  {id:'boven',  naam:'Bovenbouw',  kort:'Boven'},
+];
+export function bouwVanCategorie(categorie){
+  const m = String(categorie||'').toUpperCase().match(/^[JM]O(\d+)/);
+  if (m){
+    const lft = Number(m[1]);
+    if (lft <= 11) return 'onder';
+    if (lft <= 15) return 'midden';
+    return 'boven';
+  }
+  // Senioren, Vrouwen of niets ingesteld → bovenbouw
+  return 'boven';
+}
+export function bouwNaam(id){ return (BOUWEN.find(b => b.id === id)?.naam) || 'Overig'; }
