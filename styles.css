@@ -295,7 +295,7 @@ input,select{font:inherit;color:inherit}
 .invoer.donker{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
 .invoer.donker::placeholder{color:rgba(255,255,255,.35)}
 .invoer.donker:focus{border-color:var(--fluo)}
-.code-invoer{text-transform:uppercase;text-align:center;font-family:'Barlow Condensed';font-size:22px;letter-spacing:5px}
+.code-invoer{text-transform:uppercase;text-align:center;font-family:'Barlow Condensed';font-size:20px;letter-spacing:2px}
 
 /* ---------- Klein spul ---------- */
 .badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;background:#E3E8E0;color:var(--ink-2);letter-spacing:.3px}
