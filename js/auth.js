@@ -102,20 +102,28 @@ async function wachtwoordLogin(adresRuw, wachtwoord, knop){
   try {
     await signInWithEmailAndPassword(auth, adres, wachtwoord);
   } catch(e){
-    if (e.code === 'auth/user-not-found'){
-      // account bestaat nog niet → aanmaken
+    // Firebase geeft bij een onbekend account tegenwoordig vaak 'invalid-credential'
+    // i.p.v. 'user-not-found'. We kunnen vooraf niet betrouwbaar weten of het account
+    // bestaat, dus: probeer het account aan te maken. Lukt dat → nieuwe gebruiker.
+    // Bestaat het al ('email-already-in-use') → dan was het écht een fout wachtwoord.
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential'
+        || e.code === 'auth/invalid-login-credentials'){
       try {
         await createUserWithEmailAndPassword(auth, adres, wachtwoord);
       } catch(e2){
         if (e2.code === 'auth/email-already-in-use')
-          meld('Onjuist wachtwoord. Probeer opnieuw of gebruik "wachtwoord vergeten".');
+          meld('Onjuist wachtwoord voor dit account. Probeer opnieuw of gebruik "wachtwoord vergeten".');
         else if (e2.code === 'auth/weak-password')
           meld('Kies een wachtwoord van minstens 6 tekens');
+        else if (e2.code === 'auth/operation-not-allowed')
+          meld('E-mail/wachtwoord-login staat nog uit in Firebase. Zet de provider aan in de Console.');
         else
-          meld('Inloggen mislukt: ' + (e2.code||e2.message));
+          meld('Aanmelden mislukt: ' + (e2.code||e2.message));
       }
-    } else if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'){
-      meld('Onjuist e-mailadres of wachtwoord. Probeer opnieuw of gebruik "wachtwoord vergeten".');
+    } else if (e.code === 'auth/wrong-password'){
+      meld('Onjuist wachtwoord. Probeer opnieuw of gebruik "wachtwoord vergeten".');
+    } else if (e.code === 'auth/operation-not-allowed'){
+      meld('E-mail/wachtwoord-login staat nog uit in Firebase. Zet de provider aan in de Console.');
     } else {
       meld('Inloggen mislukt: ' + (e.code||e.message));
     }
