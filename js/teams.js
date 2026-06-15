@@ -347,6 +347,7 @@ function htmlInstellingen(){
       <div class="sectie-kop" style="margin-top:0">Coaches (${ledenIds.length})</div>
       <p style="font-size:12.5px;color:var(--ink-2);margin-bottom:10px">Staat er iemand dubbel of verkeerd in de lijst? Verwijder die met 🗑.</p>
       ${ledenHtml}
+      <button class="knop licht vol" id="wijzigMijnNaam" style="margin-top:10px">✏️ Mijn weergavenaam wijzigen</button>
     </div>
     <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Categorie & speelregels</div>
@@ -502,6 +503,7 @@ function koppelTeamTab(v, tab){
     };
     v.querySelector('#deelLink').onclick = () => modalUitnodig(S.team);
     v.querySelector('#wijzigCode').onclick = () => modalWijzigCode();
+    v.querySelector('#wijzigMijnNaam').onclick = () => modalMijnNaam();
     v.querySelector('#iNaamOk').onclick = async () => {
       const naam = $('#iTeamNaam').value.trim();
       if (!naam) return meld('Geef het team een naam');
@@ -607,6 +609,40 @@ function modalWijzigCode(){
     } catch(e){
       $('#mWcOk').disabled = false; $('#mWcOk').textContent = 'Code opslaan';
       meld('Wijzigen mislukt: ' + (e.code || e.message));
+    }
+  };
+}
+
+/* De ingelogde coach past zijn eigen weergavenaam aan. Dit werkt door in
+   ALLE teams waar hij lid van is, zodat hij overal met dezelfde naam staat. */
+function modalMijnNaam(){
+  const huidige = (S.team.ledenInfo?.[S.user.uid]?.naam) || S.user.displayName || '';
+  const aantalTeams = S.teams.length;
+  openModal(`
+    <h2>Mijn weergavenaam</h2>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Zo verschijn je in de coachlijst. ${aantalTeams > 1 ? `De naam wordt aangepast in al je <b>${aantalTeams}</b> teams.` : ''}</p>
+    <div class="veldgroep"><label>Je naam</label>
+      <input class="invoer" id="mMnNaam" value="${esc(huidige)}" placeholder="Bijv. Paul Lijten" autocomplete="name"></div>
+    <button class="knop vol" id="mMnOk">Opslaan</button>`);
+  $('#mMnNaam').focus();
+  $('#mMnOk').onclick = async () => {
+    const naam = $('#mMnNaam').value.trim();
+    if (naam.length < 2) return meld('Vul je naam in (minstens 2 tekens)');
+    const knop = $('#mMnOk');
+    knop.disabled = true; knop.textContent = 'Opslaan...';
+    try {
+      // bijwerken in elk team waar deze gebruiker lid van is
+      const mijnTeams = S.teams.filter(t => (t.leden||{})[S.user.uid]);
+      for (const t of mijnTeams){
+        await updateDoc(doc(db,'teams',t.id), {
+          ['ledenInfo.'+S.user.uid+'.naam']: naam,
+        });
+      }
+      sluitModal();
+      meld(mijnTeams.length > 1 ? `Naam aangepast in ${mijnTeams.length} teams` : 'Naam aangepast');
+    } catch(e){
+      knop.disabled = false; knop.textContent = 'Opslaan';
+      meld('Opslaan mislukt: ' + (e.code || e.message));
     }
   };
 }
