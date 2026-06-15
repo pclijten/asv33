@@ -1,4 +1,15 @@
 /* ==================== STATE & HELPERS ==================== */
+
+/* Alleen deze accounts mogen clubs en teams aanmaken. Iedereen anders is een
+   gewone coach die meedraait in teams waarvoor hij is uitgenodigd.
+   Let op: dit verbergt alleen de knoppen — de echte afdwinging staat in de
+   Firestore-beveiligingsregels (zie het stappenplan). */
+export const BEHEERDERS = ['pclijten@gmail.com'];
+export function isBeheerder(){
+  const e = (S.user?.email || '').toLowerCase();
+  return BEHEERDERS.map(x => x.toLowerCase()).includes(e);
+}
+
 export const S = {
   user:null, teams:[], team:null, teamId:null,
   spelers:[], wedstrijden:[],

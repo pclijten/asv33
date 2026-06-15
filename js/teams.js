@@ -3,7 +3,7 @@ import {
   setDoc, getDocs, query, where, onSnapshot, serverTimestamp
 } from './firebase.js';
 import {
-  S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen,
+  S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen, isBeheerder,
   openModal, sluitModal, toon, stopUnsubs
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo } from './config.js';
@@ -91,25 +91,27 @@ export function renderTeams(){
           <div class="meta">${Object.keys(t.leden||{}).length} coach(es) · code ${esc(t.code)}</div></div>
           <span class="pijl">›</span>
         </button>`).join('')}`
-      : !S.clubs.length ? `<div class="kaart leeg">Nog geen teams.<br><b>Maak een team aan</b>, sluit je aan met een teamcode, of <b>start een club</b> om meerdere teams te beheren.</div>` : ''}
+      : !S.clubs.length ? `<div class="kaart leeg">Nog geen teams.<br>${isBeheerder()
+          ? '<b>Maak een team aan</b>, sluit je aan met een teamcode, of <b>start een club</b> om meerdere teams te beheren.'
+          : 'Vraag je hoofdtrainer om een uitnodigingslink, of sluit je aan met een teamcode die je hebt gekregen.'}</div>` : ''}
 
     ${aantalOngelezen ? `<div class="kaart" style="background:rgba(229,72,77,.08);border-left:3px solid var(--uit);font-size:13.5px;color:var(--ink);margin-top:12px">📄 <b>${aantalOngelezen}</b> nieuwe training${aantalOngelezen>1?'en':''} — open je team om te bekijken.</div>` : ''}
 
+    ${isBeheerder() ? `
     <div class="rij" style="margin-top:14px">
       <button class="knop vol" id="nieuwTeam">+ Nieuw team</button>
       <button class="knop licht vol" id="joinTeam">Code invoeren</button>
     </div>
-    <button class="knop club-knop vol" id="nieuwClub" style="margin-top:8px">🏛 Nieuwe club aanmaken</button>`;
+    <button class="knop club-knop vol" id="nieuwClub" style="margin-top:8px">🏛 Nieuwe club aanmaken</button>`
+    : `
+    <button class="knop licht vol" id="joinTeam" style="margin-top:14px">Aansluiten met teamcode</button>`}`;
 
-  v.querySelector('#uitloggen').onclick = () => {
-    if (S.user.isAnonymous && !confirm('Je bent ingelogd zonder account. Na uitloggen kun je opnieuw inloggen met je teamcode. Doorgaan?')) return;
-    doSignOut();
-  };
+  v.querySelector('#uitloggen').onclick = () => doSignOut();
   v.querySelectorAll('[data-open-team]').forEach(b => b.onclick = () => openTeam(b.dataset.openTeam));
   v.querySelectorAll('[data-open-club]').forEach(b => b.onclick = () => openClub(b.dataset.openClub));
-  v.querySelector('#nieuwTeam').onclick = () => modalNieuwTeam();
+  const nt = v.querySelector('#nieuwTeam'); if (nt) nt.onclick = () => modalNieuwTeam();
   v.querySelector('#joinTeam').onclick = modalJoinTeam;
-  v.querySelector('#nieuwClub').onclick = modalNieuwClub;
+  const nc = v.querySelector('#nieuwClub'); if (nc) nc.onclick = modalNieuwClub;
 }
 
 export function modalNieuwTeam(clubId = null){
@@ -333,7 +335,7 @@ function htmlInstellingen(){
     </div>
     <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Teamcode voor coaches</div>
-      <p style="font-size:13.5px;color:var(--ink-2)">Deel deze code of een uitnodigingslink met collega-coaches. Zij vullen alleen hun naam in en zitten direct in dit team.</p>
+      <p style="font-size:13.5px;color:var(--ink-2)">Deel deze code of een uitnodigingslink met collega-coaches. Zij loggen in met e-mail of Google en zitten direct in dit team.</p>
       <div class="teamcode">${esc(S.team.code)}</div>
       <div class="rij">
         <button class="knop licht vol" id="deelCode">Code kopiëren</button>
@@ -444,7 +446,7 @@ function htmlHandleiding(){
     <h3>👥 Meerdere coaches & rommel opruimen</h3>
     <p>Onder ⚙️ <b>Team</b> vind je de <b>teamcode</b> (bijv. ASVJO11-1) en de lijst <b>coaches</b>. Deel de code of een uitnodigingslink met collega-coaches:</p>
     <ul>
-      <li>Ze openen de link, vullen hun naam in (de teamcode staat al klaar) en zitten direct in het team.</li>
+      <li>Ze openen de link en loggen in met hun e-mailadres of Google. Daarna zitten ze direct in het team — en komen ze later met dezelfde login terug als dezelfde coach.</li>
       <li>Staat er iemand verkeerd of dubbel in de lijst? Tik op het 🗑 naast een coach om die te verwijderen uit het team.</li>
       <li>Wijzigingen lopen realtime door — handig als de assistent-coach langs de lijn de wissels bijhoudt en de hoofdcoach de score.</li>
     </ul>

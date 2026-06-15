@@ -242,7 +242,7 @@ export function modalUitnodig(team){
   const link = location.origin + location.pathname + '?team=' + team.code;
   openModal(`
     <h2>Coach uitnodigen voor ${esc(team.naam)}</h2>
-    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Stuur deze persoonlijke link naar de coach. Hij of zij klikt erop, vult de eigen naam in (de teamcode staat al klaar) en zit direct in dit team.</p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Stuur deze persoonlijke link naar de coach. Hij of zij klikt erop, logt in met e-mail of Google en zit direct in dit team.</p>
     <div class="uitnodig-link" id="uitnodigLink">${esc(link)}</div>
     <div class="rij" style="margin-top:12px">
       <button class="knop vol" id="mUitnodigKopieer">Link kopiëren</button>
@@ -254,7 +254,7 @@ export function modalUitnodig(team){
     catch { meld('Link: ' + link); }
   };
   $('#mUitnodigWa').onclick = () => {
-    const tekst = `Je bent uitgenodigd als coach voor ${team.naam}. Open deze link en vul je naam in:\n${link}`;
+    const tekst = `Je bent uitgenodigd als coach voor ${team.naam}. Open deze link en log in met e-mail of Google:\n${link}`;
     window.open('https://wa.me/?text=' + encodeURIComponent(tekst), '_blank');
   };
 }
@@ -285,7 +285,7 @@ function modalAlleLinks(teams){
   });
   $$('#modalInhoud [data-wa]').forEach(b => b.onclick = () => {
     const t = teams.find(x => x.id === b.dataset.wa);
-    const tekst = `Je bent uitgenodigd als coach voor ${t.naam}. Open deze link en vul je naam in:\n${link(t)}`;
+    const tekst = `Je bent uitgenodigd als coach voor ${t.naam}. Open deze link en log in met e-mail of Google:\n${link(t)}`;
     window.open('https://wa.me/?text=' + encodeURIComponent(tekst), '_blank');
   });
   $('#mLinksKopieerAlle').onclick = async () => {

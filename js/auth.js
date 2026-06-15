@@ -1,83 +1,112 @@
 import {
-  auth, db, GoogleAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut,
+  auth, db, GoogleAuthProvider, signInWithPopup, signOut,
+  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
   collection, doc, getDocs, updateDoc, query, where
 } from './firebase.js';
 import { S, $, meld } from './state.js';
 
 /* ====================================================================
-   AANMELD-FLOW
-   - Normale login: Google of teamcode+naam (anoniem, aan apparaat gekoppeld).
-   - Uitnodigingslink (?team=CODE): toont een apart scherm waar de teamcode
-     al vaststaat; de coach hoeft alleen een naam in te vullen, of kan
-     met Google koppelen (handig voor meerdere apparaten).
-   Deze opzet houdt de drempel laag maar voorkomt "rommel": een coach die
-   per ongeluk aansluit kan door een teamcoach uit de lijst worden verwijderd
-   (zie teams.js, ledenbeheer).
+   AANMELD-FLOW (e-maillink + Google, geen anonieme login meer)
+
+   - Coaches loggen in met Google óf met een wachtwoordloze e-maillink.
+     Beide geven een STABIELE identiteit (vaste uid), dus opnieuw inloggen
+     maakt geen dubbele coach meer aan.
+   - Een uitnodigingslink (?team=CODE) bepaalt bij welk team je komt. De
+     teamcode bewaren we in localStorage zodat hij de mail-omweg overleeft:
+     na het klikken op de inloglink opent de app op een verse pagina.
+   - Alleen accounts in BEHEERDERS (state.js) mogen clubs/teams aanmaken;
+     dat wordt in de UI verborgen én in de Firestore-regels afgedwongen.
 ==================================================================== */
 
-let pendingJoin = null;                 // {code, naam} — anonieme login die nog moet koppelen
-let pendingJoinNaNormaleLogin = null;   // teamcode om te koppelen na Google-login
-let pendingTeamInfo = null;             // {code, teamNaam} — uit de uitnodigingslink
+const LS_EMAIL = 'opstelling_login_email';   // e-mailadres tijdens maillink-flow
+const LS_CODE  = 'opstelling_join_code';     // teamcode die na login gekoppeld moet worden
+
+let pendingJoinNaLogin = null;   // teamcode om te koppelen zodra we zijn ingelogd
+let pendingTeamInfo = null;      // {code, teamNaam} uit de uitnodigingslink
 let deeplinkVerwerkt = false;
 
 export function getPendingTeamInfo(){ return pendingTeamInfo; }
 
+/* instellingen voor de e-maillink: keer terug op deze pagina */
+function actionCodeSettings(){
+  return { url: location.origin + location.pathname, handleCodeInApp: true };
+}
+
 /* ---------- knoppen koppelen (één keer, bij opstart) ---------- */
 export function initAuthUI(){
+  // --- Inlogscherm: Google ---
   $('#googleLogin').addEventListener('click', async () => {
-    if (pendingTeamInfo) pendingJoinNaNormaleLogin = pendingTeamInfo.code;
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch(e){ meld('Inloggen mislukt: ' + e.code); }
+    catch(e){ meld('Inloggen mislukt: ' + (e.code||e.message)); }
   });
 
-  $('#codeLoginToon').addEventListener('click', () => {
-    const f = $('#codeLoginForm');
-    f.style.display = f.style.display === 'none' ? '' : 'none';
-    if (f.style.display === '') $('#loginNaam').focus();
+  // --- Inlogscherm: e-maillink aanvragen ---
+  $('#mailLoginOk').addEventListener('click', () => stuurInloglink(
+    $('#loginEmail').value, $('#mailLoginForm'), $('#mailVerstuurd'), $('#mailVerstuurdAdres')));
+
+  const opnieuw = $('#mailOpnieuw');
+  if (opnieuw) opnieuw.addEventListener('click', () => {
+    $('#mailVerstuurd').style.display = 'none';
+    $('#mailLoginForm').style.display = '';
+    $('#loginEmail').focus();
   });
 
-  $('#codeLoginOk').addEventListener('click', async () => {
-    const naam = $('#loginNaam').value.trim();
-    const code = $('#loginCode').value.trim().toUpperCase();
-    if (naam.length < 2) return meld('Vul je naam in');
-    if (code.length < 4) return meld('Vul een geldige teamcode in');
-    try {
-      pendingJoin = {code, naam};
-      const cred = await signInAnonymously(auth);
-      await updateProfile(cred.user, {displayName: naam});
-    } catch(e){ pendingJoin = null; meld('Inloggen mislukt: ' + e.code); }
-  });
-
-  $('#uitnodigOk').addEventListener('click', async () => {
-    const naam = $('#uitnodigNaam').value.trim();
-    if (naam.length < 2) return meld('Vul je naam in');
-    $('#uitnodigOk').disabled = true;
-    $('#uitnodigOk').textContent = 'Bezig...';
-    try {
-      pendingJoin = {code: pendingTeamInfo.code, naam};
-      const cred = await signInAnonymously(auth);
-      await updateProfile(cred.user, {displayName: naam});
-    } catch(e){
-      pendingJoin = null;
-      $('#uitnodigOk').disabled = false;
-      $('#uitnodigOk').textContent = 'Aansluiten';
-      meld('Aansluiten mislukt: ' + e.code);
-    }
-  });
-
+  // --- Uitnodigingsscherm: Google ---
   $('#uitnodigGoogle').addEventListener('click', async () => {
-    if (pendingTeamInfo) pendingJoinNaNormaleLogin = pendingTeamInfo.code;
+    if (pendingTeamInfo) { try { localStorage.setItem(LS_CODE, pendingTeamInfo.code); } catch(e){} }
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch(e){ meld('Inloggen mislukt: ' + e.code); }
+    catch(e){ meld('Inloggen mislukt: ' + (e.code||e.message)); }
+  });
+
+  // --- Uitnodigingsscherm: e-maillink aanvragen ---
+  $('#uitnodigOk').addEventListener('click', () => {
+    if (pendingTeamInfo) { try { localStorage.setItem(LS_CODE, pendingTeamInfo.code); } catch(e){} }
+    stuurInloglink($('#uitnodigEmail').value, null, $('#uitnodigVerstuurd'), $('#uitnodigVerstuurdAdres'));
   });
 
   $('#uitnodigAnders').addEventListener('click', () => {
     $('#uitnodiging').style.display = 'none';
     $('#login').style.display = '';
-    $('#codeLoginForm').style.display = '';
-    if (pendingTeamInfo) $('#loginCode').value = pendingTeamInfo.code;
-    $('#loginNaam').focus();
+    $('#loginEmail').focus();
   });
+}
+
+/* stuur een wachtwoordloze inloglink naar het opgegeven adres */
+async function stuurInloglink(adresRuw, verbergEl, toonEl, adresEl){
+  const adres = (adresRuw||'').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adres)) return meld('Vul een geldig e-mailadres in');
+  try {
+    await sendSignInLinkToEmail(auth, adres, actionCodeSettings());
+    try { localStorage.setItem(LS_EMAIL, adres); } catch(e){}
+    if (verbergEl) verbergEl.style.display = 'none';
+    if (adresEl) adresEl.textContent = adres;
+    if (toonEl) toonEl.style.display = '';
+  } catch(e){
+    meld('Versturen mislukt: ' + (e.code||e.message));
+  }
+}
+
+/* Als de huidige URL een inloglink is: rond het inloggen af.
+   Retourneert true als er een loginpoging liep (de auth-listener pikt 'm op). */
+export async function checkInlogLink(){
+  if (!isSignInWithEmailLink(auth, location.href)) return false;
+  let email = '';
+  try { email = localStorage.getItem(LS_EMAIL) || ''; } catch(e){}
+  if (!email){
+    // mail op een ander apparaat geopend: vraag het adres opnieuw
+    email = window.prompt('Bevestig je e-mailadres om het inloggen af te ronden:') || '';
+  }
+  if (!email){ meld('Inloggen afgebroken'); return false; }
+  try {
+    await signInWithEmailLink(auth, email, location.href);
+    try { localStorage.removeItem(LS_EMAIL); } catch(e){}
+    // URL opschonen zodat de link niet opnieuw verwerkt wordt
+    history.replaceState(null, '', location.origin + location.pathname);
+    return true;
+  } catch(e){
+    meld('Inloglink ongeldig of verlopen: ' + (e.code||e.message));
+    return false;
+  }
 }
 
 export function doSignOut(){ signOut(auth); }
@@ -87,15 +116,13 @@ export async function joinMetCode(code, naam = null){
   const snap = await getDocs(query(collection(db,'teams'), where('code','==',code)));
   if (snap.empty){ meld('Geen team gevonden met code ' + code); return null; }
   const t = snap.docs[0];
-  // Voorkeur: expliciet meegegeven naam (uit het invulveld), anders de
-  // accountnaam van de gebruiker (bij Google-login is dit de echte inlognaam).
   const ledNaam = (naam && naam.trim())
     || S.user.displayName
-    || S.user.email
+    || (S.user.email ? S.user.email.split('@')[0] : '')
     || 'Coach';
   await updateDoc(t.ref, {
     ['leden.'+S.user.uid]: true,
-    ['ledenInfo.'+S.user.uid]: {naam: ledNaam},
+    ['ledenInfo.'+S.user.uid]: {naam: ledNaam, email: S.user.email || ''},
   });
   return t;
 }
@@ -105,54 +132,41 @@ export async function checkUitnodiging(){
   const p = new URLSearchParams(location.search);
   const code = (p.get('team') || '').toUpperCase();
   if (!code) return false;
-  // standaard: scherm klaarzetten zodat aansluiten sowieso mogelijk is
   pendingTeamInfo = {code, teamNaam: ''};
-  $('#uitnodigOk').style.display = '';
-  $('#uitnodigNaam').style.display = '';
-  $('#uitnodigGoogle').style.display = '';
   try {
     const snap = await getDocs(query(collection(db,'teams'), where('code','==',code)));
     if (snap.empty){
-      // we kónden lezen, maar er is geen team met deze code → echt ongeldig
       $('#uitnodigTitel').textContent = 'Uitnodiging ongeldig';
       $('#uitnodigSubtitel').textContent = 'Deze link werkt niet meer. Controleer of je de volledige link hebt, of vraag een nieuwe aan je coach.';
-      $('#uitnodigOk').style.display = 'none';
-      $('#uitnodigNaam').style.display = 'none';
       $('#uitnodigGoogle').style.display = 'none';
+      $('#uitnodigOk').style.display = 'none';
+      $('#uitnodigEmail').style.display = 'none';
       pendingTeamInfo = null;
     } else {
       const team = snap.docs[0].data();
       $('#uitnodigTitel').textContent = '🏟 ' + team.naam;
       $('#uitnodigSubtitel').textContent = team.clubNaam
-        ? 'Je bent uitgenodigd als coach bij ' + team.clubNaam + '. Vul je naam in om door te gaan.'
-        : 'Je bent uitgenodigd als coach. Vul je naam in om door te gaan.';
+        ? 'Je bent uitgenodigd als coach bij ' + team.clubNaam + '. Log in om aan te sluiten.'
+        : 'Je bent uitgenodigd als coach. Log in om aan te sluiten.';
       pendingTeamInfo = {code, teamNaam: team.naam};
     }
   } catch(e){
-    // Lezen vóór inloggen mag niet (bijv. permission-denied): geen blokker.
-    // Toon een nette welkomsttekst; het echte koppelen gebeurt ná het inloggen.
     $('#uitnodigTitel').textContent = 'Welkom!';
-    $('#uitnodigSubtitel').textContent = 'Vul je naam in om als coach aan te sluiten bij het team.';
-    // pendingTeamInfo blijft staan met de code, knoppen blijven zichtbaar
+    $('#uitnodigSubtitel').textContent = 'Log in om als coach aan te sluiten bij het team.';
   }
   return true;
 }
 
-/* na inloggen: eventuele openstaande koppeling afhandelen.
+/* na inloggen: openstaande teamkoppeling afhandelen (uit localStorage).
    Geeft het team-document terug als er net is aangesloten, anders null. */
 export async function handelPendingJoin(){
-  if (pendingJoin){
-    const {code, naam} = pendingJoin; pendingJoin = null;
-    return await joinMetCode(code, naam);
-  }
-  if (pendingJoinNaNormaleLogin){
-    const code = pendingJoinNaNormaleLogin; pendingJoinNaNormaleLogin = null;
-    if (!S.teams.find(t => (t.code||'').toUpperCase() === code.toUpperCase())){
-      // Google-login: geen expliciete naam → joinMetCode pakt de Google-accountnaam
-      return await joinMetCode(code);
-    }
-  }
-  return null;
+  let code = pendingJoinNaLogin;
+  pendingJoinNaLogin = null;
+  if (!code){ try { code = localStorage.getItem(LS_CODE) || ''; } catch(e){} }
+  if (!code) return null;
+  try { localStorage.removeItem(LS_CODE); } catch(e){}
+  if (S.teams.find(t => (t.code||'').toUpperCase() === code.toUpperCase())) return null;
+  return await joinMetCode(code);
 }
 
 /* deep-links (?team= of ?club=) na inloggen verwerken */
