@@ -1,7 +1,7 @@
 import { auth, onAuthStateChanged } from './firebase.js';
 import { S, $, initModalSluiten, meld } from './state.js';
 import {
-  initAuthUI, checkInlogLink, checkUitnodiging, handelPendingJoin, verwerkDeeplink
+  initAuthUI, checkUitnodiging, handelPendingJoin, verwerkDeeplink
 } from './auth.js';
 import { startTeams, openTeam } from './teams.js';
 import { openClub } from './club.js';
@@ -9,10 +9,6 @@ import { openClub } from './club.js';
 /* knoppen en modal-gedrag één keer registreren */
 initModalSluiten();
 initAuthUI();
-
-/* Komt de gebruiker terug via een e-maillink? Rond dan eerst het inloggen af;
-   de auth-listener hieronder pikt de ingelogde gebruiker daarna op. */
-checkInlogLink();
 
 onAuthStateChanged(auth, async user => {
   S.user = user;

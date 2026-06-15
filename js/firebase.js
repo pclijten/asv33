@@ -13,8 +13,7 @@ const firebaseConfig = {
 };
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,
-         sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink }
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,         signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
          collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
@@ -44,8 +43,7 @@ const storage = getStorage(app);
 export {
   app, auth, db, storage,
   /* auth */
-  GoogleAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,
-  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+  GoogleAuthProvider, OAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail,
   /* firestore */
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
   getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId,

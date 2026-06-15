@@ -1,67 +1,77 @@
 import {
-  auth, db, GoogleAuthProvider, signInWithPopup, signOut,
-  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+  auth, db, GoogleAuthProvider, OAuthProvider, signInWithPopup, signOut,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail,
   collection, doc, getDocs, updateDoc, query, where
 } from './firebase.js';
 import { S, $, meld } from './state.js';
 
 /* ====================================================================
-   AANMELD-FLOW (e-maillink + Google, geen anonieme login meer)
+   AANMELD-FLOW — Google, Microsoft of e-mail+wachtwoord.
 
-   - Coaches loggen in met Google óf met een wachtwoordloze e-maillink.
-     Beide geven een STABIELE identiteit (vaste uid), dus opnieuw inloggen
-     maakt geen dubbele coach meer aan.
+   - Alle drie geven een STABIELE identiteit (vaste uid), dus opnieuw
+     inloggen maakt geen dubbele coach meer aan.
+   - E-mail+wachtwoord: bestaat het account nog niet, dan wordt het bij de
+     eerste keer automatisch aangemaakt (registreren = eerste login).
    - Een uitnodigingslink (?team=CODE) bepaalt bij welk team je komt. De
-     teamcode bewaren we in localStorage zodat hij de mail-omweg overleeft:
-     na het klikken op de inloglink opent de app op een verse pagina.
+     teamcode bewaren we in localStorage zodat hij een eventuele
+     redirect/herlaad overleeft.
    - Alleen accounts in BEHEERDERS (state.js) mogen clubs/teams aanmaken;
      dat wordt in de UI verborgen én in de Firestore-regels afgedwongen.
 ==================================================================== */
 
-const LS_EMAIL = 'opstelling_login_email';   // e-mailadres tijdens maillink-flow
-const LS_CODE  = 'opstelling_join_code';     // teamcode die na login gekoppeld moet worden
+const LS_CODE = 'opstelling_join_code';   // teamcode die na login gekoppeld moet worden
 
-let pendingJoinNaLogin = null;   // teamcode om te koppelen zodra we zijn ingelogd
-let pendingTeamInfo = null;      // {code, teamNaam} uit de uitnodigingslink
+let pendingTeamInfo = null;   // {code, teamNaam} uit de uitnodigingslink
 let deeplinkVerwerkt = false;
 
 export function getPendingTeamInfo(){ return pendingTeamInfo; }
 
-/* instellingen voor de e-maillink: keer terug op deze pagina */
-function actionCodeSettings(){
-  return { url: location.origin + location.pathname, handleCodeInApp: true };
+function bewaarCode(){
+  if (pendingTeamInfo){ try { localStorage.setItem(LS_CODE, pendingTeamInfo.code); } catch(e){} }
+}
+function microsoftProvider(){
+  const p = new OAuthProvider('microsoft.com');
+  p.setCustomParameters({ prompt: 'select_account' });
+  return p;
 }
 
 /* ---------- knoppen koppelen (één keer, bij opstart) ---------- */
 export function initAuthUI(){
-  // --- Inlogscherm: Google ---
+  // ===== Inlogscherm =====
   $('#googleLogin').addEventListener('click', async () => {
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch(e){ meld('Inloggen mislukt: ' + (e.code||e.message)); }
+    catch(e){ meldLoginFout(e); }
+  });
+  $('#microsoftLogin').addEventListener('click', async () => {
+    try { await signInWithPopup(auth, microsoftProvider()); }
+    catch(e){ meldLoginFout(e); }
   });
 
-  // --- Inlogscherm: e-maillink aanvragen ---
-  $('#mailLoginOk').addEventListener('click', () => stuurInloglink(
-    $('#loginEmail').value, $('#mailLoginForm'), $('#mailVerstuurd'), $('#mailVerstuurdAdres')));
-
-  const opnieuw = $('#mailOpnieuw');
-  if (opnieuw) opnieuw.addEventListener('click', () => {
-    $('#mailVerstuurd').style.display = 'none';
-    $('#mailLoginForm').style.display = '';
-    $('#loginEmail').focus();
+  // e-mail + wachtwoord (form-submit vangt klik én Enter af)
+  $('#mailLoginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    wachtwoordLogin($('#loginEmail').value, $('#loginWachtwoord').value, $('#wwLoginOk'));
+  });
+  $('#wwVergeten').addEventListener('click', e => {
+    e.preventDefault();
+    wachtwoordVergeten($('#loginEmail').value);
   });
 
-  // --- Uitnodigingsscherm: Google ---
+  // ===== Uitnodigingsscherm =====
   $('#uitnodigGoogle').addEventListener('click', async () => {
-    if (pendingTeamInfo) { try { localStorage.setItem(LS_CODE, pendingTeamInfo.code); } catch(e){} }
+    bewaarCode();
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch(e){ meld('Inloggen mislukt: ' + (e.code||e.message)); }
+    catch(e){ meldLoginFout(e); }
   });
-
-  // --- Uitnodigingsscherm: e-maillink aanvragen ---
-  $('#uitnodigOk').addEventListener('click', () => {
-    if (pendingTeamInfo) { try { localStorage.setItem(LS_CODE, pendingTeamInfo.code); } catch(e){} }
-    stuurInloglink($('#uitnodigEmail').value, null, $('#uitnodigVerstuurd'), $('#uitnodigVerstuurdAdres'));
+  $('#uitnodigMicrosoft').addEventListener('click', async () => {
+    bewaarCode();
+    try { await signInWithPopup(auth, microsoftProvider()); }
+    catch(e){ meldLoginFout(e); }
+  });
+  $('#uitnodigForm').addEventListener('submit', e => {
+    e.preventDefault();
+    bewaarCode();
+    wachtwoordLogin($('#uitnodigEmail').value, $('#uitnodigWachtwoord').value, $('#uitnodigWwOk'));
   });
 
   $('#uitnodigAnders').addEventListener('click', () => {
@@ -71,41 +81,61 @@ export function initAuthUI(){
   });
 }
 
-/* stuur een wachtwoordloze inloglink naar het opgegeven adres */
-async function stuurInloglink(adresRuw, verbergEl, toonEl, adresEl){
+/* nette foutmelding bij social login (popup gesloten = geen melding nodig) */
+function meldLoginFout(e){
+  if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+  if (e.code === 'auth/account-exists-with-different-credential'){
+    meld('Dit e-mailadres is al gekoppeld aan een andere inlogmethode. Gebruik die methode om in te loggen.');
+    return;
+  }
+  meld('Inloggen mislukt: ' + (e.code || e.message));
+}
+
+/* Log in met e-mail + wachtwoord. Bestaat het account nog niet, dan wordt het
+   automatisch aangemaakt met dit wachtwoord. */
+async function wachtwoordLogin(adresRuw, wachtwoord, knop){
   const adres = (adresRuw||'').trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adres)) return meld('Vul een geldig e-mailadres in');
+  if ((wachtwoord||'').length < 6) return meld('Wachtwoord moet minstens 6 tekens zijn');
+  const oudeTekst = knop ? knop.textContent : '';
+  if (knop){ knop.disabled = true; knop.textContent = 'Bezig...'; }
   try {
-    await sendSignInLinkToEmail(auth, adres, actionCodeSettings());
-    try { localStorage.setItem(LS_EMAIL, adres); } catch(e){}
-    if (verbergEl) verbergEl.style.display = 'none';
-    if (adresEl) adresEl.textContent = adres;
-    if (toonEl) toonEl.style.display = '';
+    await signInWithEmailAndPassword(auth, adres, wachtwoord);
   } catch(e){
-    meld('Versturen mislukt: ' + (e.code||e.message));
+    if (e.code === 'auth/user-not-found'){
+      // account bestaat nog niet → aanmaken
+      try {
+        await createUserWithEmailAndPassword(auth, adres, wachtwoord);
+      } catch(e2){
+        if (e2.code === 'auth/email-already-in-use')
+          meld('Onjuist wachtwoord. Probeer opnieuw of gebruik "wachtwoord vergeten".');
+        else if (e2.code === 'auth/weak-password')
+          meld('Kies een wachtwoord van minstens 6 tekens');
+        else
+          meld('Inloggen mislukt: ' + (e2.code||e2.message));
+      }
+    } else if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'){
+      meld('Onjuist e-mailadres of wachtwoord. Probeer opnieuw of gebruik "wachtwoord vergeten".');
+    } else {
+      meld('Inloggen mislukt: ' + (e.code||e.message));
+    }
+  } finally {
+    if (knop){ knop.disabled = false; knop.textContent = oudeTekst; }
   }
 }
 
-/* Als de huidige URL een inloglink is: rond het inloggen af.
-   Retourneert true als er een loginpoging liep (de auth-listener pikt 'm op). */
-export async function checkInlogLink(){
-  if (!isSignInWithEmailLink(auth, location.href)) return false;
-  let email = '';
-  try { email = localStorage.getItem(LS_EMAIL) || ''; } catch(e){}
-  if (!email){
-    // mail op een ander apparaat geopend: vraag het adres opnieuw
-    email = window.prompt('Bevestig je e-mailadres om het inloggen af te ronden:') || '';
-  }
-  if (!email){ meld('Inloggen afgebroken'); return false; }
+/* stuur een wachtwoord-reset-mail */
+async function wachtwoordVergeten(adresRuw){
+  const adres = (adresRuw||'').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adres)) return meld('Vul eerst je e-mailadres in');
   try {
-    await signInWithEmailLink(auth, email, location.href);
-    try { localStorage.removeItem(LS_EMAIL); } catch(e){}
-    // URL opschonen zodat de link niet opnieuw verwerkt wordt
-    history.replaceState(null, '', location.origin + location.pathname);
-    return true;
+    await sendPasswordResetEmail(auth, adres);
+    meld('Reset-link gestuurd naar ' + adres + ' (check ook je spam)');
   } catch(e){
-    meld('Inloglink ongeldig of verlopen: ' + (e.code||e.message));
-    return false;
+    if (e.code === 'auth/user-not-found')
+      meld('Geen account met dit e-mailadres gevonden');
+    else
+      meld('Kon geen reset-mail sturen: ' + (e.code||e.message));
   }
 }
 
@@ -139,8 +169,8 @@ export async function checkUitnodiging(){
       $('#uitnodigTitel').textContent = 'Uitnodiging ongeldig';
       $('#uitnodigSubtitel').textContent = 'Deze link werkt niet meer. Controleer of je de volledige link hebt, of vraag een nieuwe aan je coach.';
       $('#uitnodigGoogle').style.display = 'none';
-      $('#uitnodigOk').style.display = 'none';
-      $('#uitnodigEmail').style.display = 'none';
+      $('#uitnodigMicrosoft').style.display = 'none';
+      $('#uitnodigForm').style.display = 'none';
       pendingTeamInfo = null;
     } else {
       const team = snap.docs[0].data();
@@ -160,8 +190,8 @@ export async function checkUitnodiging(){
 /* na inloggen: openstaande teamkoppeling afhandelen (uit localStorage).
    Geeft het team-document terug als er net is aangesloten, anders null. */
 export async function handelPendingJoin(){
-  let code = pendingJoinNaLogin;
-  pendingJoinNaLogin = null;
+  let code = '';
+  if (pendingTeamInfo) code = pendingTeamInfo.code;
   if (!code){ try { code = localStorage.getItem(LS_CODE) || ''; } catch(e){} }
   if (!code) return null;
   try { localStorage.removeItem(LS_CODE); } catch(e){}
