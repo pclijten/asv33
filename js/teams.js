@@ -414,6 +414,32 @@ function htmlHandleiding(){
     <h3>👋 Welkom bij Opstelling</h3>
     <p>Een app om voor je voetbalteam de opstelling te maken, wissels te beheren, speeltijd eerlijk te verdelen en de wedstrijd te loggen. Alles werkt realtime, dus collega-coaches zien direct dezelfde informatie.</p>
 
+    <h3>🔑 De eerste keer inloggen</h3>
+    <p>Je hoeft niets te installeren. Je opent de app gewoon in je browser en logt in op de manier die jij prettig vindt:</p>
+    <ul>
+      <li><b>Met Google of Microsoft</b> — één tik en je bent binnen.</li>
+      <li><b>Met e-mail en wachtwoord</b> — vul je e-mailadres en een zelfgekozen wachtwoord in. Bestaat je account nog niet? Dan wordt het automatisch aangemaakt. De volgende keer kom je met diezelfde gegevens direct terug als dezelfde coach.</li>
+    </ul>
+    <div class="tip"><b>Wachtwoord vergeten?</b> Tik op "Wachtwoord vergeten?" onder de inlogknop — je krijgt dan een mailtje om een nieuw wachtwoord in te stellen.</div>
+
+    <h3>🔗 Aansluiten bij je team</h3>
+    <p>Je coach of de clubbeheerder stuurt je een <b>persoonlijke uitnodigingslink</b> (vaak via WhatsApp). Zo werkt het:</p>
+    <ul>
+      <li>Tik op de link. Je ziet een welkomstscherm met de naam van je team.</li>
+      <li>Log in (Google, Microsoft of e-mail) — en je zit meteen in het juiste team.</li>
+      <li>Geen link gekregen? Vraag je coach om de <b>teamcode</b> (bijv. ASVJO11-1) en vul die in op het inlogscherm.</li>
+    </ul>
+
+    <h3>📱 Zet de app op je beginscherm</h3>
+    <p>Voor een echt app-gevoel: open het menu van je browser en kies <b>"Toevoegen aan beginscherm"</b>. Dan staat Opstelling als icoontje tussen je apps en open je hem met één tik — geen browser meer nodig.</p>
+
+    <h3>📄 Trainingen & 🎬 video's</h3>
+    <p>Onder het tabblad <b>Training</b> vind je de oefenstof voor je team, gedeeld als PDF. Onder <b>Video</b> staan YouTube-links met oefeningen of beelden.</p>
+    <div class="tip"><b>Elke zondag</b> worden hier de trainingen voor de komende week en eventuele video's klaargezet — kijk er dus aan het begin van de week even in. Een <b>🔴 rood stipje</b> op het tabblad laat zien dat er iets nieuws is.</div>
+
+    <h3>✏️ Je eigen naam instellen</h3>
+    <p>Onder ⚙️ <b>Team</b> kun je via <b>"Mijn weergavenaam wijzigen"</b> instellen hoe je in de coachlijst verschijnt. Handig zodat je teamgenoten zien wie wie is.</p>
+
     <h3>🚀 Snel beginnen</h3>
     <ul>
       <li>Voeg je <b>spelers</b> toe onder het tabblad 👕 — naam en rugnummer is genoeg.</li>
