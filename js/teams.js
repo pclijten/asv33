@@ -183,9 +183,9 @@ export function renderTeams(){
     }
     if (doel) openTeam(doel.id, 'trainingen');
   };
-  const ovW = v.querySelector('#ovWedstrijden');
+  const ovW = v.querySelector('#ovTrainingen');
   if (ovW) ovW.onclick = () => {
-    if (S.teams.length) openTeam(S.teams[0].id, 'wedstrijden');
+    if (S.teams.length) openTeam(S.teams[0].id, 'trainingen');
   };
 }
 
