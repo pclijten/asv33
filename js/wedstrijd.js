@@ -627,10 +627,24 @@ export function htmlStats(){
   }
   const rijen = [...S.spelers].sort((a,b) => (tot.tijd[b.id]||0) - (tot.tijd[a.id]||0));
   const heeftData = Object.keys(tot.tijd).length > 0;
+
+  // Opkomst training: aanwezig = niet in de afwezig-lijst van een sessie
+  const totTrainingen = (S.presentie || []).length;
+  const opkomst = {};
+  if (totTrainingen){
+    for (const p of S.spelers){
+      let aanwezig = 0;
+      for (const sessie of S.presentie){
+        if (!(sessie.afwezig || []).includes(p.id)) aanwezig++;
+      }
+      opkomst[p.id] = Math.round((aanwezig / totTrainingen) * 100);
+    }
+  }
+  const toonOpkomst = totTrainingen > 0;
   return `
     ${heeftData ? '' : `<div class="kaart leeg" style="margin-bottom:12px">Nog geen gespeelde wedstrijden.<br>Zodra je opstellingen maakt, verschijnt hier automatisch de speeltijd per speler.</div>`}
     <table class="stat-tabel">
-      <thead><tr><th>Speler</th><th>Wed.</th><th>Speeltijd</th><th>⚽</th><th>C</th><th>K</th><th>🟨</th><th>🟥</th></tr></thead>
+      <thead><tr><th>Speler</th><th>Wed.</th><th>Speeltijd</th><th>⚽</th><th>C</th><th>K</th><th>🟨</th><th>🟥</th>${toonOpkomst?'<th>Tr.</th>':''}</tr></thead>
       <tbody>${rijen.map(p => `<tr>
           <td class="naam-cel">${esc(p.naam)}</td>
           <td>${tot.wedstrijden[p.id]||0}</td>
@@ -639,10 +653,10 @@ export function htmlStats(){
           <td>${tot.aanv[p.id] ? tot.aanv[p.id]+'×' : ''}</td>
           <td>${tot.keeper[p.id]||0}</td>
           <td>${tot.geel[p.id]||0}</td>
-          <td>${tot.rood[p.id]||0}</td></tr>`).join('')}</tbody>
+          <td>${tot.rood[p.id]||0}</td>${toonOpkomst?`<td class="opkomst-cel ${opkomst[p.id]>=80?'goed':opkomst[p.id]>=50?'matig':'laag'}">${opkomst[p.id]}%</td>`:''}</tr>`).join('')}</tbody>
     </table>
     <p style="font-size:12px;color:var(--ink-2);margin-top:10px;line-height:1.5">
-      ⚽ doelpunten · <b>C</b> aanvoerdersbeurten · <b>K</b> periodes als keeper · 🟨 gele kaarten · 🟥 rode kaarten.
+      ⚽ doelpunten · <b>C</b> aanvoerdersbeurten · <b>K</b> periodes als keeper · 🟨 gele kaarten · 🟥 rode kaarten${toonOpkomst?' · <b>Tr.</b> opkomst training ('+totTrainingen+' geregistreerd)':''}.
       Speeltijd komt van de kwartklok; zonder klok telt de ingestelde periodeduur.</p>`;
 }
 

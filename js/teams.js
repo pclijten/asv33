@@ -100,7 +100,12 @@ export function renderTeams(){
     (t.teams||[]).some(tid => S.teams.find(x => x.id === tid)) && !S.trainingenGelezen[t.id]).length;
 
   // Persoonlijke begroeting: voornaam + datum van vandaag, voluit in het Nederlands
-  const naam = (S.user.displayName || S.user.email || '').trim();
+  // De naam die de coach zelf instelde staat in ledenInfo van zijn teams/clubs;
+  // die heeft voorrang op de Google-naam of het e-mailadres.
+  let ingesteldeNaam = '';
+  for (const t of S.teams){ const n = t.ledenInfo?.[S.user.uid]?.naam; if (n){ ingesteldeNaam = n; break; } }
+  if (!ingesteldeNaam) for (const c of S.clubs){ const n = c.ledenInfo?.[S.user.uid]?.naam; if (n){ ingesteldeNaam = n; break; } }
+  const naam = (ingesteldeNaam || S.user.displayName || S.user.email || '').trim();
   const voornaam = naam ? naam.split(/[ @.]/)[0] : '';
   const voornaamMooi = voornaam ? voornaam.charAt(0).toUpperCase() + voornaam.slice(1) : '';
   let vandaag = '';
@@ -116,18 +121,18 @@ export function renderTeams(){
         <div class="welkom-datum">${esc(vandaag)}</div>
         <h1 class="welkom-groet">Hoi ${esc(voornaamMooi || 'coach')} 👋</h1>
       </div>
-      <button class="terug" id="uitloggen" title="Uitloggen">⏻</button>
+      <button class="uitlog-knop" id="uitloggen" title="Uitloggen"><span>⏻</span></button>
     </div>
 
     ${toonOverzicht ? `
     <div class="overzicht-blokjes">
       <button class="ov-blok ${aantalOngelezen ? 'ov-actief' : ''}" id="ovTrainingen">
-        <div class="ov-getal">${aantalOngelezen || '✓'}</div>
-        <div class="ov-label">${aantalOngelezen ? `nieuwe training${aantalOngelezen>1?'en':''}` : 'alles gelezen'}</div>
+        <div class="ov-getal">${aantalOngelezen || '📄'}</div>
+        <div class="ov-label">${aantalOngelezen ? `nieuwe training${aantalOngelezen>1?'en':''}` : 'trainingen'}</div>
       </button>
-      <button class="ov-blok ov-actie" id="ovNieuweWedstrijd">
-        <div class="ov-getal">+</div>
-        <div class="ov-label">nieuwe wedstrijd</div>
+      <button class="ov-blok ov-wedstrijden" id="ovWedstrijden">
+        <div class="ov-getal">📋</div>
+        <div class="ov-label">wedstrijden</div>
       </button>
     </div>` : ''}
 
@@ -178,10 +183,9 @@ export function renderTeams(){
     }
     if (doel) openTeam(doel.id, 'trainingen');
   };
-  const ovW = v.querySelector('#ovNieuweWedstrijd');
+  const ovW = v.querySelector('#ovWedstrijden');
   if (ovW) ovW.onclick = () => {
-    if (S.teams.length === 1) openTeam(S.teams[0].id, 'wedstrijden', {nieuweWedstrijd:true});
-    else meld('Open eerst je team om een wedstrijd te starten');
+    if (S.teams.length) openTeam(S.teams[0].id, 'wedstrijden');
   };
 }
 
