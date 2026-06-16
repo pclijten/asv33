@@ -177,6 +177,15 @@ input,select{font:inherit;color:inherit}
 .tablabel .puntje{position:absolute;top:-2px;right:-10px;width:8px;height:8px;border-radius:50%;background:var(--uit)}
 .uitnodig-link{font-family:'Barlow Condensed';font-weight:600;font-size:13px;background:#0F1E14;color:var(--fluo);padding:9px 12px;border-radius:10px;word-break:break-all;letter-spacing:.3px;line-height:1.5}
 .training-rij{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:11px;padding:11px 13px;margin-bottom:8px;box-shadow:var(--shadow)}
+.video-rij{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:11px;padding:9px 11px;margin-bottom:8px;box-shadow:var(--shadow)}
+.video-rij .thumb{position:relative;width:64px;height:44px;border-radius:7px;overflow:hidden;flex-shrink:0;background:#000}
+.video-rij .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.video-rij .thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;text-shadow:0 1px 4px rgba(0,0,0,.7)}
+.video-rij .v{flex:1;min-width:0}
+.video-rij .v-titel{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.video-rij .v-meta{font-size:11.5px;color:var(--ink-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.video-rij .acties{display:flex;gap:4px;flex-shrink:0}
+.video-rij .acties button{width:32px;height:32px;border-radius:8px;color:var(--ink-2);font-size:14px}
 .training-rij .ico{width:38px;height:38px;border-radius:10px;background:rgba(229,72,77,.12);color:var(--uit);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;font-weight:700;font-family:'Barlow Condensed'}
 .training-rij .t{flex:1;min-width:0}
 .training-rij .t-titel{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -272,8 +281,9 @@ input,select{font:inherit;color:inherit}
 .correctie-opties .knop{justify-content:flex-start}
 
 /* ---------- Onderbalk ---------- */
-.onderbalk{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:540px;background:var(--card);border-top:1px solid var(--hair);display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:20}
-.onderbalk button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0;font-size:10.5px;font-weight:600;color:var(--ink-2);border-radius:10px}
+.onderbalk{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:540px;background:var(--card);border-top:1px solid var(--hair);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:20}
+.onderbalk button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0;font-size:9.5px;font-weight:600;color:var(--ink-2);border-radius:10px;min-width:0}
+.onderbalk .tablabel{white-space:nowrap}
 .onderbalk button.actief{color:var(--grass)}
 .onderbalk .ico{font-size:19px;line-height:1}
 
