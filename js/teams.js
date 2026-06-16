@@ -105,8 +105,8 @@ export function renderTeams(){
     ${S.clubs.length ? `<div class="sectie-kop" style="margin-top:0">Clubs die je beheert</div>
       ${S.clubs.map(c => `
         <button class="lijst-item" data-open-club="${c.id}">
-          <div class="mini-shirt" style="width:40px;height:40px;border-radius:50%;background:var(--pitch-ink);color:var(--fluo);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:14px">🏛</div>
-          <div><div class="titel">${esc(c.naam)} <span class="club-badge">admin</span></div>
+          <div class="club-shirt">🏛</div>
+          <div class="li-tekst"><div class="titel">${esc(c.naam)} <span class="club-badge">admin</span></div>
           <div class="meta">${Object.keys(c.teams||{}).length} teams</div></div>
           <span class="pijl">›</span>
         </button>`).join('')}` : ''}
@@ -114,8 +114,8 @@ export function renderTeams(){
     ${S.teams.length ? `<div class="sectie-kop">Mijn teams</div>
       ${S.teams.map(t => `
         <button class="lijst-item" data-open-team="${t.id}">
-          <div class="mini-shirt" style="width:40px;height:40px;border-radius:50%;background:var(--grass);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:16px">${esc(t.format)}v${esc(t.format)}</div>
-          <div><div class="titel">${esc(t.naam)}${t.club ? ' <span class="club-badge licht">'+esc(t.clubNaam||'club')+'</span>' : ''}</div>
+          <div class="team-shirt">${esc(t.format)}<small>v${esc(t.format)}</small></div>
+          <div class="li-tekst"><div class="titel">${esc(t.naam)}${t.club ? ' <span class="club-badge licht">'+esc(t.clubNaam||'club')+'</span>' : ''}</div>
           <div class="meta">${Object.keys(t.leden||{}).length} coach(es) · code ${esc(t.code)}</div></div>
           <span class="pijl">›</span>
         </button>`).join('')}`
@@ -297,7 +297,7 @@ function htmlWedstrijden(){
         : `${datumNL(w.datum)} · ${esc(w.format)}v${esc(w.format)} · ${esc(w.formatie)}`;
       return `
       <button class="lijst-item" data-open-w="${w.id}">
-        <div><div class="titel">${titel}</div>
+        <div class="li-tekst"><div class="titel">${titel}</div>
         <div class="meta">${meta}</div></div>
         ${uitslag ? `<span class="badge" style="font-family:'Barlow Condensed';font-size:15px;font-weight:700">${uitslag}</span>` : ''}
         <span class="pijl">›</span></button>`;
