@@ -268,7 +268,7 @@ function modalJoinTeam(){
 export function openTeam(teamId, beginTab = 'wedstrijden', opties = {}){
   S.teamId = teamId; S.teamTab = beginTab;
   S._pendingNieuweWedstrijd = !!opties.nieuweWedstrijd;
-  stopUnsubs('team','spelers','wedstrijden');
+  stopUnsubs('team','spelers','wedstrijden','presentie');
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
@@ -289,10 +289,15 @@ export function openTeam(teamId, beginTab = 'wedstrijden', opties = {}){
       modalNieuweWedstrijd();
     }
   });
+  S.unsub.presentie = onSnapshot(collection(db,'teams',teamId,'presentie'), snap => {
+    S.presentie = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+    if (!S.wedstrijdId && S.teamTab === 'trainingen') renderTeam();
+  });
   toon('team');
 }
 export function verlaatTeamView(){
-  stopUnsubs('team','spelers','wedstrijden');
+  stopUnsubs('team','spelers','wedstrijden','presentie');
   S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = [];
   renderTeams(); toon('teams');
 }
@@ -368,21 +373,56 @@ function htmlSpelers(){
     : `<div class="kaart leeg">Nog geen spelers.<br>Voeg je selectie toe — naam en rugnummer is genoeg.</div>`}`;
 }
 
-/* ---------- Tab: trainingen ---------- */
+/* ---------- Tab: trainingen (presentie + gedeelde PDF's) ---------- */
 function htmlTeamTrainingen(){
-  const lijst = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
-  if (!lijst.length) return `<div class="kaart leeg">Nog geen trainingen.<br>Vraag je clubadmin om trainingen te delen met dit team.</div>`;
-  return lijst.map(t => {
-    const ongelezen = !S.trainingenGelezen[t.id];
-    const datum = t.gemaakt?.seconds ? new Date(t.gemaakt.seconds*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) : '';
+  const pdfs = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
+  const vandaag = new Date().toISOString().slice(0,10);
+  const alGeregistreerd = S.presentie.find(p => p.datum === vandaag);
+
+  // --- Presentie-sectie ---
+  const presentieLijst = S.presentie.length ? S.presentie.map(p => {
+    const afw = (p.afwezig || []);
+    const dat = new Date(p.datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'});
+    const datMooi = dat.charAt(0).toUpperCase()+dat.slice(1);
+    const afwNamen = afw.length
+      ? afw.map(id => { const sp = S.spelers.find(s => s.id === id); return sp ? esc(sp.naam) : null; }).filter(Boolean).join(', ')
+      : '';
     return `
-    <div class="training-rij ${ongelezen?'ongelezen':''}" data-open-training="${t.id}" data-url="${esc(t.url)}" style="cursor:pointer">
-      <div class="ico">PDF</div>
-      <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
-        <div class="t-meta">${esc(t.week || '')}${t.week && datum?' · ':''}${esc(datum)}${t.clubNaam?' · '+esc(t.clubNaam):''}</div></div>
-      <div class="acties"><button title="Openen">↗</button></div>
-    </div>`;
-  }).join('');
+      <div class="presentie-rij" data-presentie="${p.id}" style="cursor:pointer">
+        <div class="pr-datum"><span class="pr-dag">${datMooi}</span></div>
+        <div class="pr-info">
+          ${afw.length
+            ? `<span class="pr-afw">${afw.length} afwezig</span><span class="pr-namen">${afwNamen}</span>`
+            : `<span class="pr-allen">✓ Iedereen aanwezig</span>`}
+        </div>
+        <span class="acties"><button title="Aanpassen">✏️</button></span>
+      </div>`;
+  }).join('') : `<div class="kaart leeg" style="margin-bottom:14px">Nog geen presentie geregistreerd.</div>`;
+
+  const presentieSectie = `
+    <div class="sectie-kop" style="margin-top:0">📋 Presentie training</div>
+    ${alGeregistreerd
+      ? `<div class="kaart" style="background:rgba(46,125,70,.08);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. Tik de regel hieronder aan om aan te passen.</div>`
+      : `<button class="knop vol" id="presentieVandaag" style="margin-bottom:12px">✓ Wie is er vandaag?</button>`}
+    ${presentieLijst}`;
+
+  // --- PDF-sectie ---
+  const pdfSectie = `
+    <div class="sectie-kop">📄 Gedeelde trainingen</div>
+    ${pdfs.length ? pdfs.map(t => {
+      const ongelezen = !S.trainingenGelezen[t.id];
+      const datum = t.gemaakt?.seconds ? new Date(t.gemaakt.seconds*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) : '';
+      return `
+      <div class="training-rij ${ongelezen?'ongelezen':''}" data-open-training="${t.id}" data-url="${esc(t.url)}" style="cursor:pointer">
+        <div class="ico">PDF</div>
+        <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
+          <div class="t-meta">${esc(t.week || '')}${t.week && datum?' · ':''}${esc(datum)}${t.clubNaam?' · '+esc(t.clubNaam):''}</div></div>
+        <div class="acties"><button title="Openen">↗</button></div>
+      </div>`;
+    }).join('')
+    : `<div class="kaart leeg">Nog geen trainingen gedeeld.<br>Elke zondag zet je clubadmin hier de oefenstof voor de komende week klaar.</div>`}`;
+
+  return presentieSectie + pdfSectie;
 }
 
 /* ---------- Tab: video's ---------- */
@@ -601,6 +641,12 @@ function koppelTeamTab(v, tab){
         try { await setDoc(doc(db,'gebruikers',S.user.uid,'gelezen',id), {tijd: serverTimestamp()}); } catch(e){}
       }
     });
+    const pv = v.querySelector('#presentieVandaag');
+    if (pv) pv.onclick = () => modalPresentie();
+    v.querySelectorAll('[data-presentie]').forEach(r => r.onclick = () => {
+      const p = S.presentie.find(x => x.id === r.dataset.presentie);
+      if (p) modalPresentie(p);
+    });
     return;
   }
   if (tab === 'videos'){
@@ -770,5 +816,74 @@ function modalMijnNaam(){
       knop.disabled = false; knop.textContent = 'Opslaan';
       meld('Opslaan mislukt: ' + (e.code || e.message));
     }
+  };
+}
+
+/* ---------- Presentie registreren / aanpassen ----------
+   Iedereen staat standaard op AANWEZIG. De coach tikt alleen de afwezigen aan.
+   We slaan alleen de lijst met afwezige speler-id's op (compact). */
+function modalPresentie(bestaande = null){
+  if (!S.spelers.length) return meld('Voeg eerst spelers toe onder het tabblad Spelers');
+  const datum = bestaande ? bestaande.datum : new Date().toISOString().slice(0,10);
+  const afwezig = new Set(bestaande ? (bestaande.afwezig || []) : []);
+  const datLeesbaar = new Date(datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+
+  const rijen = S.spelers.map(p => `
+    <button class="pres-speler ${afwezig.has(p.id)?'afwezig':'aanwezig'}" data-pid="${p.id}">
+      <span class="pres-shirt">${esc(p.nummer ?? '·')}</span>
+      <span class="pres-naam">${esc(p.naam)}</span>
+      <span class="pres-status">${afwezig.has(p.id)?'Afwezig':'Aanwezig'}</span>
+    </button>`).join('');
+
+  openModal(`
+    <h2>Presentie training</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:4px;text-transform:capitalize">${esc(datLeesbaar)}</p>
+    <p style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px">Iedereen staat op <b>aanwezig</b>. Tik wie er <b>niet</b> is.</p>
+    <div class="pres-lijst">${rijen}</div>
+    <div class="rij" style="margin-top:14px">
+      ${bestaande ? '<button class="knop licht vol" id="mPresWeg" style="color:var(--uit)">Verwijderen</button>' : ''}
+      <button class="knop vol" id="mPresOk">Opslaan</button>
+    </div>`);
+
+  // aan/uit tikken
+  $$('.pres-speler').forEach(b => b.onclick = () => {
+    const id = b.dataset.pid;
+    if (afwezig.has(id)){ afwezig.delete(id); b.classList.remove('afwezig'); b.classList.add('aanwezig'); b.querySelector('.pres-status').textContent = 'Aanwezig'; }
+    else { afwezig.add(id); b.classList.remove('aanwezig'); b.classList.add('afwezig'); b.querySelector('.pres-status').textContent = 'Afwezig'; }
+  });
+
+  $('#mPresOk').onclick = async () => {
+    const knop = $('#mPresOk'); knop.disabled = true; knop.textContent = 'Opslaan...';
+    const data = {
+      datum,
+      afwezig: Array.from(afwezig),
+      aantalAanwezig: S.spelers.length - afwezig.size,
+      aantalSpelers: S.spelers.length,
+      door: S.user.displayName || S.user.email || '',
+      gewijzigd: serverTimestamp(),
+    };
+    try {
+      if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'presentie',bestaande.id), data);
+      else {
+        // bestaat er al een registratie voor deze datum? Dan die bijwerken i.p.v. dubbel.
+        const zelfde = S.presentie.find(p => p.datum === datum);
+        if (zelfde) await updateDoc(doc(db,'teams',S.teamId,'presentie',zelfde.id), data);
+        else await addDoc(collection(db,'teams',S.teamId,'presentie'), {...data, gemaakt: serverTimestamp()});
+      }
+      sluitModal();
+      meld(afwezig.size ? `${afwezig.size} afwezig genoteerd` : 'Iedereen aanwezig genoteerd');
+    } catch(e){
+      knop.disabled = false; knop.textContent = 'Opslaan';
+      meld('Opslaan mislukt: ' + (e.code || e.message));
+    }
+  };
+
+  const weg = $('#mPresWeg');
+  if (weg) weg.onclick = async () => {
+    if (!confirm('Deze presentieregistratie verwijderen?')) return;
+    try {
+      await deleteDoc(doc(db,'teams',S.teamId,'presentie',bestaande.id));
+      sluitModal(); meld('Presentie verwijderd');
+    } catch(e){ meld('Verwijderen mislukt: ' + (e.code || e.message)); }
   };
 }
