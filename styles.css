@@ -483,3 +483,40 @@ input,select{font:inherit;color:inherit}
 .ov-blok.ov-actie .ov-getal{ color:var(--pitch-ink);font-size:32px; }
 .ov-blok.ov-actie .ov-label{ color:var(--pitch-ink);font-weight:600; }
 .ov-blok.ov-actie:hover{ box-shadow:0 6px 18px rgba(214,251,65,.4); }
+
+/* ==================== PRESENTIE ==================== */
+/* Geschiedenis-rij in het Training-tabblad */
+.presentie-rij{
+  display:flex;align-items:center;gap:12px;background:var(--card);
+  border-radius:12px;padding:11px 13px;margin-bottom:8px;
+  box-shadow:0 1px 2px rgba(16,39,26,.05),0 4px 14px rgba(16,39,26,.05);
+  border:1.5px solid transparent;transition:border-color .2s ease;
+}
+.presentie-rij:hover{ border-color:rgba(214,251,65,.5); }
+.pr-datum{ flex-shrink:0; }
+.pr-dag{ font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;text-transform:uppercase;color:var(--pitch-ink); }
+.pr-info{ flex:1;min-width:0;display:flex;flex-direction:column;gap:1px; }
+.pr-afw{ font-size:13px;font-weight:700;color:var(--uit); }
+.pr-namen{ font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.pr-allen{ font-size:13px;font-weight:600;color:var(--grass); }
+
+/* Speler-knoppen in de presentie-modal */
+.pres-lijst{ display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow-y:auto; }
+.pres-speler{
+  display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  padding:9px 11px;border-radius:11px;border:1.5px solid transparent;
+  transition:background .15s ease, border-color .15s ease;
+}
+.pres-speler.aanwezig{ background:rgba(46,125,70,.10);border-color:rgba(46,125,70,.25); }
+.pres-speler.afwezig{ background:rgba(229,72,77,.10);border-color:rgba(229,72,77,.3); }
+.pres-shirt{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:#fff;
+}
+.pres-speler.aanwezig .pres-shirt{ background:var(--grass); }
+.pres-speler.afwezig .pres-shirt{ background:var(--uit); }
+.pres-naam{ flex:1;font-weight:600;font-size:14px;color:var(--ink); }
+.pres-status{ font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px; }
+.pres-speler.aanwezig .pres-status{ color:var(--grass); }
+.pres-speler.afwezig .pres-status{ color:var(--uit); }
