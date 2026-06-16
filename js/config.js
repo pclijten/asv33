@@ -141,3 +141,23 @@ export function bouwVanCategorie(categorie){
   return 'boven';
 }
 export function bouwNaam(id){ return (BOUWEN.find(b => b.id === id)?.naam) || 'Overig'; }
+
+/* ==================== YOUTUBE-HELPERS ==================== */
+/* haalt de video-id uit allerlei YouTube-URL-vormen; null als het geen YouTube is */
+export function youtubeId(url){
+  if (!url) return null;
+  const s = String(url).trim();
+  const patronen = [
+    /(?:youtube\.com\/watch\?[^ ]*\bv=)([A-Za-z0-9_-]{11})/,
+    /(?:youtu\.be\/)([A-Za-z0-9_-]{11})/,
+    /(?:youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/,
+    /(?:youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+    /(?:youtube\.com\/live\/)([A-Za-z0-9_-]{11})/,
+  ];
+  for (const p of patronen){ const m = s.match(p); if (m) return m[1]; }
+  // kale 11-teken id
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  return null;
+}
+export function youtubeThumb(id){ return `https://img.youtube.com/vi/${id}/mqdefault.jpg`; }
+export function youtubeWatch(id){ return `https://www.youtube.com/watch?v=${id}`; }

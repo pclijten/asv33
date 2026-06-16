@@ -6,7 +6,7 @@ import {
   S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen, isBeheerder,
   openModal, sluitModal, toon, stopUnsubs
 } from './state.js';
-import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo } from './config.js';
+import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
@@ -23,6 +23,7 @@ export function startTeams(){
                        .sort((a,b) => (a.naam||'').localeCompare(b.naam||''));
     if (!S.teamId && !S.clubId) renderTeams();
     laadTrainingenVoorTeams();
+    laadVideosVoorTeams();
   });
   const q2 = query(collection(db,'clubs'), where('admins.'+S.user.uid, '==', true));
   S.unsub.clubs = onSnapshot(q2, snap => {
@@ -63,6 +64,33 @@ function laadTrainingenVoorTeams(){
       if (S.team) renderTeam();
     });
     trainingenUnsubs.push(u);
+  });
+}
+
+/* video's voor de teams waar de coach lid van is */
+let videoUnsubs = [];
+function laadVideosVoorTeams(){
+  videoUnsubs.forEach(u => u());
+  videoUnsubs = [];
+  const teamIds = S.teams.map(t => t.id);
+  if (!teamIds.length){ S.videos = []; return; }
+  const chunks = [];
+  for (let i = 0; i < teamIds.length; i += 30) chunks.push(teamIds.slice(i, i+30));
+  S.videos = [];
+  chunks.forEach(c => {
+    const q = query(collection(db,'videos'), where('teams','array-contains-any', c));
+    const u = onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      S.videos = S.videos.filter(t => !c.some(tid => (t.teams||[]).includes(tid)) || ids.has(t.id));
+      snap.docs.forEach(d => {
+        const i = S.videos.findIndex(t => t.id === d.id);
+        const data = {id:d.id, ...d.data()};
+        if (i >= 0) S.videos[i] = data; else S.videos.push(data);
+      });
+      S.videos.sort((a,b) => (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
+      if (S.team) renderTeam();
+    });
+    videoUnsubs.push(u);
   });
 }
 
@@ -229,6 +257,7 @@ export function renderTeam(){
   if (tab === 'spelers')     inhoud = htmlSpelers();
   if (tab === 'stats')       inhoud = htmlStats();
   if (tab === 'trainingen')  inhoud = htmlTeamTrainingen();
+  if (tab === 'videos')      inhoud = htmlTeamVideos();
   if (tab === 'instellingen')inhoud = htmlInstellingen();
   if (tab === 'help')        inhoud = htmlHandleiding();
 
@@ -241,7 +270,7 @@ export function renderTeam(){
       <button class="terug" id="teamInstel" title="Teaminstellingen">⚙️</button></div>
     ${inhoud}
     <nav class="onderbalk">
-      ${[['wedstrijden','📋','Wedstrijden'],['spelers','👕','Spelers'],['trainingen','📄','Training'],['stats','⏱','Stats'],['help','❓','Help']]
+      ${[['wedstrijden','📋','Wedstr.'],['spelers','👕','Spelers'],['trainingen','📄','Training'],['videos','🎬','Video'],['stats','⏱','Stats'],['help','❓','Help']]
         .map(([id,ico,naam]) => `<button data-tab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span><span class="tablabel">${naam}${id==='trainingen' && ongelezen ? '<span class="puntje"></span>' : ''}</span></button>`).join('')}
     </nav>`;
 
@@ -303,6 +332,22 @@ function htmlTeamTrainingen(){
       <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
         <div class="t-meta">${esc(t.week || '')}${t.week && datum?' · ':''}${esc(datum)}${t.clubNaam?' · '+esc(t.clubNaam):''}</div></div>
       <div class="acties"><button title="Openen">↗</button></div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- Tab: video's ---------- */
+function htmlTeamVideos(){
+  const lijst = S.videos.filter(t => (t.teams||[]).includes(S.teamId));
+  if (!lijst.length) return `<div class="kaart leeg">Nog geen video's.<br>Vraag je clubadmin om YouTube-video's te delen met dit team.</div>`;
+  return lijst.map(vid => {
+    const id = youtubeId(vid.url);
+    return `
+    <div class="video-rij" data-open-video="${esc(youtubeWatch(id) || vid.url)}" style="cursor:pointer">
+      <div class="thumb">${id ? `<img src="${esc(youtubeThumb(id))}" alt="" loading="lazy"><span class="play">▶</span>` : '<span class="play">▶</span>'}</div>
+      <div class="v"><div class="v-titel">${esc(vid.titel || 'Video')}</div>
+        <div class="v-meta">${vid.clubNaam ? esc(vid.clubNaam) : 'YouTube'}</div></div>
+      <div class="acties"><button title="Afspelen">▶</button></div>
     </div>`;
   }).join('');
 }
@@ -480,6 +525,12 @@ function koppelTeamTab(v, tab){
       if (!S.trainingenGelezen[id]){
         try { await setDoc(doc(db,'gebruikers',S.user.uid,'gelezen',id), {tijd: serverTimestamp()}); } catch(e){}
       }
+    });
+    return;
+  }
+  if (tab === 'videos'){
+    v.querySelectorAll('[data-open-video]').forEach(r => r.onclick = () => {
+      window.open(r.dataset.openVideo, '_blank');
     });
     return;
   }

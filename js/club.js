@@ -6,7 +6,7 @@ import {
 import {
   S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs
 } from './state.js';
-import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam } from './config.js';
+import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam, youtubeId, youtubeThumb, youtubeWatch } from './config.js';
 
 /* openTeam en modalNieuwTeam komen uit teams.js; om kringverwijzing te
    vermijden importeren we ze lui binnen de functies die ze nodig hebben. */
@@ -71,6 +71,12 @@ async function clubTrainingenOphalen(){
     .sort((a,b) => (b.week||'').localeCompare(a.week||'') || (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
 }
 
+async function clubVideosOphalen(){
+  const snap = await getDocs(query(collection(db,'videos'), where('club','==',S.clubId)));
+  return snap.docs.map(d => ({id:d.id, ...d.data()}))
+    .sort((a,b) => (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
+}
+
 async function renderClub(){
   if (!S.club) return;
   const v = $('#view-club');
@@ -78,22 +84,25 @@ async function renderClub(){
   S.clubTeams = teams;
   const trainingen = await clubTrainingenOphalen();
   S.clubTrainingen = trainingen;
+  const videos = await clubVideosOphalen();
+  S.clubVideos = videos;
   const tab = S.clubTab;
   let inhoud = '';
   if (tab === 'teams')      inhoud = htmlClubTeams(teams);
   if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
+  if (tab === 'videos')     inhoud = htmlClubVideos(teams, videos);
   if (tab === 'instel')     inhoud = htmlClubInstel();
   v.innerHTML = `
     <div class="kop"><button class="terug" id="naarTeams">‹</button>
       <h1>🏛 ${esc(S.club.naam)}<span class="sub">${Object.keys(S.club.teams||{}).length} teams · clubcode ${esc(S.club.code)}</span></h1></div>
     ${inhoud}
     <nav class="onderbalk">
-      ${[['teams','👥','Teams'],['trainingen','📄','Trainingen'],['instel','⚙️','Club']]
+      ${[['teams','👥','Teams'],['trainingen','📄','Training'],['videos','🎬','Videos'],['instel','⚙️','Club']]
         .map(([id,ico,naam]) => `<button data-ctab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span>${naam}</button>`).join('')}
     </nav>`;
   v.querySelector('#naarTeams').onclick = verlaatClubView;
   v.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { S.clubTab = b.dataset.ctab; renderClub(); });
-  koppelClubTab(v, tab, teams, trainingen);
+  koppelClubTab(v, tab, teams, trainingen, videos);
 }
 
 function htmlClubTeams(teams){
@@ -162,6 +171,43 @@ function htmlClubTrainingen(teams, trainingen){
     ${lijst}`;
 }
 
+function htmlClubVideos(teams, videos){
+  const actief = S.clubVideoBouw || 'onder';
+  const telPerBouw = {onder:0, midden:0, boven:0};
+  for (const vid of videos)
+    for (const b of bouwenVanTraining(vid, teams)) telPerBouw[b]++;
+  const zichtbaar = videos.filter(vid => bouwenVanTraining(vid, teams).has(actief));
+
+  const segment = `
+    <div class="segment" id="videoBouwTabs" style="margin-bottom:14px">
+      ${BOUWEN.map(b => `<button data-vbouw="${b.id}" class="${actief===b.id?'actief':''}">${b.kort}${telPerBouw[b.id]?` <span style="opacity:.6">(${telPerBouw[b.id]})</span>`:''}</button>`).join('')}
+    </div>`;
+
+  const lijst = zichtbaar.length ? zichtbaar.map(vid => {
+    const teamNamen = (vid.teams||[]).map(tid => (teams.find(x => x.id === tid)?.naam) || '?').join(', ');
+    const id = youtubeId(vid.url);
+    return `
+      <div class="video-rij">
+        <a class="thumb" href="${esc(youtubeWatch(id) || vid.url)}" target="_blank" rel="noopener">
+          ${id ? `<img src="${esc(youtubeThumb(id))}" alt="" loading="lazy"><span class="play">▶</span>` : '<span class="play">▶</span>'}
+        </a>
+        <div class="v"><div class="v-titel">${esc(vid.titel || 'Video')}</div>
+          <div class="v-meta">${esc(teamNamen || '—')}</div></div>
+        <div class="acties">
+          <button data-vbewerk="${vid.id}" title="Teams en titel wijzigen">✏️</button>
+          <button data-vshare="${vid.id}" title="Delen naar WhatsApp">📤</button>
+          <button data-vweg="${vid.id}" title="Verwijderen" style="color:var(--uit)">🗑</button>
+        </div>
+      </div>`;
+  }).join('')
+  : `<div class="kaart leeg">Nog geen video's voor de ${esc(bouwNaam(actief).toLowerCase())}.<br>Plak een YouTube-link en koppel hem aan een team uit deze bouw.</div>`;
+
+  return `
+    <button class="upload-knop" id="videoToevoegen">🎬 YouTube-video toevoegen voor één of meer teams</button>
+    ${segment}
+    ${lijst}`;
+}
+
 function htmlClubInstel(){
   const admins = Object.values(S.club.adminsInfo || {}).map(a => esc(a.naam)).join(', ');
   return `
@@ -178,7 +224,7 @@ function htmlClubInstel(){
     <button class="knop gevaar vol" id="verwijderClub">Club opheffen</button>`;
 }
 
-function koppelClubTab(v, tab, teams, trainingen){
+function koppelClubTab(v, tab, teams, trainingen, videos){
   if (tab === 'teams'){
     v.querySelector('#clubNieuwTeam').onclick = async () => (await teamsModule()).modalNieuwTeam(S.clubId);
     const impBtn = v.querySelector('#clubImporteerPDF');
@@ -222,6 +268,27 @@ function koppelClubTab(v, tab, teams, trainingen){
       try { if (t.path) await deleteObject(sRef(storage, t.path)); } catch(e){}
       await deleteDoc(doc(db,'trainingen',t.id));
       meld('Training verwijderd'); renderClub();
+    });
+  }
+  if (tab === 'videos'){
+    v.querySelectorAll('[data-vbouw]').forEach(b => b.onclick = () => {
+      S.clubVideoBouw = b.dataset.vbouw; renderClub();
+    });
+    v.querySelector('#videoToevoegen').onclick = () => modalNieuweVideo(teams, S.clubVideoBouw);
+    v.querySelectorAll('[data-vbewerk]').forEach(b => b.onclick = () => {
+      const vid = videos.find(x => x.id === b.dataset.vbewerk);
+      modalBewerkVideo(vid, teams);
+    });
+    v.querySelectorAll('[data-vshare]').forEach(b => b.onclick = () => {
+      const vid = videos.find(x => x.id === b.dataset.vshare);
+      const tekst = `🎬 ${vid.titel || 'Video'}\n${vid.url}`;
+      window.open('https://wa.me/?text=' + encodeURIComponent(tekst), '_blank');
+    });
+    v.querySelectorAll('[data-vweg]').forEach(b => b.onclick = async () => {
+      const vid = videos.find(x => x.id === b.dataset.vweg);
+      if (!confirm(`Video "${vid.titel || ''}" verwijderen?`)) return;
+      await deleteDoc(doc(db,'videos',vid.id));
+      meld('Video verwijderd'); renderClub();
     });
   }
   if (tab === 'instel'){
@@ -598,6 +665,99 @@ function modalBewerkTraining(t, teams){
       meld('Training bijgewerkt'); renderClub();
     } catch(e){
       console.error(e); meld('Opslaan mislukt: ' + (e.code || e.message));
+    }
+  };
+}
+
+/* ==================== VIDEO'S (YouTube-links) ==================== */
+/* teams gegroepeerd per bouw als selecteerbare chips; voorvink = set met team-id's */
+function teamKeuzePerBouw(teams, voorgevinkt){
+  const vink = voorgevinkt instanceof Set ? voorgevinkt : new Set(voorgevinkt || []);
+  return BOUWEN.map(b => {
+    const lijst = teams.filter(t => bouwVanCategorie(t.categorie) === b.id);
+    if (!lijst.length) return '';
+    return `
+      <div style="font-size:11.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-2);margin:10px 0 6px">${esc(b.naam)}</div>
+      <div class="team-chip-kies">
+        ${lijst.map(t => `<label data-pid="${t.id}" class="${vink.has(t.id)?'aan':''}"><input type="checkbox" data-tid="${t.id}" ${vink.has(t.id)?'checked':''}><span>${esc(t.naam)}</span></label>`).join('')}
+      </div>`;
+  }).join('');
+}
+
+function modalNieuweVideo(teams, voorBouw = null){
+  const voor = voorBouw ? new Set(teams.filter(t => bouwVanCategorie(t.categorie) === voorBouw).map(t => t.id)) : new Set();
+  openModal(`
+    <h2>YouTube-video toevoegen</h2>
+    <div class="veldgroep"><label>YouTube-link</label>
+      <input class="invoer" id="mVdUrl" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off"></div>
+    <div class="veldgroep"><label>Titel</label>
+      <input class="invoer" id="mVdTitel" placeholder="Bijv. Passing-oefening 3-hoek" autocomplete="off"></div>
+    <div class="veldgroep"><label>Voor welke teams?</label>
+      <div id="mVdTeams">${teams.length ? teamKeuzePerBouw(teams, voor) : '<p style="font-size:13px;color:var(--ink-2)">Maak eerst teams aan in deze club.</p>'}</div>
+      <div class="rij" style="margin-top:8px">
+        <button class="knop licht klein" id="mVdAlle">Alle teams</button>
+        <button class="knop licht klein" id="mVdGeen">Geen</button>
+      </div>
+    </div>
+    <button class="knop vol" id="mVdOk">Toevoegen</button>`);
+  const sync = () => $$('#mVdTeams label').forEach(l => l.classList.toggle('aan', l.querySelector('input').checked));
+  $$('#mVdTeams input').forEach(c => c.onchange = sync);
+  $('#mVdAlle').onclick = () => { $$('#mVdTeams input').forEach(c => c.checked = true); sync(); };
+  $('#mVdGeen').onclick = () => { $$('#mVdTeams input').forEach(c => c.checked = false); sync(); };
+  $('#mVdOk').onclick = async () => {
+    const url = $('#mVdUrl').value.trim();
+    if (!youtubeId(url)) return meld('Plak een geldige YouTube-link');
+    const gekozen = $$('#mVdTeams input').filter(c => c.checked).map(c => c.dataset.tid);
+    if (!gekozen.length) return meld('Kies minstens één team');
+    const titel = $('#mVdTitel').value.trim() || 'Video';
+    $('#mVdOk').disabled = true; $('#mVdOk').textContent = 'Bezig...';
+    try {
+      await addDoc(collection(db,'videos'), {
+        club: S.clubId, clubNaam: S.club.naam,
+        url, titel, teams: gekozen,
+        gemaakt: serverTimestamp(),
+        door: S.user.displayName || S.user.email || '',
+      });
+      sluitModal(); meld('Video toegevoegd'); renderClub();
+    } catch(e){
+      $('#mVdOk').disabled = false; $('#mVdOk').textContent = 'Toevoegen';
+      meld('Opslaan mislukt: ' + (e.code || e.message));
+    }
+  };
+}
+
+function modalBewerkVideo(vid, teams){
+  const huidig = new Set(vid.teams || []);
+  openModal(`
+    <h2>Video aanpassen</h2>
+    <div class="veldgroep"><label>YouTube-link</label>
+      <input class="invoer" id="mVbUrl" value="${esc(vid.url || '')}" autocomplete="off"></div>
+    <div class="veldgroep"><label>Titel</label>
+      <input class="invoer" id="mVbTitel" value="${esc(vid.titel || '')}" autocomplete="off"></div>
+    <div class="veldgroep"><label>Voor welke teams?</label>
+      <div id="mVbTeams">${teams.length ? teamKeuzePerBouw(teams, huidig) : '<p style="font-size:13px;color:var(--ink-2)">Geen teams in deze club.</p>'}</div>
+      <div class="rij" style="margin-top:8px">
+        <button class="knop licht klein" id="mVbAlle">Alle teams</button>
+        <button class="knop licht klein" id="mVbGeen">Geen</button>
+      </div>
+    </div>
+    <button class="knop vol" id="mVbOk">Wijzigingen opslaan</button>`);
+  const sync = () => $$('#mVbTeams label').forEach(l => l.classList.toggle('aan', l.querySelector('input').checked));
+  $$('#mVbTeams input').forEach(c => c.onchange = sync);
+  $('#mVbAlle').onclick = () => { $$('#mVbTeams input').forEach(c => c.checked = true); sync(); };
+  $('#mVbGeen').onclick = () => { $$('#mVbTeams input').forEach(c => c.checked = false); sync(); };
+  $('#mVbOk').onclick = async () => {
+    const url = $('#mVbUrl').value.trim();
+    if (!youtubeId(url)) return meld('Plak een geldige YouTube-link');
+    const gekozen = $$('#mVbTeams input').filter(c => c.checked).map(c => c.dataset.tid);
+    if (!gekozen.length) return meld('Kies minstens één team');
+    const titel = $('#mVbTitel').value.trim() || 'Video';
+    sluitModal();
+    try {
+      await updateDoc(doc(db,'videos',vid.id), {url, titel, teams: gekozen});
+      meld('Video bijgewerkt'); renderClub();
+    } catch(e){
+      meld('Opslaan mislukt: ' + (e.code || e.message));
     }
   };
 }
