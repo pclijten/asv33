@@ -443,3 +443,43 @@ input,select{font:inherit;color:inherit}
   .lijst-item,.view.actief,.view.actief>*,
   .view.actief .lijst-item,.team-shirt{ animation:none!important; transition:none!important; }
 }
+
+/* ==================== WARM STARTSCHERM (begroeting + overzicht) ==================== */
+.welkom-kop{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  background:var(--pitch-ink);
+  border-radius:18px;padding:18px 18px 20px;margin-bottom:14px;
+  position:relative;overflow:hidden;
+}
+.welkom-kop::after{
+  content:'';position:absolute;top:-40px;right:-30px;
+  width:130px;height:130px;border-radius:50%;
+  background:rgba(214,251,65,.09);
+}
+.welkom-tekst{ position:relative;z-index:1; }
+.welkom-datum{ color:var(--fluo);font-size:12.5px;font-weight:600;margin-bottom:2px; }
+.welkom-groet{
+  color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;
+  font-size:27px;line-height:1.05;text-transform:uppercase;letter-spacing:.4px;margin:0;
+}
+.welkom-kop .terug{ color:rgba(255,255,255,.7);position:relative;z-index:1; }
+
+.overzicht-blokjes{ display:flex;gap:10px;margin-bottom:18px; }
+.ov-blok{
+  flex:1;border-radius:14px;padding:14px 12px;text-align:center;
+  background:var(--card);box-shadow:0 1px 2px rgba(16,39,26,.05),0 6px 16px rgba(16,39,26,.06);
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:transform .12s ease, box-shadow .2s ease;
+}
+.ov-blok:active{ transform:scale(.97); }
+.ov-getal{
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;line-height:1;
+  color:var(--grass);
+}
+.ov-label{ font-size:11.5px;color:var(--ink-2);font-weight:500; }
+.ov-blok.ov-actief{ background:rgba(229,72,77,.08);box-shadow:0 6px 16px rgba(229,72,77,.12); }
+.ov-blok.ov-actief .ov-getal{ color:var(--uit); }
+.ov-blok.ov-actie{ background:var(--fluo); }
+.ov-blok.ov-actie .ov-getal{ color:var(--pitch-ink);font-size:32px; }
+.ov-blok.ov-actie .ov-label{ color:var(--pitch-ink);font-weight:600; }
+.ov-blok.ov-actie:hover{ box-shadow:0 6px 18px rgba(214,251,65,.4); }

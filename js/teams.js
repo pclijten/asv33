@@ -98,11 +98,40 @@ export function renderTeams(){
   const v = $('#view-teams');
   const aantalOngelezen = S.trainingen.filter(t =>
     (t.teams||[]).some(tid => S.teams.find(x => x.id === tid)) && !S.trainingenGelezen[t.id]).length;
-  v.innerHTML = `
-    <div class="kop"><h1>Mijn teams<span class="sub">${esc(S.user.displayName || S.user.email || '')}</span></h1>
-      <button class="terug" id="uitloggen" title="Uitloggen">⏻</button></div>
 
-    ${S.clubs.length ? `<div class="sectie-kop" style="margin-top:0">Clubs die je beheert</div>
+  // Persoonlijke begroeting: voornaam + datum van vandaag, voluit in het Nederlands
+  const naam = (S.user.displayName || S.user.email || '').trim();
+  const voornaam = naam ? naam.split(/[ @.]/)[0] : '';
+  const voornaamMooi = voornaam ? voornaam.charAt(0).toUpperCase() + voornaam.slice(1) : '';
+  let vandaag = '';
+  try { vandaag = new Date().toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'}); } catch(e){}
+  vandaag = vandaag.charAt(0).toUpperCase() + vandaag.slice(1);
+
+  // Overzichtsblokjes tonen we alleen aan gewone coaches met minstens één team
+  const toonOverzicht = S.teams.length > 0;
+
+  v.innerHTML = `
+    <div class="welkom-kop">
+      <div class="welkom-tekst">
+        <div class="welkom-datum">${esc(vandaag)}</div>
+        <h1 class="welkom-groet">Hoi ${esc(voornaamMooi || 'coach')} 👋</h1>
+      </div>
+      <button class="terug" id="uitloggen" title="Uitloggen">⏻</button>
+    </div>
+
+    ${toonOverzicht ? `
+    <div class="overzicht-blokjes">
+      <button class="ov-blok ${aantalOngelezen ? 'ov-actief' : ''}" id="ovTrainingen">
+        <div class="ov-getal">${aantalOngelezen || '✓'}</div>
+        <div class="ov-label">${aantalOngelezen ? `nieuwe training${aantalOngelezen>1?'en':''}` : 'alles gelezen'}</div>
+      </button>
+      <button class="ov-blok ov-actie" id="ovNieuweWedstrijd">
+        <div class="ov-getal">+</div>
+        <div class="ov-label">nieuwe wedstrijd</div>
+      </button>
+    </div>` : ''}
+
+    ${S.clubs.length ? `<div class="sectie-kop" style="margin-top:4px">Clubs die je beheert</div>
       ${S.clubs.map(c => `
         <button class="lijst-item" data-open-club="${c.id}">
           <div class="club-shirt">🏛</div>
@@ -123,8 +152,6 @@ export function renderTeams(){
           ? '<b>Maak een team aan</b>, sluit je aan met een teamcode, of <b>start een club</b> om meerdere teams te beheren.'
           : 'Vraag je hoofdtrainer om een uitnodigingslink, of sluit je aan met een teamcode die je hebt gekregen.'}</div>` : ''}
 
-    ${aantalOngelezen ? `<div class="kaart" style="background:rgba(229,72,77,.08);border-left:3px solid var(--uit);font-size:13.5px;color:var(--ink);margin-top:12px">📄 <b>${aantalOngelezen}</b> nieuwe training${aantalOngelezen>1?'en':''} — open je team om te bekijken.</div>` : ''}
-
     ${isBeheerder() ? `
     <div class="rij" style="margin-top:14px">
       <button class="knop vol" id="nieuwTeam">+ Nieuw team</button>
@@ -140,6 +167,22 @@ export function renderTeams(){
   const nt = v.querySelector('#nieuwTeam'); if (nt) nt.onclick = () => modalNieuwTeam();
   v.querySelector('#joinTeam').onclick = modalJoinTeam;
   const nc = v.querySelector('#nieuwClub'); if (nc) nc.onclick = modalNieuwClub;
+
+  // Overzichtsblokjes
+  const ovT = v.querySelector('#ovTrainingen');
+  if (ovT) ovT.onclick = () => {
+    // open het eerste team met een ongelezen training; anders gewoon het eerste team op het training-tabblad
+    let doel = S.teams[0];
+    for (const t of S.teams){
+      if (S.trainingen.some(tr => (tr.teams||[]).includes(t.id) && !S.trainingenGelezen[tr.id])){ doel = t; break; }
+    }
+    if (doel) openTeam(doel.id, 'trainingen');
+  };
+  const ovW = v.querySelector('#ovNieuweWedstrijd');
+  if (ovW) ovW.onclick = () => {
+    if (S.teams.length === 1) openTeam(S.teams[0].id, 'wedstrijden', {nieuweWedstrijd:true});
+    else meld('Open eerst je team om een wedstrijd te starten');
+  };
 }
 
 export function modalNieuwTeam(clubId = null){
@@ -222,8 +265,9 @@ function modalJoinTeam(){
 }
 
 /* ==================== TEAM OPENEN ==================== */
-export function openTeam(teamId){
-  S.teamId = teamId; S.teamTab = 'wedstrijden';
+export function openTeam(teamId, beginTab = 'wedstrijden', opties = {}){
+  S.teamId = teamId; S.teamTab = beginTab;
+  S._pendingNieuweWedstrijd = !!opties.nieuweWedstrijd;
   stopUnsubs('team','spelers','wedstrijden');
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
@@ -239,6 +283,11 @@ export function openTeam(teamId){
     S.wedstrijden = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
     if (!S.wedstrijdId) renderTeam();
+    // gevraagd om meteen een nieuwe wedstrijd te starten? Doe dat zodra alles geladen is.
+    if (S._pendingNieuweWedstrijd){
+      S._pendingNieuweWedstrijd = false;
+      modalNieuweWedstrijd();
+    }
   });
   toon('team');
 }
