@@ -463,6 +463,17 @@ input,select{font:inherit;color:inherit}
   font-size:27px;line-height:1.05;text-transform:uppercase;letter-spacing:.4px;margin:0;
 }
 .welkom-kop .terug{ color:rgba(255,255,255,.7);position:relative;z-index:1; }
+.uitlog-knop{
+  position:relative;z-index:1;flex-shrink:0;
+  width:42px;height:42px;border-radius:12px;
+  background:rgba(255,255,255,.12);
+  border:1.5px solid rgba(255,255,255,.25);
+  color:#fff;font-size:19px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s ease, transform .12s ease;
+}
+.uitlog-knop:hover{ background:rgba(229,72,77,.9);border-color:transparent; }
+.uitlog-knop:active{ transform:scale(.94); }
 
 .overzicht-blokjes{ display:flex;gap:10px;margin-bottom:18px; }
 .ov-blok{
@@ -479,10 +490,8 @@ input,select{font:inherit;color:inherit}
 .ov-label{ font-size:11.5px;color:var(--ink-2);font-weight:500; }
 .ov-blok.ov-actief{ background:rgba(229,72,77,.08);box-shadow:0 6px 16px rgba(229,72,77,.12); }
 .ov-blok.ov-actief .ov-getal{ color:var(--uit); }
-.ov-blok.ov-actie{ background:var(--fluo); }
-.ov-blok.ov-actie .ov-getal{ color:var(--pitch-ink);font-size:32px; }
-.ov-blok.ov-actie .ov-label{ color:var(--pitch-ink);font-weight:600; }
-.ov-blok.ov-actie:hover{ box-shadow:0 6px 18px rgba(214,251,65,.4); }
+.ov-blok.ov-wedstrijden .ov-getal{ color:var(--grass); }
+.ov-blok.ov-wedstrijden:hover{ box-shadow:0 6px 18px rgba(46,125,70,.22); }
 
 /* ==================== PRESENTIE ==================== */
 /* Geschiedenis-rij in het Training-tabblad */
@@ -520,3 +529,9 @@ input,select{font:inherit;color:inherit}
 .pres-status{ font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px; }
 .pres-speler.aanwezig .pres-status{ color:var(--grass); }
 .pres-speler.afwezig .pres-status{ color:var(--uit); }
+
+/* Opkomst-kolom in statistieken */
+.opkomst-cel{ font-weight:700;font-size:12px; }
+.opkomst-cel.goed{ color:var(--grass); }
+.opkomst-cel.matig{ color:#C8860A; }
+.opkomst-cel.laag{ color:var(--uit); }
