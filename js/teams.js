@@ -595,7 +595,7 @@ function htmlInstellingen(){
 /* ---------- Tab: handleiding ---------- */
 function htmlHandleiding(){
   return `<div class="hl">
-    <h3>👋 Welkom bij Opstelling</h3>
+    <h3>👋 Welkom bij Cluppie</h3>
     <p>Een app om voor je voetbalteam de opstelling te maken, wissels te beheren, speeltijd eerlijk te verdelen en de wedstrijd te loggen. Alles werkt realtime, dus collega-coaches zien direct dezelfde informatie.</p>
 
     <h3>🔑 De eerste keer inloggen</h3>
@@ -615,7 +615,7 @@ function htmlHandleiding(){
     </ul>
 
     <h3>📱 Zet de app op je beginscherm</h3>
-    <p>Voor een echt app-gevoel: open het menu van je browser en kies <b>"Toevoegen aan beginscherm"</b>. Dan staat Opstelling als icoontje tussen je apps en open je hem met één tik — geen browser meer nodig.</p>
+    <p>Voor een echt app-gevoel: open het menu van je browser en kies <b>"Toevoegen aan beginscherm"</b>. Dan staat Cluppie als icoontje tussen je apps en open je hem met één tik — geen browser meer nodig.</p>
 
     <h3>📄 Trainingen & 🎬 video's</h3>
     <p>Onder het tabblad <b>Training</b> vind je de oefenstof voor je team, gedeeld als PDF. Onder <b>Video</b> staan YouTube-links met oefeningen of beelden.</p>
