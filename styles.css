@@ -535,3 +535,24 @@ input,select{font:inherit;color:inherit}
 .opkomst-cel.goed{ color:var(--grass); }
 .opkomst-cel.matig{ color:#C8860A; }
 .opkomst-cel.laag{ color:var(--uit); }
+
+/* Maand-groepen in de presentie-historie */
+.maand-groep{ margin-bottom:8px; }
+.maand-kop{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:11px 13px;border-radius:11px;background:var(--card);
+  box-shadow:0 1px 2px rgba(16,39,26,.05);
+  transition:background .15s ease;
+}
+.maand-kop:hover{ background:var(--card-2,#f4f6f2); }
+.maand-naam{ font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.3px;color:var(--pitch-ink); }
+.maand-tel{ font-size:11.5px;color:var(--ink-2);margin-left:auto; }
+.maand-pijl{ font-size:13px;color:var(--ink-2);transition:transform .2s ease;flex-shrink:0; }
+.maand-pijl.open{ transform:rotate(180deg); }
+.maand-inhoud{ padding:8px 0 2px 0; }
+.toon-meer{
+  width:100%;text-align:center;padding:9px;border-radius:10px;
+  font-size:12.5px;font-weight:600;color:var(--grass);
+  background:rgba(46,125,70,.07);margin-top:2px;
+}
+.toon-meer:hover{ background:rgba(46,125,70,.13); }
