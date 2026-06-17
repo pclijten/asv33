@@ -269,7 +269,7 @@ function modalJoinTeam(){
 }
 
 /* ==================== TEAM OPENEN ==================== */
-export function openTeam(teamId, beginTab = 'wedstrijden', opties = {}){
+export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   S.teamId = teamId; S.teamTab = beginTab;
   S._pendingNieuweWedstrijd = !!opties.nieuweWedstrijd;
   stopUnsubs('team','spelers','wedstrijden','presentie');
@@ -383,8 +383,20 @@ function htmlTeamTrainingen(){
   const vandaag = new Date().toISOString().slice(0,10);
   const alGeregistreerd = S.presentie.find(p => p.datum === vandaag);
 
-  // --- Presentie-sectie ---
-  const presentieLijst = S.presentie.length ? S.presentie.map(p => {
+  // welke maanden zijn opengeklapt? standaard alleen de huidige maand.
+  if (!S._presentieOpen){
+    S._presentieOpen = new Set([vandaag.slice(0,7)]);   // 'YYYY-MM'
+    S._presentieToonAlles = new Set();                  // maanden waar alle items getoond worden
+  }
+  const TOON_PER_MAAND = 4;   // standaard aantal per maand voordat "toon meer" verschijnt
+
+  const maandNaam = (ym) => {
+    const [j,m] = ym.split('-');
+    const d = new Date(parseInt(j), parseInt(m)-1, 1);
+    const s = d.toLocaleDateString('nl-NL', {month:'long', year:'numeric'});
+    return s.charAt(0).toUpperCase()+s.slice(1);
+  };
+  const rijHtml = (p) => {
     const afw = (p.afwezig || []);
     const dat = new Date(p.datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'});
     const datMooi = dat.charAt(0).toUpperCase()+dat.slice(1);
@@ -401,7 +413,40 @@ function htmlTeamTrainingen(){
         </div>
         <span class="acties"><button title="Aanpassen">✏️</button></span>
       </div>`;
-  }).join('') : `<div class="kaart leeg" style="margin-bottom:14px">Nog geen presentie geregistreerd.</div>`;
+  };
+
+  // groepeer presentie per maand (S.presentie is al gesorteerd nieuw → oud)
+  let presentieLijst;
+  if (!S.presentie.length){
+    presentieLijst = `<div class="kaart leeg" style="margin-bottom:14px">Nog geen presentie geregistreerd.</div>`;
+  } else {
+    const perMaand = new Map();
+    for (const p of S.presentie){
+      const ym = (p.datum||'').slice(0,7);
+      if (!perMaand.has(ym)) perMaand.set(ym, []);
+      perMaand.get(ym).push(p);
+    }
+    presentieLijst = [...perMaand.entries()].map(([ym, items]) => {
+      const open = S._presentieOpen.has(ym);
+      const toonAlles = S._presentieToonAlles.has(ym);
+      const afwTotaal = items.reduce((n,p) => n + (p.afwezig||[]).length, 0);
+      const zichtbaar = (open && !toonAlles) ? items.slice(0, TOON_PER_MAAND) : items;
+      const meer = items.length - TOON_PER_MAAND;
+      return `
+        <div class="maand-groep">
+          <button class="maand-kop" data-maand="${ym}">
+            <span class="maand-naam">${maandNaam(ym)}</span>
+            <span class="maand-tel">${items.length} training${items.length>1?'en':''}${afwTotaal?` · ${afwTotaal} afm.`:''}</span>
+            <span class="maand-pijl ${open?'open':''}">▾</span>
+          </button>
+          ${open ? `
+            <div class="maand-inhoud">
+              ${zichtbaar.map(rijHtml).join('')}
+              ${(!toonAlles && meer > 0) ? `<button class="toon-meer" data-toonmeer="${ym}">Toon ${meer} eerdere uit deze maand</button>` : ''}
+            </div>` : ''}
+        </div>`;
+    }).join('');
+  }
 
   const presentieSectie = `
     <div class="sectie-kop" style="margin-top:0">📋 Presentie training</div>
@@ -650,6 +695,19 @@ function koppelTeamTab(v, tab){
     v.querySelectorAll('[data-presentie]').forEach(r => r.onclick = () => {
       const p = S.presentie.find(x => x.id === r.dataset.presentie);
       if (p) modalPresentie(p);
+    });
+    // maand in-/uitklappen
+    v.querySelectorAll('[data-maand]').forEach(b => b.onclick = () => {
+      const ym = b.dataset.maand;
+      if (S._presentieOpen.has(ym)){ S._presentieOpen.delete(ym); S._presentieToonAlles.delete(ym); }
+      else S._presentieOpen.add(ym);
+      renderTeam();
+    });
+    // alle trainingen van een maand tonen
+    v.querySelectorAll('[data-toonmeer]').forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      S._presentieToonAlles.add(b.dataset.toonmeer);
+      renderTeam();
     });
     return;
   }
