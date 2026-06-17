@@ -455,21 +455,67 @@ function htmlTeamTrainingen(){
       : `<button class="knop vol" id="presentieVandaag" style="margin-bottom:12px">✓ Wie is er vandaag?</button>`}
     ${presentieLijst}`;
 
-  // --- PDF-sectie ---
-  const pdfSectie = `
-    <div class="sectie-kop">📄 Gedeelde trainingen</div>
-    ${pdfs.length ? pdfs.map(t => {
-      const ongelezen = !S.trainingenGelezen[t.id];
-      const datum = t.gemaakt?.seconds ? new Date(t.gemaakt.seconds*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) : '';
-      return `
+  // --- PDF-sectie (ook per maand, zelfde gedrag als presentie) ---
+  // huidige maand staat standaard open; gebruiker kan maanden dicht/open klappen.
+  if (!S._pdfDicht){ S._pdfDicht = new Set(); S._pdfToonAlles = new Set(); }
+
+  const pdfRijHtml = (t) => {
+    const ongelezen = !S.trainingenGelezen[t.id];
+    const datum = t.gemaakt?.seconds ? new Date(t.gemaakt.seconds*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) : '';
+    return `
       <div class="training-rij ${ongelezen?'ongelezen':''}" data-open-training="${t.id}" data-url="${esc(t.url)}" style="cursor:pointer">
         <div class="ico">PDF</div>
         <div class="t"><div class="t-titel">${esc(t.titel || t.bestandsnaam)}</div>
           <div class="t-meta">${esc(t.week || '')}${t.week && datum?' · ':''}${esc(datum)}${t.clubNaam?' · '+esc(t.clubNaam):''}</div></div>
         <div class="acties"><button title="Openen">↗</button></div>
       </div>`;
-    }).join('')
-    : `<div class="kaart leeg">Nog geen trainingen gedeeld.<br>Elke zondag zet je clubadmin hier de oefenstof voor de komende week klaar.</div>`}`;
+  };
+
+  let pdfLijst;
+  if (!pdfs.length){
+    pdfLijst = `<div class="kaart leeg">Nog geen trainingen gedeeld.<br>Elke zondag zet je clubadmin hier de oefenstof voor de komende week klaar.</div>`;
+  } else {
+    // nieuw → oud op uploaddatum; items zonder datum gaan naar 'Eerder'
+    const gesorteerd = [...pdfs].sort((a,b) => (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
+    const perMaand = new Map();
+    for (const t of gesorteerd){
+      const ym = t.gemaakt?.seconds
+        ? new Date(t.gemaakt.seconds*1000).toISOString().slice(0,7)
+        : 'eerder';
+      if (!perMaand.has(ym)) perMaand.set(ym, []);
+      perMaand.get(ym).push(t);
+    }
+    const eersteYm = [...perMaand.keys()][0];   // nieuwste maand
+    const TOON_PDF = 5;
+    pdfLijst = [...perMaand.entries()].map(([ym, items]) => {
+      // standaard open: de nieuwste maand. Tenzij de gebruiker hem dichtklapte.
+      // overige maanden standaard dicht, tenzij de gebruiker ze openklapte (dan staan ze NIET in _pdfDicht maar markeren we expliciet).
+      const standaardOpen = (ym === eersteYm);
+      const open = standaardOpen ? !S._pdfDicht.has(ym) : S._pdfDicht.has('open:'+ym);
+      const toonAlles = S._pdfToonAlles.has(ym);
+      const titel = ym === 'eerder' ? 'Eerder' : maandNaam(ym);
+      const ongelezenInMaand = items.filter(t => !S.trainingenGelezen[t.id]).length;
+      const zichtbaar = (open && !toonAlles) ? items.slice(0, TOON_PDF) : items;
+      const meer = items.length - TOON_PDF;
+      return `
+        <div class="maand-groep">
+          <button class="maand-kop" data-pdfmaand="${ym}">
+            <span class="maand-naam">${esc(titel)}</span>
+            <span class="maand-tel">${items.length} training${items.length>1?'en':''}${ongelezenInMaand?` · <b style="color:var(--uit)">${ongelezenInMaand} nieuw</b>`:''}</span>
+            <span class="maand-pijl ${open?'open':''}">▾</span>
+          </button>
+          ${open ? `
+            <div class="maand-inhoud">
+              ${zichtbaar.map(pdfRijHtml).join('')}
+              ${(!toonAlles && meer > 0) ? `<button class="toon-meer" data-pdftoonmeer="${ym}">Toon ${meer} eerdere uit deze maand</button>` : ''}
+            </div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  const pdfSectie = `
+    <div class="sectie-kop">📄 Gedeelde trainingen</div>
+    ${pdfLijst}`;
 
   return presentieSectie + pdfSectie;
 }
@@ -696,17 +742,40 @@ function koppelTeamTab(v, tab){
       const p = S.presentie.find(x => x.id === r.dataset.presentie);
       if (p) modalPresentie(p);
     });
-    // maand in-/uitklappen
+    // maand in-/uitklappen (presentie)
     v.querySelectorAll('[data-maand]').forEach(b => b.onclick = () => {
       const ym = b.dataset.maand;
       if (S._presentieOpen.has(ym)){ S._presentieOpen.delete(ym); S._presentieToonAlles.delete(ym); }
       else S._presentieOpen.add(ym);
       renderTeam();
     });
-    // alle trainingen van een maand tonen
+    // alle trainingen van een maand tonen (presentie)
     v.querySelectorAll('[data-toonmeer]').forEach(b => b.onclick = (e) => {
       e.stopPropagation();
       S._presentieToonAlles.add(b.dataset.toonmeer);
+      renderTeam();
+    });
+    // maand in-/uitklappen (PDF-trainingen)
+    v.querySelectorAll('[data-pdfmaand]').forEach(b => b.onclick = () => {
+      const ym = b.dataset.pdfmaand;
+      const pijlOpen = b.querySelector('.maand-pijl').classList.contains('open');
+      // bepaal of dit de standaard-open (nieuwste) maand is aan de huidige pijlstand
+      if (pijlOpen){
+        // nu open → dichtklappen
+        S._pdfDicht.add(ym);              // voor standaard-open maand
+        S._pdfDicht.delete('open:'+ym);   // voor handmatig geopende maand
+        S._pdfToonAlles.delete(ym);
+      } else {
+        // nu dicht → openklappen
+        S._pdfDicht.delete(ym);           // standaard-open maand weer open
+        S._pdfDicht.add('open:'+ym);      // andere maand expliciet open
+      }
+      renderTeam();
+    });
+    // alle PDF-trainingen van een maand tonen
+    v.querySelectorAll('[data-pdftoonmeer]').forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      S._pdfToonAlles.add(b.dataset.pdftoonmeer);
       renderTeam();
     });
     return;
