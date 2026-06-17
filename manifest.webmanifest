@@ -1,7 +1,7 @@
 {
-  "name": "Coach je team",
-  "short_name": "Coachie",
-  "description": "Maak per kwart je opstelling, beheer wissels en verdeel speeltijd eerlijk.",
+  "name": "Cluppie — Coach je team",
+  "short_name": "Cluppie",
+  "description": "Coach je team: opstelling per kwart, wissels, presentie en speeltijd eerlijk verdeeld.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
