@@ -1,25 +1,17 @@
 {
-  "name": "Opstelling — Coach je team",
-  "short_name": "Opstelling",
+  "name": "Coach je team",
+  "short_name": "Coachie",
   "description": "Maak per kwart je opstelling, beheer wissels en verdeel speeltijd eerlijk.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#10271A",
+  "background_color": "#FFFFFF",
   "theme_color": "#10271A",
   "icons": [
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='38' fill='%2310271A'/%3E%3Ccircle cx='96' cy='96' r='52' fill='none' stroke='%23D6FB41' stroke-width='10'/%3E%3Cline x1='96' y1='30' x2='96' y2='162' stroke='%23D6FB41' stroke-width='6'/%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%2310271A'/%3E%3Ccircle cx='256' cy='256' r='140' fill='none' stroke='%23D6FB41' stroke-width='26'/%3E%3Cline x1='256' y1='80' x2='256' y2='432' stroke='%23D6FB41' stroke-width='16'/%3E%3C/svg%3E",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
