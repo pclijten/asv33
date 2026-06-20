@@ -448,12 +448,17 @@ function htmlTeamTrainingen(){
     }).join('');
   }
 
+  const aantalDagen = S.presentie.length;
   const presentieSectie = `
     <div class="sectie-kop" style="margin-top:0">📋 Presentie training</div>
     ${alGeregistreerd
-      ? `<div class="kaart" style="background:rgba(226,6,19,.07);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. Tik de regel hieronder aan om aan te passen.</div>`
+      ? `<div class="kaart" style="background:rgba(226,6,19,.07);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. Open de geschiedenis hieronder om aan te passen.</div>`
       : `<button class="knop vol" id="presentieVandaag" style="margin-bottom:12px">✓ Wie is er vandaag?</button>`}
-    ${presentieLijst}`;
+    ${aantalDagen
+      ? `<details class="uitklap" id="presentieHistorie" style="margin-top:0;margin-bottom:14px" ${S._presentieHistorieOpen?'open':''}><summary>Eerdere trainingen${aantalDagen?` (${aantalDagen})`:''}</summary>
+          <div class="inhoud">${presentieLijst}</div>
+        </details>`
+      : presentieLijst}`;
 
   // --- PDF-sectie (ook per maand, zelfde gedrag als presentie) ---
   // huidige maand staat standaard open; gebruiker kan maanden dicht/open klappen.
@@ -742,6 +747,9 @@ function koppelTeamTab(v, tab){
       const p = S.presentie.find(x => x.id === r.dataset.presentie);
       if (p) modalPresentie(p);
     });
+    // historie-blok open/dicht onthouden over re-renders heen
+    const presHist = v.querySelector('#presentieHistorie');
+    if (presHist) presHist.addEventListener('toggle', () => { S._presentieHistorieOpen = presHist.open; });
     // maand in-/uitklappen (presentie)
     v.querySelectorAll('[data-maand]').forEach(b => b.onclick = () => {
       const ym = b.dataset.maand;
