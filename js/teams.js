@@ -451,7 +451,7 @@ function htmlTeamTrainingen(){
   const presentieSectie = `
     <div class="sectie-kop" style="margin-top:0">📋 Presentie training</div>
     ${alGeregistreerd
-      ? `<div class="kaart" style="background:rgba(46,125,70,.08);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. Tik de regel hieronder aan om aan te passen.</div>`
+      ? `<div class="kaart" style="background:rgba(226,6,19,.07);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. Tik de regel hieronder aan om aan te passen.</div>`
       : `<button class="knop vol" id="presentieVandaag" style="margin-bottom:12px">✓ Wie is er vandaag?</button>`}
     ${presentieLijst}`;
 

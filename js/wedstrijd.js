@@ -713,7 +713,7 @@ export function renderWedstrijd(){
         : (w.thuis ? esc(S.team.naam)+' – '+esc(w.tegenstander) : esc(w.tegenstander)+' – '+esc(S.team.naam))}
       <span class="sub">${datumNL(w.datum)} · ${isToernooi(w) ? w.toernooi.wedstrijden+' wedstrijden · ' : ''}${esc(w.formatie)}</span></h1>
       <button class="terug" id="wInstellingen" title="Wedstrijdinstellingen">⚙️</button></div>
-    ${w.doel ? `<div class="kaart" style="background:rgba(214,251,65,.18);border-left:3px solid var(--grass);font-size:13.5px;color:var(--ink);padding:9px 12px;margin-bottom:10px"><b>🎯 Doel:</b> ${esc(w.doel)}</div>` : ''}
+    ${w.doel ? `<div class="kaart" style="background:rgba(226,6,19,.08);border-left:3px solid var(--grass);font-size:13.5px;color:var(--ink);padding:9px 12px;margin-bottom:10px"><b>🎯 Doel:</b> ${esc(w.doel)}</div>` : ''}
 
     <div class="scorebord">
       <button class="sb-goal" id="${sbLinks.knop}" title="Doelpunt ${esc(sbLinks.naam)}">⚽</button>
