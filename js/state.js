@@ -17,6 +17,7 @@ export const S = {
   teamTab:'wedstrijden', geselecteerd:null,
   clubs:[], club:null, clubId:null, clubTab:'teams', clubTrainBouw:'onder', clubTeams:[], clubTrainingen:[],
   trainingen:[], trainingenGelezen:{}, videos:[], presentie:[],
+  planning:[], _planningFilter:'alles', _planningDichteMaanden:null,
   unsub:{}, klokInterval:null, saveTimer:null, lokaalTot:0,
 };
 
