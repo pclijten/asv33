@@ -321,21 +321,6 @@ input,select{font:inherit;color:inherit}
 .uitklap summary::after{content:'▾';margin-left:auto;color:var(--ink-2)}
 .uitklap[open] summary::after{content:'▴'}
 .uitklap .inhoud{margin-top:8px}
-
-/* Notities — coach-overleg per wedstrijd */
-.notitie-blok .inhoud{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px}
-.notitie-lijst{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;margin-bottom:10px}
-.notitie-leeg{font-size:13.5px;color:var(--ink-2);text-align:center;padding:16px 8px;line-height:1.5}
-.notitie{background:#F3F3F0;border-radius:12px;padding:8px 11px;align-self:flex-start;max-width:88%}
-.notitie.eigen{background:rgba(226,6,19,.08);align-self:flex-end}
-.notitie-kop{display:flex;align-items:center;gap:8px;margin-bottom:2px}
-.notitie-naam{font-weight:700;font-size:12.5px;color:var(--grass)}
-.notitie-tijd{font-size:11px;color:var(--ink-2);font-variant-numeric:tabular-nums}
-.notitie-weg{margin-left:auto;color:var(--ink-2);font-size:13px;line-height:1;padding:0 2px}
-.notitie-tekst{font-size:14px;color:var(--ink);line-height:1.45;white-space:pre-wrap;word-break:break-word}
-.notitie-invoer{display:flex;gap:8px;align-items:flex-end}
-.notitie-invoer textarea{flex:1;resize:none;min-height:42px;font-size:14px;line-height:1.4}
-.notitie-invoer .knop{flex-shrink:0;padding:11px 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* ==================================================================
@@ -582,3 +567,40 @@ input,select{font:inherit;color:inherit}
   box-shadow:0 6px 20px rgba(0,0,0,.25);
   object-fit:contain;
 }
+
+/* ==================== SEIZOENSPLANNING ==================== */
+.plan-kop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.plan-seizoen{font-family:'Barlow Condensed';font-weight:700;font-size:19px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink)}
+.plan-chips{display:flex;gap:7px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.plan-chip{flex:0 0 auto;padding:6px 13px;border-radius:20px;background:var(--card);border:1.5px solid var(--hair);font-size:12.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.plan-chip.aan{background:var(--grass);border-color:var(--grass);color:#fff}
+
+.plan-maand{margin-bottom:10px}
+.plan-maand-kop{display:flex;align-items:center;gap:10px;width:100%;padding:7px 4px;background:none;border:none;font-family:'Barlow Condensed';font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-2)}
+.plan-maand-kop .plan-aantal{background:var(--paper);border-radius:10px;padding:1px 9px;font-family:'Inter';font-size:11px;font-weight:700;letter-spacing:0}
+.plan-maand-kop .plan-pijl{margin-left:auto;font-size:12px;color:var(--ink-2)}
+.plan-lijst{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+
+.plan-rij{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--card);border:1px solid var(--hair);border-left:4px solid var(--ink-2);border-radius:11px;padding:9px 12px;box-shadow:var(--shadow)}
+.plan-rij.wd{border-left-color:var(--veld)}
+.plan-rij.beker{border-left-color:#7C4DBC}
+.plan-rij.inhaal{border-left-color:var(--keeper)}
+.plan-rij.vrij{border-left-color:#B7B7B2;background:#FAFAF8}
+.plan-rij.eigen{border-left-color:var(--grass)}
+.plan-rij.verleden{opacity:.55}
+
+.plan-datum{flex:0 0 auto;text-align:center;min-width:34px;line-height:1}
+.plan-datum .d{display:block;font-family:'Barlow Condensed';font-weight:700;font-size:19px;color:var(--ink)}
+.plan-datum .w{display:block;font-size:9.5px;text-transform:uppercase;color:var(--ink-2);letter-spacing:.3px}
+.plan-tekst{flex:1;min-width:0}
+.plan-titel{font-size:13.5px;font-weight:600;color:var(--ink)}
+.plan-mark{font-size:11px;font-weight:600;color:var(--ink-2)}
+.plan-sub{font-size:11.5px;color:var(--ink-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan-sub.eigen{color:var(--grass)}
+
+.plan-badge{flex:0 0 auto;font-family:'Barlow Condensed';font-weight:700;font-size:11px;letter-spacing:.5px;padding:3px 8px;border-radius:7px;color:#fff}
+.plan-badge.wd{background:var(--veld)}
+.plan-badge.beker{background:#7C4DBC}
+.plan-badge.inhaal{background:var(--keeper)}
+.plan-badge.vrij{background:#fff;color:var(--ink-2);border:1px solid var(--hair)}
+.plan-bewerk{flex:0 0 auto;color:var(--ink-2);font-size:14px}
