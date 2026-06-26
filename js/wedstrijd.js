@@ -773,6 +773,13 @@ export function renderWedstrijd(){
       </div>
     </div>
 
+    ${(() => {
+      if (Number(S.kwart) !== 1 || opVeld.size > 0) return '';
+      const vorige = laatsteOpstelling(w.format);
+      if (!vorige || vorige.bron?.id === S.wedstrijdId) return '';
+      return `<button class="knop vol" id="neemVorigeOver" style="margin-bottom:10px;background:var(--ink-1);color:#fff">⧉ Opstelling vorige wedstrijd overnemen${vorige.bron.tegenstander ? ' (tegen '+esc(vorige.bron.tegenstander)+')' : ''}</button>`;
+    })()}
+
     <div class="veld-wrap"><div class="veld" id="veld">
       <div class="lijn midden"></div><div class="lijn cirkel"></div>
       <div class="lijn zestien-o"></div><div class="lijn vijf-o"></div>
@@ -869,6 +876,20 @@ export function renderWedstrijd(){
     }
     renderWedstrijd();
   });
+  const neemOverBtn = v.querySelector('#neemVorigeOver');
+  if (neemOverBtn) neemOverBtn.onclick = () => {
+    const vorige = laatsteOpstelling(w.format);
+    if (!vorige){ meld('Geen vorige opstelling gevonden'); return; }
+    const lineup = {};
+    for (const [slot, pid] of Object.entries(vorige.lineup))
+      if ((w.selectie||[]).includes(pid) && speler(pid)) lineup[slot] = pid;
+    if (!Object.keys(lineup).length){ meld('Geen spelers uit de vorige opstelling zitten in deze selectie'); return; }
+    w.kwarten['1'].lineup = lineup;
+    if (FORMATIES[w.format][vorige.formatie]) w.formatie = vorige.formatie;
+    S.kwart = '1';
+    bewaarWedstrijd(); renderWedstrijd();
+    meld(`Opstelling overgenomen${vorige.bron.tegenstander ? ' van wedstrijd tegen '+vorige.bron.tegenstander : ''} — pas aan waar nodig`);
+  };
   v.querySelector('#goalVoor').onclick = modalGoalVoor;
   v.querySelector('#goalTegen').onclick = () => registreerGoal({type:'tegen'});
   v.querySelector('#kaartKnop').onclick = modalKaart;
