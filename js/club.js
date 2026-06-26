@@ -318,8 +318,17 @@ function modalClubAflasten(teams){
 async function clubAfgelastOpheffen(teams){
   if (!confirm('Afgelasting opheffen? De trainingen gaan dan weer gewoon door.')) return;
   try {
+    // 1) wis het afgelast-veld op alle team-documenten (verbergt de banner)
     await Promise.all(teams.map(t =>
       updateDoc(doc(db,'teams',t.id), { afgelast: deleteField() })
+    ));
+    // 2) verwijder de actieve (vandaag/toekomstige) historie-records, zodat een
+    //    per ongeluk ingestelde afgelasting de stats niet vervuilt en het clubscherm
+    //    niet langer 'actief' toont. Opheffen = correctie van een vergissing.
+    const vandaag = new Date().toISOString().slice(0,10);
+    const actieve = (S.clubAfgelastingen || []).filter(a => a.datum >= vandaag);
+    await Promise.all(actieve.map(a =>
+      deleteDoc(doc(db,'clubs',S.clubId,'afgelastingen',a.id))
     ));
     meld('Afgelasting opgeheven');
     renderClub();
