@@ -658,3 +658,19 @@ input,select{font:inherit;color:inherit}
 .caf-rij:first-of-type{border-top:none}
 .caf-rij-datum{font-weight:600;min-width:74px;text-transform:capitalize}
 .caf-rij-reden{color:var(--ink-2);flex:1}
+
+/* ==================== VOETBAL.NL TOKEN-BEHEER ==================== */
+.tok-rij{display:flex;flex-direction:column;gap:7px;padding:13px 0;border-top:1px solid #f0f0ee}
+.tok-rij:first-of-type{border-top:none}
+.tok-kop{display:flex;align-items:center;gap:8px}
+.tok-team{font-weight:700;font-size:15px;flex:1}
+.tok-status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.3px}
+.tok-status.gekoppeld{background:rgba(29,138,63,.12);color:#1d8a3f}
+.tok-status.leeg{background:rgba(110,110,108,.12);color:var(--ink-2)}
+.tok-invoer{display:flex;gap:7px}
+.tok-invoer input{flex:1;min-width:0;border:1.5px solid #e3e3e0;border-radius:10px;padding:10px 11px;font-size:13px;font-family:'Inter';background:#fafafa}
+.tok-invoer input:focus{outline:none;border-color:var(--grass);background:#fff}
+.tok-invoer button{border:none;border-radius:10px;padding:0 15px;font-weight:700;font-size:13px;background:var(--grass);color:#fff;white-space:nowrap}
+.tok-invoer button:disabled{opacity:.6}
+.tok-laatste{font-size:11px;color:var(--ink-2)}
+.tok-laatste b{color:#1d8a3f;font-weight:600}
