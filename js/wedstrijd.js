@@ -203,7 +203,7 @@ function normaliseerWedstrijd(w){
   }
   if (!Array.isArray(w.goals)){ w.goals = []; veranderd = true; }
   if (!Array.isArray(w.kaarten)){ w.kaarten = []; veranderd = true; }
-  if (!Array.isArray(w.selectie)){ w.selectie = S.spelers.map(p => p.id); veranderd = true; }
+  if (!Array.isArray(w.selectie) || !w.selectie.length){ w.selectie = S.spelers.map(p => p.id); veranderd = true; }
   return veranderd;
 }
 
