@@ -1,5 +1,5 @@
 import {
-  db, storage, collection, doc, addDoc, deleteDoc, updateDoc, getDocs,
+  db, storage, collection, doc, addDoc, deleteDoc, updateDoc, deleteField, getDocs,
   query, where, onSnapshot, serverTimestamp, documentId,
   sRef, uploadBytes, getDownloadURL, deleteObject
 } from './firebase.js';
@@ -77,6 +77,19 @@ async function clubVideosOphalen(){
     .sort((a,b) => (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
 }
 
+/* afgelast-historie: centrale lijst onder clubs/{clubId}/afgelastingen (nieuw → oud) */
+async function clubAfgelastingenOphalen(){
+  const snap = await getDocs(collection(db,'clubs',S.clubId,'afgelastingen'));
+  return snap.docs.map(d => ({id:d.id, ...d.data()}))
+    .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+}
+
+/* 'YYYY-MM-DD' -> 'do 25 jun' (kort, voor de statslijst) */
+function afgKort(datum){
+  try { return new Date(datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}); }
+  catch { return datum; }
+}
+
 async function renderClub(){
   if (!S.club) return;
   const v = $('#view-club');
@@ -86,9 +99,11 @@ async function renderClub(){
   S.clubTrainingen = trainingen;
   const videos = await clubVideosOphalen();
   S.clubVideos = videos;
+  const afgelastingen = await clubAfgelastingenOphalen();
+  S.clubAfgelastingen = afgelastingen;
   const tab = S.clubTab;
   let inhoud = '';
-  if (tab === 'teams')      inhoud = htmlClubTeams(teams);
+  if (tab === 'teams')      inhoud = htmlClubTeams(teams, afgelastingen);
   if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
   if (tab === 'videos')     inhoud = htmlClubVideos(teams, videos);
   if (tab === 'instel')     inhoud = htmlClubInstel();
@@ -105,8 +120,42 @@ async function renderClub(){
   koppelClubTab(v, tab, teams, trainingen, videos);
 }
 
-function htmlClubTeams(teams){
+function htmlClubTeams(teams, afgelastingen = []){
+  // is er nu een geldige (vandaag of toekomstige) afgelasting actief?
+  const vandaag = new Date().toISOString().slice(0,10);
+  const actief = afgelastingen.find(a => a.datum >= vandaag);
+
+  // stats: tel afgelastingen in het lopende seizoen-jaar (laatste 12 mnd is simpel en duidelijk)
+  const grens = new Date(Date.now() - 365*24*3600*1000).toISOString().slice(0,10);
+  const recent = afgelastingen.filter(a => a.datum >= grens);
+  const laatste5 = afgelastingen.slice(0, 5);
+
+  const afgelastBlok = `
+    <div class="club-afgelast-blok">
+      ${actief
+        ? `<div class="caf-actief">
+             <div class="caf-actief-kop"><span>⛔</span><b>Training afgelast — ${esc(afgKort(actief.datum))}</b></div>
+             ${actief.reden ? `<div class="caf-actief-reden">${esc(actief.reden)}</div>` : ''}
+             <button class="knop licht vol caf-op" id="clubAfgelastOpheffen">Afgelasting opheffen</button>
+           </div>`
+        : `<button class="knop vol caf-aflast" id="clubAflast">⛔ Training afgelasten (clubbreed)</button>`}
+      <div class="caf-stats">
+        <div class="caf-stat"><span class="caf-getal">${recent.length}</span><span class="caf-label">laatste 12 mnd</span></div>
+        <div class="caf-stat"><span class="caf-getal">${afgelastingen.length}</span><span class="caf-label">totaal</span></div>
+      </div>
+      ${laatste5.length ? `
+        <div class="caf-historie">
+          <div class="caf-historie-kop">Recente afgelastingen</div>
+          ${laatste5.map(a => `
+            <div class="caf-rij">
+              <span class="caf-rij-datum">${esc(afgKort(a.datum))}</span>
+              <span class="caf-rij-reden">${a.reden ? esc(a.reden) : '—'}</span>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
+
   return `
+    ${afgelastBlok}
     <button class="knop vol" id="clubNieuwTeam" style="margin-bottom:8px">+ Team aanmaken voor deze club</button>
     <div class="rij" style="margin-bottom:14px">
       <button class="knop licht vol" id="clubImporteerPDF">📥 Importeren uit PDF</button>
@@ -224,8 +273,67 @@ function htmlClubInstel(){
     <button class="knop gevaar vol" id="verwijderClub">Club opheffen</button>`;
 }
 
+/* ---------- Clubbrede afgelasting ---------- */
+/* Schrijft het afgelast-veld naar ALLE team-documenten van de club tegelijk (Optie B),
+   plus één centraal historie-record onder clubs/{clubId}/afgelastingen voor de stats.
+   Geen naam in de afgelasting. Alleen de beheerder ziet/gebruikt deze knop. */
+function modalClubAflasten(teams){
+  const vandaag = new Date().toISOString().slice(0,10);
+  openModal(`
+    <h2>Training afgelasten</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">Dit last de training af voor <b>alle ${teams.length} teams</b> van de club. Elke trainer kan het bericht daarna doorsturen in zijn eigen WhatsApp-groep.</p>
+    <div class="veldgroep"><label>Welke dag?</label>
+      <input class="invoer" id="mAflasDatum" type="date" value="${vandaag}" min="${vandaag}"></div>
+    <div class="veldgroep"><label>Reden (optioneel)</label>
+      <input class="invoer" id="mAflasReden" placeholder="Bijv. slecht weer, velden onbespeelbaar" autocomplete="off" maxlength="140"></div>
+    <div class="rij" style="margin-top:6px">
+      <button class="knop licht vol" id="mAflasAnnuleer">Annuleren</button>
+      <button class="knop vol" id="mAflasOk">Aflasten voor hele club</button>
+    </div>`);
+
+  $('#mAflasAnnuleer').onclick = () => sluitModal();
+  $('#mAflasOk').onclick = async () => {
+    const datum = $('#mAflasDatum').value;
+    if (!datum) return meld('Kies eerst een dag');
+    const reden = ($('#mAflasReden').value || '').trim();
+    const knop = $('#mAflasOk'); knop.disabled = true; knop.textContent = 'Aflasten...';
+    const data = { datum, reden, tijd: serverTimestamp() };
+    try {
+      // 1) naar alle team-documenten van de club (Optie B)
+      await Promise.all(teams.map(t =>
+        updateDoc(doc(db,'teams',t.id), { afgelast: data })
+      ));
+      // 2) één centraal historie-record voor de stats
+      await addDoc(collection(db,'clubs',S.clubId,'afgelastingen'), data);
+      sluitModal();
+      meld(`Training afgelast voor ${teams.length} teams`);
+      renderClub();
+    } catch(e){
+      knop.disabled = false; knop.textContent = 'Aflasten voor hele club';
+      meld('Aflasten mislukt: ' + (e.code || e.message));
+    }
+  };
+}
+
+async function clubAfgelastOpheffen(teams){
+  if (!confirm('Afgelasting opheffen? De trainingen gaan dan weer gewoon door.')) return;
+  try {
+    await Promise.all(teams.map(t =>
+      updateDoc(doc(db,'teams',t.id), { afgelast: deleteField() })
+    ));
+    meld('Afgelasting opgeheven');
+    renderClub();
+  } catch(e){
+    meld('Opheffen mislukt: ' + (e.code || e.message));
+  }
+}
+
 function koppelClubTab(v, tab, teams, trainingen, videos){
   if (tab === 'teams'){
+    const aflastBtn = v.querySelector('#clubAflast');
+    if (aflastBtn) aflastBtn.onclick = () => modalClubAflasten(teams);
+    const opheffenBtn = v.querySelector('#clubAfgelastOpheffen');
+    if (opheffenBtn) opheffenBtn.onclick = () => clubAfgelastOpheffen(teams);
     v.querySelector('#clubNieuwTeam').onclick = async () => (await teamsModule()).modalNieuwTeam(S.clubId);
     const impBtn = v.querySelector('#clubImporteerPDF');
     if (impBtn) impBtn.onclick = modalImporteerPDF;

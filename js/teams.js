@@ -6,7 +6,8 @@ import {
   S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen, isBeheerder,
   openModal, sluitModal, toon, stopUnsubs
 } from './state.js';
-import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch } from './config.js';
+import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
+  KNVB_SEIZOEN, knvbKalenderVoorTeam } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
@@ -272,7 +273,7 @@ function modalJoinTeam(){
 export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   S.teamId = teamId; S.teamTab = beginTab;
   S._pendingNieuweWedstrijd = !!opties.nieuweWedstrijd;
-  stopUnsubs('team','spelers','wedstrijden','presentie');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning');
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
@@ -298,11 +299,15 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
       .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
     if (!S.wedstrijdId && S.teamTab === 'trainingen') renderTeam();
   });
+  S.unsub.planning = onSnapshot(collection(db,'teams',teamId,'planning'), snap => {
+    S.planning = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    if (!S.wedstrijdId && S.teamTab === 'planning') renderTeam();
+  });
   toon('team');
 }
 export function verlaatTeamView(){
-  stopUnsubs('team','spelers','wedstrijden','presentie');
-  S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = [];
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning');
+  S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = []; S.planning = [];
   renderTeams(); toon('teams');
 }
 
@@ -313,6 +318,7 @@ export function renderTeam(){
   let inhoud = '';
   if (tab === 'wedstrijden') inhoud = htmlWedstrijden();
   if (tab === 'spelers')     inhoud = htmlSpelers();
+  if (tab === 'planning')    inhoud = htmlPlanning();
   if (tab === 'stats')       inhoud = htmlStats();
   if (tab === 'trainingen')  inhoud = htmlTeamTrainingen();
   if (tab === 'videos')      inhoud = htmlTeamVideos();
@@ -328,7 +334,7 @@ export function renderTeam(){
       <button class="terug" id="teamInstel" title="Teaminstellingen">⚙️</button></div>
     ${inhoud}
     <nav class="onderbalk">
-      ${[['wedstrijden','📋','Wedstr.'],['spelers','👕','Spelers'],['trainingen','📄','Training'],['videos','🎬','Video'],['stats','⏱','Stats'],['help','❓','Help']]
+      ${[['wedstrijden','📋','Wedstr.'],['spelers','👕','Spelers'],['planning','📅','Planning'],['trainingen','📄','Training'],['videos','🎬','Video'],['stats','⏱','Stats'],['help','❓','Help']]
         .map(([id,ico,naam]) => `<button data-tab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span><span class="tablabel">${naam}${id==='trainingen' && ongelezen ? '<span class="puntje"></span>' : ''}</span></button>`).join('')}
     </nav>`;
 
@@ -377,9 +383,133 @@ function htmlSpelers(){
     : `<div class="kaart leeg">Nog geen spelers.<br>Voeg je selectie toe — naam en rugnummer is genoeg.</div>`}`;
 }
 
-/* ---------- Afgelasting: geldt de afgelasting nog? ----------
-   Een afgelasting hangt op het team-document (S.team.afgelast = {datum, reden, door, tijd}).
-   Hij is geldig t/m de opgegeven datum; daarna 'verlopen' en tonen we hem niet meer. */
+/* ---------- Tab: seizoensplanning ---------- */
+const PLAN_TYPE = {
+  wd:     {kort:'WD',   klas:'wd',     naam:'Wedstrijddag'},
+  beker:  {kort:'BEK',  klas:'beker',  naam:'Beker'},
+  inhaal: {kort:'INH',  klas:'inhaal', naam:'Inhaal'},
+  vrij:   {kort:'VRIJ', klas:'vrij',   naam:'Vrij'},
+  eigen:  {kort:'',     klas:'eigen',  naam:'Eigen dag'},
+};
+const PLAN_FILTERS = [
+  ['alles','Alles'], ['wd','Wedstrijden'], ['beker','Beker'], ['vrij','Vrij'],
+];
+const PLAN_MAANDEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+
+/* combineer KNVB-kalender + Firestore-aanpassingen + eigen dagen tot één gesorteerde lijst.
+   Override-docs hebben id 'knvb_<datum>' en kunnen {verborgen:true} of een nieuw label/type zetten.
+   Eigen dagen zijn losse docs met bron:'eigen'. */
+function planningItems(){
+  const team = S.team;
+  if (!team) return [];
+  const knvb = knvbKalenderVoorTeam(team);
+  const overrides = {};
+  const eigen = [];
+  for (const p of (S.planning||[])){
+    if (p.bron === 'eigen') eigen.push(p);
+    else if (p.id && p.id.startsWith('knvb_')) overrides[p.datum] = p;
+  }
+  const items = [];
+  for (const k of knvb){
+    const ov = overrides[k.d];
+    if (ov && ov.verborgen) continue;
+    items.push({
+      bron: 'knvb',
+      docId: ov ? ov.id : null,
+      datum: k.d,
+      type: (ov && ov.type) || k.t,
+      label: (ov && ov.label) || k.l,
+      opmerking: ov && 'opmerking' in ov ? ov.opmerking : (k.n || ''),
+      aangepast: !!ov,
+    });
+  }
+  for (const e of eigen){
+    items.push({
+      bron: 'eigen', docId: e.id, datum: e.datum,
+      type: e.type || 'eigen', label: e.label || 'Eigen dag',
+      opmerking: e.opmerking || '', aangepast: false,
+    });
+  }
+  return items.sort((a,b) => a.datum.localeCompare(b.datum));
+}
+
+function htmlPlanning(){
+  const filter = S._planningFilter || 'alles';
+  let items = planningItems();
+  if (filter !== 'alles'){
+    items = items.filter(it => it.type === filter);
+  }
+  // standaard: verleden maanden ingeklapt. _planningDichteMaanden = expliciet gesloten set;
+  // bij eerste render vullen we 'm met alle maanden vóór de huidige.
+  if (S._planningDichteMaanden === null){
+    S._planningDichteMaanden = new Set();
+    const nu = new Date().toISOString().slice(0,7);
+    for (const it of items){
+      const ym = it.datum.slice(0,7);
+      if (ym < nu) S._planningDichteMaanden.add(ym);
+    }
+  }
+  const dicht = S._planningDichteMaanden;
+
+  const chips = PLAN_FILTERS.map(([id,lbl]) =>
+    `<button class="plan-chip ${filter===id?'aan':''}" data-planfilter="${id}">${lbl}</button>`).join('');
+
+  let body = '';
+  if (!items.length){
+    body = `<div class="kaart leeg">Geen speeldagen voor dit filter.</div>`;
+  } else {
+    // groepeer per maand (jaar-maand)
+    const perMaand = {};
+    for (const it of items){
+      const ym = it.datum.slice(0,7);
+      (perMaand[ym] ||= []).push(it);
+    }
+    const nu = new Date().toISOString().slice(0,10);
+    body = Object.keys(perMaand).sort().map(ym => {
+      const [jr,mn] = ym.split('-');
+      const maandNaam = PLAN_MAANDEN[Number(mn)-1];
+      const open = !dicht.has(ym);
+      const rijen = perMaand[ym].map(it => {
+        const ti = PLAN_TYPE[it.type] || PLAN_TYPE.eigen;
+        const dt = new Date(it.datum+'T12:00');
+        const dag = dt.getDate();
+        const wdag = dt.toLocaleDateString('nl-NL',{weekday:'short'}).replace('.','');
+        const isVerleden = it.datum < nu;
+        const badge = ti.kort ? `<span class="plan-badge ${ti.klas}">${ti.kort}</span>` : `<span class="plan-bewerk">✎</span>`;
+        const opm = it.opmerking ? `<div class="plan-sub">${esc(it.opmerking)}</div>`
+          : (it.bron === 'eigen' ? `<div class="plan-sub eigen">Eigen dag</div>` : '');
+        return `
+          <button class="plan-rij ${ti.klas} ${isVerleden?'verleden':''}" data-plandag="${it.datum}" data-planbron="${it.bron}" data-plandoc="${it.docId||''}">
+            <div class="plan-datum"><span class="d">${dag}</span><span class="w">${wdag}</span></div>
+            <div class="plan-tekst"><div class="plan-titel">${esc(it.label)}${it.aangepast?' <span class="plan-mark">·aangepast</span>':''}</div>${opm}</div>
+            ${badge}
+          </button>`;
+      }).join('');
+      return `
+        <div class="plan-maand">
+          <button class="plan-maand-kop" data-planmaand="${ym}">
+            <span>${maandNaam} ${jr}</span>
+            <span class="plan-aantal">${perMaand[ym].length}</span>
+            <span class="plan-pijl">${open?'▾':'▸'}</span>
+          </button>
+          ${open ? `<div class="plan-lijst">${rijen}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  return `
+    <div class="plan-kop">
+      <div class="plan-seizoen">Seizoen ${esc(KNVB_SEIZOEN)}</div>
+      <button class="knop vol klein" id="planEigenDag">+ Eigen dag</button>
+    </div>
+    <div class="plan-chips">${chips}</div>
+    ${body}`;
+}
+
+/* ---------- Afgelasting (clubbreed) ----------
+   De beheerder schrijft de afgelasting weg naar ALLE team-documenten van de club
+   (zie modalClubAflasten in club.js). Elk team toont 'm hier zolang de datum geldig is.
+   Geen naam in de banner of het WhatsApp-bericht. */
 function afgelastGeldig(){
   const a = S.team && S.team.afgelast;
   if (!a || !a.datum) return null;
@@ -387,48 +517,41 @@ function afgelastGeldig(){
   return (a.datum >= vandaag) ? a : null;   // alleen vandaag of in de toekomst
 }
 
-/* datum 'YYYY-MM-DD' -> 'donderdag 25 juni' (met hoofdletter) */
-function afgelastDatumTekst(datum){
+/* 'YYYY-MM-DD' -> 'donderdag 25 juni' (met hoofdletter) */
+export function afgelastDatumTekst(datum){
   const d = new Date(datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
   return d.charAt(0).toUpperCase()+d.slice(1);
 }
 
-/* de WhatsApp-tekst die wordt voorgevuld bij delen */
+/* de WhatsApp-tekst die de trainer doorstuurt naar zijn eigen teamgroep — zonder naam */
 function afgelastWhatsappTekst(a){
   const dag = afgelastDatumTekst(a.datum);
-  let t = `⛔ *${S.team.naam} — training afgelast*\n`;
+  let t = `⛔ *Training afgelast*\n`;
   t += `De training van ${dag} gaat *niet* door.`;
   if (a.reden && a.reden.trim()) t += `\n\n${a.reden.trim()}`;
   return t;
 }
 
-/* de rode banner bovenaan de trainingen-tab */
+/* de rode banner bovenaan de trainingen-tab (zichtbaar voor alle teamleden) */
 function afgelastBannerHtml(a){
   const dag = afgelastDatumTekst(a.datum);
   return `
     <div class="afgelast-banner">
       <div class="ab-kop"><span class="ab-ico">⛔</span><h2>Training afgelast</h2></div>
       <div class="ab-tekst">De training van <b>${esc(dag)}</b> gaat <b>niet</b> door.
-        ${a.reden && a.reden.trim() ? `<div class="ab-reden">${esc(a.reden.trim())}</div>` : ''}
-        ${a.door ? `<div class="ab-door">Afgelast door ${esc(a.door)}</div>` : ''}</div>
-      <div class="ab-knoppen">
-        <button class="ab-wa" id="afgelastDeel">📲 Deel via WhatsApp</button>
-        <button class="ab-op" id="afgelastOpheffen">Opheffen</button>
-      </div>
+        ${a.reden && a.reden.trim() ? `<div class="ab-reden">${esc(a.reden.trim())}</div>` : ''}</div>
+      <button class="ab-wa-vol" id="afgelastDeel">📲 Stuur door in mijn teamgroep</button>
     </div>`;
 }
 
-/* ---------- Tab: trainingen (presentie + gedeelde PDF's) ---------- */
 function htmlTeamTrainingen(){
   const pdfs = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
   const vandaag = new Date().toISOString().slice(0,10);
   const alGeregistreerd = S.presentie.find(p => p.datum === vandaag);
 
-  // afgelasting: toon banner als die geldt, anders een knop om af te lasten
+  // afgelasting: toon banner als die geldt (geen aflast-knop hier; dat doet de beheerder op het clubscherm)
   const afg = afgelastGeldig();
-  const afgelastSectie = afg
-    ? afgelastBannerHtml(afg)
-    : `<button class="aflas-knop" id="aflasStart">⛔ Training afgelasten</button>`;
+  const afgelastSectie = afg ? afgelastBannerHtml(afg) : '';
 
   // welke maanden zijn opengeklapt? standaard alleen de huidige maand.
   if (!S._presentieOpen){
@@ -775,24 +898,33 @@ function htmlHandleiding(){
 }
 
 function koppelTeamTab(v, tab){
+  if (tab === 'planning'){
+    const eigenBtn = v.querySelector('#planEigenDag');
+    if (eigenBtn) eigenBtn.onclick = () => modalEigenDag();
+    v.querySelectorAll('[data-planfilter]').forEach(b => b.onclick = () => {
+      S._planningFilter = b.dataset.planfilter; renderTeam();
+    });
+    v.querySelectorAll('[data-planmaand]').forEach(b => b.onclick = () => {
+      const ym = b.dataset.planmaand;
+      if (S._planningDichteMaanden.has(ym)) S._planningDichteMaanden.delete(ym);
+      else S._planningDichteMaanden.add(ym);
+      renderTeam();
+    });
+    v.querySelectorAll('[data-plandag]').forEach(b => b.onclick = () => {
+      const datum = b.dataset.plandag;
+      const bron = b.dataset.planbron;
+      const it = planningItems().find(x => x.datum === datum && x.bron === bron);
+      if (it) modalPlanDag(it);
+    });
+  }
   if (tab === 'trainingen'){
-    // --- afgelasting ---
-    const aflasStart = v.querySelector('#aflasStart');
-    if (aflasStart) aflasStart.onclick = () => modalAflasten();
+    // afgelasting doorsturen naar eigen teamgroep
     const afgDeel = v.querySelector('#afgelastDeel');
     if (afgDeel) afgDeel.onclick = () => {
       const a = afgelastGeldig();
       if (!a) return;
       const tekst = encodeURIComponent(afgelastWhatsappTekst(a));
       window.open('https://wa.me/?text=' + tekst, '_blank');
-    };
-    const afgOp = v.querySelector('#afgelastOpheffen');
-    if (afgOp) afgOp.onclick = async () => {
-      if (!confirm('Afgelasting opheffen? De training gaat dan weer gewoon door.')) return;
-      try {
-        await updateDoc(doc(db,'teams',S.teamId), { afgelast: deleteField() });
-        meld('Afgelasting opgeheven');
-      } catch(e){ meld('Opheffen mislukt: ' + (e.code || e.message)); }
     };
     v.querySelectorAll('[data-open-training]').forEach(r => r.onclick = async () => {
       const id = r.dataset.openTraining;
@@ -1018,48 +1150,6 @@ function modalMijnNaam(){
 /* ---------- Presentie registreren / aanpassen ----------
    Iedereen staat standaard op AANWEZIG. De coach tikt alleen de afwezigen aan.
    We slaan alleen de lijst met afwezige speler-id's op (compact). */
-/* ---------- Modal: training afgelasten ---------- */
-function modalAflasten(){
-  const vandaag = new Date().toISOString().slice(0,10);
-  // standaard al ingevuld op vandaag; coach kan een andere dag kiezen
-  openModal(`
-    <h2>Training afgelasten</h2>
-    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">Kies voor welke dag de training niet doorgaat. Daarna kun je het meteen delen via WhatsApp.</p>
-    <div class="veldgroep"><label>Welke dag?</label>
-      <input class="invoer" id="mAflasDatum" type="date" value="${vandaag}" min="${vandaag}"></div>
-    <div class="veldgroep"><label>Reden (optioneel)</label>
-      <input class="invoer" id="mAflasReden" placeholder="Bijv. slecht weer, veld onbespeelbaar" autocomplete="off" maxlength="140"></div>
-    <div class="rij" style="margin-top:6px">
-      <button class="knop licht vol" id="mAflasAnnuleer">Annuleren</button>
-      <button class="knop vol" id="mAflasOk">Aflasten</button>
-    </div>`);
-
-  $('#mAflasAnnuleer').onclick = () => sluitModal();
-  $('#mAflasOk').onclick = async () => {
-    const datum = $('#mAflasDatum').value;
-    if (!datum) return meld('Kies eerst een dag');
-    const reden = $('#mAflasReden').value.trim();
-    const knop = $('#mAflasOk'); knop.disabled = true; knop.textContent = 'Aflasten...';
-    const data = {
-      datum,
-      reden: reden || '',
-      door: S.team.ledenInfo?.[S.user.uid]?.naam || S.user.displayName || S.user.email || '',
-      tijd: serverTimestamp(),
-    };
-    try {
-      await updateDoc(doc(db,'teams',S.teamId), { afgelast: data });
-      sluitModal();
-      // direct delen aanbieden: open WhatsApp met de voorgevulde tekst
-      const tekst = encodeURIComponent(afgelastWhatsappTekst({datum, reden}));
-      window.open('https://wa.me/?text=' + tekst, '_blank');
-      meld('Training afgelast — deel het bericht in je teamgroep');
-    } catch(e){
-      knop.disabled = false; knop.textContent = 'Aflasten';
-      meld('Aflasten mislukt: ' + (e.code || e.message));
-    }
-  };
-}
-
 function modalPresentie(bestaande = null){
   if (!S.spelers.length) return meld('Voeg eerst spelers toe onder het tabblad Spelers');
   const datum = bestaande ? bestaande.datum : new Date().toISOString().slice(0,10);
@@ -1123,5 +1213,95 @@ function modalPresentie(bestaande = null){
       await deleteDoc(doc(db,'teams',S.teamId,'presentie',bestaande.id));
       sluitModal(); meld('Presentie verwijderd');
     } catch(e){ meld('Verwijderen mislukt: ' + (e.code || e.message)); }
+  };
+}
+
+/* ---------- Planning: eigen dag toevoegen ---------- */
+function modalEigenDag(){
+  const vandaag = new Date().toISOString().slice(0,10);
+  openModal(`
+    <h2>Eigen dag toevoegen</h2>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:12px">Voeg een eigen datum toe aan de planning — bijvoorbeeld een toernooi, teamuitje of trainingskamp.</p>
+    <div class="veldgroep"><label>Datum</label>
+      <input class="invoer" id="mEdDatum" type="date" value="${vandaag}"></div>
+    <div class="veldgroep"><label>Omschrijving</label>
+      <input class="invoer" id="mEdLabel" placeholder="Bijv. Teamfoto, toernooi, vrij" autocomplete="off"></div>
+    <div class="veldgroep"><label>Notitie (optioneel)</label>
+      <input class="invoer" id="mEdOpm" placeholder="Extra info" autocomplete="off"></div>
+    <button class="knop vol" id="mEdOk">Toevoegen</button>`);
+  $('#mEdOk').onclick = async () => {
+    const datum = $('#mEdDatum').value;
+    const label = $('#mEdLabel').value.trim();
+    if (!datum) return meld('Kies een datum');
+    if (!label) return meld('Geef een omschrijving');
+    try {
+      await addDoc(collection(db,'teams',S.teamId,'planning'), {
+        bron: 'eigen', datum, type: 'eigen', label,
+        opmerking: $('#mEdOpm').value.trim(),
+        gemaakt: serverTimestamp(),
+      });
+      // zorg dat de maand zichtbaar is na toevoegen
+      if (S._planningDichteMaanden) S._planningDichteMaanden.delete(datum.slice(0,7));
+      sluitModal(); meld('Dag toegevoegd');
+    } catch(e){ meld('Toevoegen mislukt: ' + (e.code || e.message)); }
+  };
+}
+
+/* ---------- Planning: KNVB-dag aanpassen/verbergen of eigen dag bewerken ---------- */
+function modalPlanDag(it){
+  const isEigen = it.bron === 'eigen';
+  const typeOpties = [['wd','Wedstrijddag'],['beker','Beker'],['inhaal','Inhaal'],['vrij','Vrij'],['eigen','Eigen dag']];
+  openModal(`
+    <h2>${datumNL(it.datum)}</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px">${isEigen ? 'Eigen dag bewerken of verwijderen.' : 'KNVB-speeldag aanpassen of verbergen voor dit team. De originele kalender blijft bewaard.'}</p>
+    <div class="veldgroep"><label>Type</label>
+      <select class="invoer" id="mPdType">${typeOpties.map(([v,l]) => `<option value="${v}" ${it.type===v?'selected':''}>${l}</option>`).join('')}</select></div>
+    <div class="veldgroep"><label>Omschrijving</label>
+      <input class="invoer" id="mPdLabel" value="${esc(it.label||'')}" autocomplete="off"></div>
+    <div class="veldgroep"><label>Notitie (optioneel)</label>
+      <input class="invoer" id="mPdOpm" value="${esc(it.opmerking||'')}" autocomplete="off"></div>
+    <button class="knop vol" id="mPdOk">Opslaan</button>
+    <div class="rij" style="margin-top:8px">
+      ${it.aangepast && !isEigen ? `<button class="knop licht" id="mPdReset" style="flex:1">Herstel KNVB</button>` : ''}
+      <button class="knop gevaar" id="mPdWeg" style="flex:1">${isEigen ? 'Verwijderen' : 'Verbergen'}</button>
+    </div>`);
+  $('#mPdOk').onclick = async () => {
+    const type = $('#mPdType').value;
+    const label = $('#mPdLabel').value.trim() || (PLAN_TYPE[type]?.naam || 'Dag');
+    const opmerking = $('#mPdOpm').value.trim();
+    try {
+      if (isEigen){
+        await updateDoc(doc(db,'teams',S.teamId,'planning',it.docId), {type, label, opmerking});
+      } else {
+        await setDoc(doc(db,'teams',S.teamId,'planning','knvb_'+it.datum), {
+          bron:'knvb', datum: it.datum, type, label, opmerking, verborgen:false,
+        });
+      }
+      sluitModal(); meld('Opgeslagen');
+    } catch(e){ meld('Opslaan mislukt: ' + (e.code || e.message)); }
+  };
+  const reset = $('#mPdReset');
+  if (reset) reset.onclick = async () => {
+    try {
+      await deleteDoc(doc(db,'teams',S.teamId,'planning','knvb_'+it.datum));
+      sluitModal(); meld('KNVB-dag hersteld');
+    } catch(e){ meld('Mislukt: ' + (e.code || e.message)); }
+  };
+  $('#mPdWeg').onclick = async () => {
+    if (isEigen){
+      if (!confirm('Deze eigen dag verwijderen?')) return;
+      try {
+        await deleteDoc(doc(db,'teams',S.teamId,'planning',it.docId));
+        sluitModal(); meld('Verwijderd');
+      } catch(e){ meld('Mislukt: ' + (e.code || e.message)); }
+    } else {
+      if (!confirm('Deze KNVB-dag verbergen voor dit team?')) return;
+      try {
+        await setDoc(doc(db,'teams',S.teamId,'planning','knvb_'+it.datum), {
+          bron:'knvb', datum: it.datum, verborgen:true,
+        });
+        sluitModal(); meld('Verborgen');
+      } catch(e){ meld('Mislukt: ' + (e.code || e.message)); }
+    }
   };
 }
