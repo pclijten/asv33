@@ -1,5 +1,5 @@
 import {
-  db, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp, query
+  db, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot, serverTimestamp
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, mmss, uurMin, datumNL, speler, spelerNaam, spelerNr,
@@ -180,6 +180,33 @@ export function modalNieuweWedstrijd(){
 }
 
 /* ==================== OPENEN & OPSLAAN ==================== */
+
+/* Vult ontbrekende wedstrijdvelden aan (bv. geïmporteerde voetbal.nl-wedstrijden
+   hebben geen format/periodes/formatie/kwartduur/kwarten). Geeft true terug als
+   er iets is aangevuld, zodat we het document één keer kunnen wegschrijven. */
+function normaliseerWedstrijd(w){
+  const cat = catInfo(S.team.categorie) || null;
+  let veranderd = false;
+  if (w.type !== 'toernooi' && w.type !== 'normaal'){ w.type = 'normaal'; veranderd = true; }
+  if (!w.format){ w.format = (cat ? cat.format : S.team.format) || '8'; veranderd = true; }
+  if (typeof w.thuis !== 'boolean'){ w.thuis = true; veranderd = true; }
+  if (!w.periodes){ w.periodes = cat ? cat.periodes : 4; veranderd = true; }
+  if (!w.kwartduur){ w.kwartduur = cat ? cat.duur : 15; veranderd = true; }
+  if (!FORMATIES[w.format]){ w.format = '8'; veranderd = true; }
+  if (!w.formatie || !FORMATIES[w.format][w.formatie]){
+    w.formatie = Object.keys(FORMATIES[w.format])[0]; veranderd = true;
+  }
+  if (!w.kwarten || typeof w.kwarten !== 'object' || !Object.keys(w.kwarten).length){
+    const kwarten = {};
+    for (let i = 1; i <= w.periodes; i++) kwarten[i] = leegKwart();
+    w.kwarten = kwarten; veranderd = true;
+  }
+  if (!Array.isArray(w.goals)){ w.goals = []; veranderd = true; }
+  if (!Array.isArray(w.kaarten)){ w.kaarten = []; veranderd = true; }
+  if (!Array.isArray(w.selectie)){ w.selectie = S.spelers.map(p => p.id); veranderd = true; }
+  return veranderd;
+}
+
 export function openWedstrijd(wid){
   S.wedstrijdId = wid; S.kwart = '1'; S.geselecteerd = null;
   stopUnsubs('wedstrijd');
@@ -187,14 +214,16 @@ export function openWedstrijd(wid){
     if (!snap.exists()){ sluitWedstrijd(); return; }
     if (snap.metadata.hasPendingWrites) return;
     if (Date.now() - S.lokaalTot < 1800) return;
-    S.wedstrijd = snap.data(); renderWedstrijd();
+    const data = snap.data();
+    const aangevuld = normaliseerWedstrijd(data);
+    S.wedstrijd = data;
+    renderWedstrijd();
+    if (aangevuld) bewaarWedstrijd();
   });
-  startNotities(wid);
   toon('wedstrijd');
 }
 export function sluitWedstrijd(){
   stopUnsubs('wedstrijd');
-  stopNotities();
   clearInterval(S.klokInterval); S.klokInterval = null;
   S.wedstrijd = null; S.wedstrijdId = null;
   import('./teams.js').then(m => { m.renderTeam(); toon('team'); });
@@ -206,90 +235,6 @@ function bewaarWedstrijd(){
     setDoc(doc(db,'teams',S.teamId,'wedstrijden',S.wedstrijdId), S.wedstrijd)
       .catch(e => meld('Opslaan mislukt: ' + e.code));
   }, 600);
-}
-
-/* ==================== NOTITIES (coach-overleg per wedstrijd) ==================== */
-/* Aparte subcollectie i.p.v. in het wedstrijd-document: zo komen berichten van
-   collega-coaches direct binnen en botsen ze niet met de klok-/opstelling-opslag. */
-S.notities = S.notities || [];
-
-/* De weergavenaam van de ingelogde coach, net als op het startscherm. */
-function mijnCoachNaam(){
-  const n = S.team?.ledenInfo?.[S.user.uid]?.naam;
-  const naam = (n || S.user?.displayName || S.user?.email || 'Coach').trim();
-  return naam.split('@')[0];
-}
-
-function startNotities(wid){
-  stopNotities();
-  S.notities = [];
-  S.unsub.notities = onSnapshot(
-    collection(db,'teams',S.teamId,'wedstrijden',wid,'notities'),
-    snap => {
-      S.notities = snap.docs.map(d => ({id:d.id, ...d.data()}))
-        .sort((a,b) => (a.aangemaakt?.seconds||1e15) - (b.aangemaakt?.seconds||1e15));
-      if (S.wedstrijd) renderNotities();
-    },
-    () => {}
-  );
-}
-function stopNotities(){
-  if (S.unsub.notities){ S.unsub.notities(); S.unsub.notities = null; }
-}
-
-async function stuurNotitie(tekst){
-  tekst = tekst.trim();
-  if (!tekst) return;
-  try {
-    await addDoc(collection(db,'teams',S.teamId,'wedstrijden',S.wedstrijdId,'notities'), {
-      tekst,
-      naam: mijnCoachNaam(),
-      uid: S.user.uid,
-      aangemaakt: serverTimestamp()
-    });
-  } catch(e){ meld('Notitie versturen mislukt: ' + (e.code||e.message)); }
-}
-async function wisNotitie(id){
-  try {
-    await deleteDoc(doc(db,'teams',S.teamId,'wedstrijden',S.wedstrijdId,'notities',id));
-  } catch(e){ meld('Verwijderen mislukt: ' + (e.code||e.message)); }
-}
-
-function notitieTijd(ts){
-  if (!ts?.seconds) return 'nu';
-  return new Date(ts.seconds*1000).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
-}
-
-/* Vult alleen het notitie-blok opnieuw, zonder de hele wedstrijd te hertekenen,
-   zodat de klok blijft lopen en een open invoerveld niet de focus verliest. */
-function renderNotities(){
-  const lijst = $('#notitieLijst');
-  if (!lijst) return;
-  lijst.innerHTML = notitiesHtml();
-  koppelNotitieKnoppen();
-}
-
-function notitiesHtml(){
-  if (!S.notities.length){
-    return `<div class="notitie-leeg">Nog geen notities. Schrijf hieronder iets voor je mede-coaches.</div>`;
-  }
-  return S.notities.map(n => {
-    const eigen = n.uid === S.user.uid;
-    return `<div class="notitie ${eigen?'eigen':''}">
-      <div class="notitie-kop">
-        <span class="notitie-naam">${esc(n.naam || 'Coach')}</span>
-        <span class="notitie-tijd">${notitieTijd(n.aangemaakt)}</span>
-        ${eigen ? `<button class="notitie-weg" data-notitie-weg="${n.id}" title="Verwijderen">✕</button>` : ''}
-      </div>
-      <div class="notitie-tekst">${esc(n.tekst)}</div>
-    </div>`;
-  }).join('');
-}
-
-function koppelNotitieKnoppen(){
-  document.querySelectorAll('[data-notitie-weg]').forEach(b => b.onclick = () => {
-    if (confirm('Deze notitie verwijderen?')) wisNotitie(b.dataset.notitieWeg);
-  });
 }
 
 /* ==================== KLOK ==================== */
@@ -906,16 +851,6 @@ export function renderWedstrijd(){
         </tbody></table></div>
     </details>
 
-    <details class="uitklap notitie-blok" id="notitieBlok" ${S.notities.length ? 'open' : ''}><summary>📝 Notities${S.notities.length ? ` (${S.notities.length})` : ''}</summary>
-      <div class="inhoud">
-        <div class="notitie-lijst" id="notitieLijst">${notitiesHtml()}</div>
-        <div class="notitie-invoer">
-          <textarea id="notitieInvoer" class="invoer" rows="2" placeholder="Bericht voor je mede-coaches…" autocomplete="off"></textarea>
-          <button class="knop fluo" id="notitieStuur">Versturen</button>
-        </div>
-      </div>
-    </details>
-
     <button class="knop vol" id="toonVerslag" style="margin-top:16px">📋 Wedstrijdverslag</button>
     <button class="knop gevaar vol" id="wegWedstrijd" style="margin-top:10px">Wedstrijd verwijderen</button>`;
 
@@ -938,17 +873,6 @@ export function renderWedstrijd(){
   v.querySelector('#goalTegen').onclick = () => registreerGoal({type:'tegen'});
   v.querySelector('#kaartKnop').onclick = modalKaart;
   v.querySelector('#toonVerslag').onclick = modalVerslag;
-  const notInvoer = v.querySelector('#notitieInvoer');
-  const notStuur = v.querySelector('#notitieStuur');
-  if (notStuur) notStuur.onclick = async () => {
-    const t = notInvoer.value;
-    notInvoer.value = '';
-    await stuurNotitie(t);
-  };
-  if (notInvoer) notInvoer.onkeydown = e => {
-    if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); notStuur.click(); }
-  };
-  koppelNotitieKnoppen();
   v.querySelectorAll('[data-corrigeer-goal]').forEach(b => b.onclick = e => {
     e.stopPropagation(); modalGoalCorrigeren(Number(b.dataset.corrigeerGoal));
   });
