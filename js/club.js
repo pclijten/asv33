@@ -80,12 +80,20 @@ async function clubVideosOphalen(){
 
 /* haalt de token uit een geplakte voetbal.nl-link.
    Accepteert de hele URL (…ical-team?token=XXXX) of een kale token. */
-function extraheerToken(ruw){
+/* herkent wat er geplakt is en geeft terug wat we moeten opslaan:
+   - een Sportlink-token  → { veld:'icalToken', waarde: token }
+   - een volledige iCal-URL (bv. Google Agenda, of de hele Sportlink-link)
+       → { veld:'icalUrl', waarde: url }
+   geeft null bij onherkenbare invoer. */
+function herkenKoppeling(ruw){
   const s = ruw.trim();
+  // 1) Sportlink-link met ?token=... → alleen de token bewaren (compact + veilig)
   const m = s.match(/[?&]token=([A-Za-z0-9]+)/);
-  if (m) return m[1];
-  // geen URL? accepteer een kale token (alleen letters/cijfers, redelijke lengte)
-  if (/^[A-Za-z0-9]{15,}$/.test(s)) return s;
+  if (m) return { veld: 'icalToken', waarde: m[1] };
+  // 2) een andere volledige URL (https://...) → als icalUrl bewaren
+  if (/^https?:\/\/.+/i.test(s)) return { veld: 'icalUrl', waarde: s };
+  // 3) een kale Sportlink-token (alleen letters/cijfers, redelijke lengte)
+  if (/^[A-Za-z0-9]{15,}$/.test(s)) return { veld: 'icalToken', waarde: s };
   return null;
 }
 
@@ -107,7 +115,7 @@ async function clubSyncStatusOphalen(teams){
       if (snap.exists()){
         const d = snap.data();
         status[t.id] = {
-          gekoppeld: !!d.icalToken,
+          gekoppeld: !!(d.icalToken || d.icalUrl),
           laatsteSync: d.laatsteSync || null,
           laatsteAantal: d.laatsteAantal ?? null,
           laatsteFout: d.laatsteFout || null,
@@ -510,12 +518,16 @@ function koppelClubTab(v, tab, teams, trainingen, videos){
       const input = v.querySelector(`[data-token-team="${teamId}"]`);
       const ruw = (input.value || '').trim();
       if (!ruw || ruw.startsWith('••••')) return meld('Plak eerst een nieuwe link');
-      // token uit de link halen (accepteer hele URL of kale token)
-      const token = extraheerToken(ruw);
-      if (!token) return meld('Geen geldige voetbal.nl-link herkend');
+      // herken token of volledige iCal-URL
+      const k = herkenKoppeling(ruw);
+      if (!k) return meld('Geen geldige link of token herkend');
       b.disabled = true; b.textContent = '...';
+      // schrijf het juiste veld weg en wis het andere (voorkomt dat beide blijven staan)
+      const data = k.veld === 'icalToken'
+        ? { icalToken: k.waarde, icalUrl: deleteField() }
+        : { icalUrl: k.waarde, icalToken: deleteField() };
       try {
-        await setDoc(doc(db,'clubs',S.clubId,'geheim',teamId), { icalToken: token }, { merge: true });
+        await setDoc(doc(db,'clubs',S.clubId,'geheim',teamId), data, { merge: true });
         meld('Koppeling opgeslagen');
         renderClub();
       } catch(e){
