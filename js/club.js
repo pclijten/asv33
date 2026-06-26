@@ -1,7 +1,8 @@
 import {
-  db, storage, collection, doc, addDoc, deleteDoc, updateDoc, deleteField, getDocs,
+  db, storage, collection, doc, addDoc, deleteDoc, updateDoc, deleteField, getDoc, setDoc, getDocs,
   query, where, onSnapshot, serverTimestamp, documentId,
-  sRef, uploadBytes, getDownloadURL, deleteObject
+  sRef, uploadBytes, getDownloadURL, deleteObject,
+  functions, httpsCallable
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs
@@ -77,11 +78,48 @@ async function clubVideosOphalen(){
     .sort((a,b) => (b.gemaakt?.seconds||0) - (a.gemaakt?.seconds||0));
 }
 
+/* haalt de token uit een geplakte voetbal.nl-link.
+   Accepteert de hele URL (…ical-team?token=XXXX) of een kale token. */
+function extraheerToken(ruw){
+  const s = ruw.trim();
+  const m = s.match(/[?&]token=([A-Za-z0-9]+)/);
+  if (m) return m[1];
+  // geen URL? accepteer een kale token (alleen letters/cijfers, redelijke lengte)
+  if (/^[A-Za-z0-9]{15,}$/.test(s)) return s;
+  return null;
+}
+
 /* afgelast-historie: centrale lijst onder clubs/{clubId}/afgelastingen (nieuw → oud) */
 async function clubAfgelastingenOphalen(){
   const snap = await getDocs(collection(db,'clubs',S.clubId,'afgelastingen'));
   return snap.docs.map(d => ({id:d.id, ...d.data()}))
     .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+}
+
+/* voetbal.nl-syncstatus per team uit clubs/{clubId}/geheim/{teamId}.
+   We lezen alleen de statusvelden (laatsteSync, laatsteAantal, laatsteFout) en
+   of er een token staat — de token-waarde zelf tonen we nooit. */
+async function clubSyncStatusOphalen(teams){
+  const status = {};
+  await Promise.all(teams.map(async t => {
+    try {
+      const snap = await getDoc(doc(db,'clubs',S.clubId,'geheim',t.id));
+      if (snap.exists()){
+        const d = snap.data();
+        status[t.id] = {
+          gekoppeld: !!d.icalToken,
+          laatsteSync: d.laatsteSync || null,
+          laatsteAantal: d.laatsteAantal ?? null,
+          laatsteFout: d.laatsteFout || null,
+        };
+      } else {
+        status[t.id] = { gekoppeld: false };
+      }
+    } catch(e){
+      status[t.id] = { gekoppeld: false };
+    }
+  }));
+  return status;
 }
 
 /* 'YYYY-MM-DD' -> 'do 25 jun' (kort, voor de statslijst) */
@@ -102,11 +140,16 @@ async function renderClub(){
   const afgelastingen = await clubAfgelastingenOphalen();
   S.clubAfgelastingen = afgelastingen;
   const tab = S.clubTab;
+  // syncstatus per team ophalen (alleen nodig op de instel-tab, om reads te sparen)
+  let syncStatus = {};
+  if (tab === 'instel'){
+    syncStatus = await clubSyncStatusOphalen(teams);
+  }
   let inhoud = '';
   if (tab === 'teams')      inhoud = htmlClubTeams(teams, afgelastingen);
   if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
   if (tab === 'videos')     inhoud = htmlClubVideos(teams, videos);
-  if (tab === 'instel')     inhoud = htmlClubInstel();
+  if (tab === 'instel')     inhoud = htmlClubInstel(teams, syncStatus);
   v.innerHTML = `
     <div class="kop"><button class="terug" id="naarTeams">‹</button>
       <h1>🏛 ${esc(S.club.naam)}<span class="sub">${Object.keys(S.club.teams||{}).length} teams · clubcode ${esc(S.club.code)}</span></h1></div>
@@ -257,8 +300,55 @@ function htmlClubVideos(teams, videos){
     ${lijst}`;
 }
 
-function htmlClubInstel(){
+function htmlClubInstel(teams = [], syncStatus = {}){
   const admins = Object.values(S.club.adminsInfo || {}).map(a => esc(a.naam)).join(', ');
+
+  // --- voetbal.nl-koppeling: token per team ---
+  const syncTijd = (ts) => {
+    if (!ts) return '';
+    try {
+      const d = ts.seconds ? new Date(ts.seconds*1000) : new Date(ts);
+      return d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'}) + ' ' +
+             d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+    } catch { return ''; }
+  };
+  const tokenRijen = teams.length ? teams.map(t => {
+    const st = syncStatus[t.id] || {};
+    const badge = st.gekoppeld
+      ? `<span class="tok-status gekoppeld">Gekoppeld</span>`
+      : `<span class="tok-status leeg">Geen link</span>`;
+    let onderregel = '';
+    if (st.laatsteFout){
+      onderregel = `<div class="tok-laatste" style="color:var(--uit)">Laatste sync mislukt: ${esc(st.laatsteFout)}</div>`;
+    } else if (st.laatsteSync){
+      const aantal = st.laatsteAantal != null ? `${st.laatsteAantal} wedstrijd${st.laatsteAantal===1?'':'en'}` : '';
+      onderregel = `<div class="tok-laatste">Laatste sync: <b>${esc(syncTijd(st.laatsteSync))}</b>${aantal?' · '+aantal:''}</div>`;
+    }
+    return `
+      <div class="tok-rij">
+        <div class="tok-kop"><span class="tok-team">${esc(t.naam)}</span>${badge}</div>
+        <div class="tok-invoer">
+          <input type="${st.gekoppeld?'password':'text'}" data-token-team="${t.id}"
+                 placeholder="Plak hier de voetbal.nl-link"
+                 value="${st.gekoppeld?'••••••••••••••••':''}" autocomplete="off">
+          <button data-token-opslaan="${t.id}">Opslaan</button>
+        </div>
+        ${onderregel}
+      </div>`;
+  }).join('') : `<p style="font-size:13px;color:var(--ink-2)">Maak eerst teams aan om ze te koppelen.</p>`;
+
+  const voetbalBlok = `
+    <div class="sectie-kop">⚽ voetbal.nl-koppeling</div>
+    <div class="kaart">
+      <p class="uitleg" style="font-size:13px;color:var(--ink-2);line-height:1.5;margin-bottom:6px">Plak per team de kalenderlink uit voetbal.nl. De wedstrijden worden dan automatisch in de app gezet, klaar om opstellingen te maken. De link koop je in de voetbal.nl-app (teamkalender) en ziet eruit als <code style="font-size:11px">data.sportlink.com/ical-team?token=…</code></p>
+    </div>
+    <div class="waarschuwing" style="background:#fff8e6;border:1px solid #f0d894;border-radius:11px;padding:11px 12px;font-size:12.5px;color:#7a5d00;line-height:1.5;margin-bottom:12px">
+      <b>Let op:</b> de kalenderlink is per team persoonlijk en verloopt elk halfseizoen. Vernieuw de link wanneer de sync stopt met werken.
+    </div>
+    <div class="kaart">${tokenRijen}</div>
+    <button class="knop vol" id="syncNu" style="margin-bottom:4px">🔄 Sync nu alle teams</button>
+    <p style="font-size:11.5px;color:var(--ink-2);text-align:center;margin:8px 0 4px">De sync draait sowieso elke nacht automatisch.</p>`;
+
   return `
     <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Club-uitnodiging</div>
@@ -270,6 +360,7 @@ function htmlClubInstel(){
       <div class="sectie-kop" style="margin-top:0">Club-admins</div>
       <p style="font-size:14px">${admins || '—'}</p>
     </div>
+    ${voetbalBlok}
     <button class="knop gevaar vol" id="verwijderClub">Club opheffen</button>`;
 }
 
@@ -412,6 +503,40 @@ function koppelClubTab(v, tab, teams, trainingen, videos){
     v.querySelector('#kopieerClubLink').onclick = async () => {
       try { await navigator.clipboard.writeText($('#clubLink').textContent); meld('Link gekopieerd'); }
       catch { meld('Link: ' + $('#clubLink').textContent); }
+    };
+    // voetbal.nl-token per team opslaan
+    v.querySelectorAll('[data-token-opslaan]').forEach(b => b.onclick = async () => {
+      const teamId = b.dataset.tokenOpslaan;
+      const input = v.querySelector(`[data-token-team="${teamId}"]`);
+      const ruw = (input.value || '').trim();
+      if (!ruw || ruw.startsWith('••••')) return meld('Plak eerst een nieuwe link');
+      // token uit de link halen (accepteer hele URL of kale token)
+      const token = extraheerToken(ruw);
+      if (!token) return meld('Geen geldige voetbal.nl-link herkend');
+      b.disabled = true; b.textContent = '...';
+      try {
+        await setDoc(doc(db,'clubs',S.clubId,'geheim',teamId), { icalToken: token }, { merge: true });
+        meld('Koppeling opgeslagen');
+        renderClub();
+      } catch(e){
+        b.disabled = false; b.textContent = 'Opslaan';
+        meld('Opslaan mislukt: ' + (e.code || e.message));
+      }
+    });
+    // handmatige sync nu
+    const syncBtn = v.querySelector('#syncNu');
+    if (syncBtn) syncBtn.onclick = async () => {
+      syncBtn.disabled = true; const orig = syncBtn.textContent; syncBtn.textContent = '🔄 Bezig met synchroniseren...';
+      try {
+        const fn = httpsCallable(functions, 'syncNu');
+        const res = await fn({ clubId: S.clubId });
+        const n = res.data?.totaalWedstrijden ?? 0;
+        meld(`Sync klaar — ${n} wedstrijd${n===1?'':'en'} verwerkt`);
+        renderClub();
+      } catch(e){
+        syncBtn.disabled = false; syncBtn.textContent = orig;
+        meld('Sync mislukt: ' + (e.message || e.code || 'onbekende fout'));
+      }
     };
     v.querySelector('#verwijderClub').onclick = async () => {
       if (!confirm('Club opheffen? Teams en trainingen blijven bestaan, maar zijn niet meer aan deze club gekoppeld.')) return;

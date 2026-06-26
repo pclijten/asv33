@@ -21,6 +21,8 @@ import { getFirestore, initializeFirestore, persistentLocalCache, persistentMult
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import { getFunctions, httpsCallable }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -39,6 +41,7 @@ try {
 }
 
 const storage = getStorage(app);
+const functions = getFunctions(app, 'europe-west1');
 
 export {
   app, auth, db, storage,
@@ -49,4 +52,6 @@ export {
   getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId,
   /* storage */
   sRef, uploadBytes, getDownloadURL, deleteObject,
+  /* functions */
+  functions, httpsCallable,
 };
