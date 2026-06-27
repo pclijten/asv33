@@ -1576,28 +1576,59 @@ async function verwijderLeerpunt(lpId){
   await updateDoc(doc(db,'teams',S.teamId,'spelers',p.id), {leerpunten: lp});
 }
 
+const SPELER_POSITIES = ['Keeper','Verdediger','Middenvelder','Aanvaller'];
+
 function modalSpeler(p){
+  const bewerken = !!p;
+  let gekozenPositie = p?.positie || '';
   openModal(`
-    <h2>${p ? 'Speler bewerken' : 'Speler toevoegen'}</h2>
+    <h2>${bewerken ? 'Speler bewerken' : 'Speler toevoegen'}</h2>
     <div class="rij">
-      <div class="veldgroep" style="flex:3"><label>Naam</label>
+      <div class="veldgroep" style="flex:3"><label>Voornaam</label>
         <input class="invoer" id="mSpNaam" value="${esc(p?.naam||'')}" placeholder="Voornaam" autocomplete="off"></div>
       <div class="veldgroep" style="flex:1"><label>Nr.</label>
         <input class="invoer" id="mSpNr" value="${esc(p?.nummer ?? '')}" inputmode="numeric" placeholder="7"></div>
     </div>
-    <button class="knop vol" id="mSpOk">${p ? 'Opslaan' : 'Toevoegen'}</button>`);
+    <div class="veldgroep"><label>Achternaam</label>
+      <input class="invoer" id="mSpAchter" value="${esc(p?.achternaam||'')}" placeholder="Achternaam" autocomplete="off"></div>
+    <div class="avg-balk"><span class="slot">🔒</span>
+      <span>De achternaam blijft binnen je eigen team en wordt nergens in de app getoond. Leen je deze speler uit, dan ziet de andere coach alleen de voorletter.</span></div>
+    ${bewerken ? `
+      <div class="veldgroep"><label>Voorkeurspositie</label>
+        <div class="segment wrap" id="mSpPos">
+          ${SPELER_POSITIES.map(pos => `<button type="button" data-pos="${pos}" class="${gekozenPositie===pos?'actief':''}">${pos}</button>`).join('')}
+        </div>
+      </div>` : ''}
+    <button class="knop vol" id="mSpOk">${bewerken ? 'Opslaan' : 'Toevoegen'}</button>`);
+
+  if (bewerken){
+    $('#mSpPos').querySelectorAll('[data-pos]').forEach(b => b.onclick = () => {
+      const pos = b.dataset.pos;
+      gekozenPositie = (gekozenPositie === pos) ? '' : pos;   // nogmaals tikken = leegmaken (optioneel)
+      $('#mSpPos').querySelectorAll('[data-pos]').forEach(x =>
+        x.classList.toggle('actief', x.dataset.pos === gekozenPositie));
+    });
+  }
+
   const ok = async (sluiten) => {
     const naam = $('#mSpNaam').value.trim();
     if (!naam) return meld('Vul een naam in');
     const nr = $('#mSpNr').value.trim();
-    const data = {naam, nummer: nr === '' ? null : Number(nr)};
+    const data = {
+      naam,
+      achternaam: $('#mSpAchter').value.trim() || null,
+      nummer: nr === '' ? null : Number(nr),
+    };
+    if (bewerken) data.positie = gekozenPositie || null;
     if (p) await updateDoc(doc(db,'teams',S.teamId,'spelers',p.id), data);
     else   await addDoc(collection(db,'teams',S.teamId,'spelers'), data);
     if (sluiten) sluitModal();
-    else { $('#mSpNaam').value=''; $('#mSpNr').value=''; $('#mSpNaam').focus(); meld(naam+' toegevoegd'); }
+    else { $('#mSpNaam').value=''; $('#mSpNr').value=''; $('#mSpAchter').value=''; $('#mSpNaam').focus(); meld(naam+' toegevoegd'); }
   };
-  $('#mSpOk').onclick = () => ok(!!p);
-  $('#mSpNaam').addEventListener('keydown', e => { if (e.key === 'Enter') ok(false); });
+  $('#mSpOk').onclick = () => ok(bewerken);
+  const enterAdd = e => { if (e.key === 'Enter') ok(false); };
+  $('#mSpNaam').addEventListener('keydown', enterAdd);
+  $('#mSpAchter').addEventListener('keydown', enterAdd);
 }
 
 /* Teamcode handmatig wijzigen. Controleert eerst of de nieuwe code nog vrij is. */
