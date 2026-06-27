@@ -583,6 +583,7 @@ input,select{font:inherit;color:inherit}
 
 .plan-rij{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--card);border:1px solid var(--hair);border-left:4px solid var(--ink-2);border-radius:11px;padding:9px 12px;box-shadow:var(--shadow)}
 .plan-rij.wd{border-left-color:var(--veld)}
+.plan-rij.wedstrijd{border-left-color:#E20613;background:#FFF6F6}
 .plan-rij.beker{border-left-color:#7C4DBC}
 .plan-rij.inhaal{border-left-color:var(--keeper)}
 .plan-rij.vrij{border-left-color:#B7B7B2;background:#FAFAF8}
@@ -600,6 +601,7 @@ input,select{font:inherit;color:inherit}
 
 .plan-badge{flex:0 0 auto;font-family:'Barlow Condensed';font-weight:700;font-size:11px;letter-spacing:.5px;padding:3px 8px;border-radius:7px;color:#fff}
 .plan-badge.wd{background:var(--veld)}
+.plan-badge.wedstrijd{background:#E20613;font-size:13px;padding:3px 7px}
 .plan-badge.beker{background:#7C4DBC}
 .plan-badge.inhaal{background:var(--keeper)}
 .plan-badge.vrij{background:#fff;color:var(--ink-2);border:1px solid var(--hair)}
