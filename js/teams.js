@@ -385,6 +385,7 @@ function htmlSpelers(){
 
 /* ---------- Tab: seizoensplanning ---------- */
 const PLAN_TYPE = {
+  wedstrijd: {kort:'⚽', klas:'wedstrijd', naam:'Wedstrijd'},
   wd:     {kort:'WD',   klas:'wd',     naam:'Wedstrijddag'},
   beker:  {kort:'BEK',  klas:'beker',  naam:'Beker'},
   inhaal: {kort:'INH',  klas:'inhaal', naam:'Inhaal'},
@@ -392,7 +393,7 @@ const PLAN_TYPE = {
   eigen:  {kort:'',     klas:'eigen',  naam:'Eigen dag'},
 };
 const PLAN_FILTERS = [
-  ['alles','Alles'], ['wd','Wedstrijden'], ['beker','Beker'], ['vrij','Vrij'],
+  ['alles','Alles'], ['wedstrijd','Wedstrijden'], ['wd','Speeldagen'], ['beker','Beker'], ['vrij','Vrij'],
 ];
 const PLAN_MAANDEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
 
@@ -409,10 +410,15 @@ function planningItems(){
     if (p.bron === 'eigen') eigen.push(p);
     else if (p.id && p.id.startsWith('knvb_')) overrides[p.datum] = p;
   }
+  // echte wedstrijden (geïmporteerd + zelf aangemaakt) — datums waarop er één staat
+  const wedstrijdDatums = new Set((S.wedstrijden||[]).map(w => w.datum).filter(Boolean));
+
   const items = [];
   for (const k of knvb){
     const ov = overrides[k.d];
     if (ov && ov.verborgen) continue;
+    // echte wedstrijd vervangt de generieke KNVB-wedstrijddag op dezelfde datum
+    if (k.t === 'wd' && wedstrijdDatums.has(k.d) && !(ov && ov.aangepast)) continue;
     items.push({
       bron: 'knvb',
       docId: ov ? ov.id : null,
@@ -430,7 +436,25 @@ function planningItems(){
       opmerking: e.opmerking || '', aangepast: false,
     });
   }
-  return items.sort((a,b) => a.datum.localeCompare(b.datum));
+  for (const w of (S.wedstrijden||[])){
+    if (!w.datum) continue;
+    const voor = (w.goals||[]).filter(g => g.type==='voor').length;
+    const tegen = (w.goals||[]).filter(g => g.type==='tegen').length;
+    const heeftUitslag = (w.goals||[]).length > 0;
+    const uitslag = heeftUitslag ? (w.thuis ? `${voor}–${tegen}` : `${tegen}–${voor}`) : '';
+    const label = w.type === 'toernooi'
+      ? '🏆 ' + (w.tegenstander || 'Toernooi')
+      : (w.thuis ? (team.naam||'') + ' – ' + (w.tegenstander||'?')
+                 : (w.tegenstander||'?') + ' – ' + (team.naam||''));
+    const sub = [w.tijd || '', uitslag].filter(Boolean).join(' · ');
+    items.push({
+      bron: 'wedstrijd', docId: w.id, datum: w.datum,
+      type: 'wedstrijd', label, opmerking: sub, aangepast: false,
+      wedstrijdId: w.id,
+    });
+  }
+  return items.sort((a,b) =>
+    a.datum.localeCompare(b.datum) || (a.bron==='wedstrijd'?-1:1) - (b.bron==='wedstrijd'?-1:1));
 }
 
 function htmlPlanning(){
@@ -913,6 +937,11 @@ function koppelTeamTab(v, tab){
     v.querySelectorAll('[data-plandag]').forEach(b => b.onclick = () => {
       const datum = b.dataset.plandag;
       const bron = b.dataset.planbron;
+      if (bron === 'wedstrijd'){
+        const wid = b.dataset.plandoc;
+        if (wid) openWedstrijd(wid);
+        return;
+      }
       const it = planningItems().find(x => x.datum === datum && x.bron === bron);
       if (it) modalPlanDag(it);
     });
