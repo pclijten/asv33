@@ -365,10 +365,65 @@ export function knvbKalenderVoorTeam(team){
   return KNVB_KALENDER[kol] || KNVB_KALENDER.jun;
 }
 
-/* ==================== BEOORDELINGEN ====================
-   Vijf-niveau kleurenschaal (zachte labels) + KNVB TIPS-domeinen.
-   Gebruikt door de snelle wedstrijd-/trainingbeoordeling én de volledige
-   periodieke beoordeling in het spelerprofiel. */
+/* ==================== ONTWIKKELDOMEINEN (ASV'33 hybride model) ====================
+   De 4 voetbal-skills (Technisch/Tactisch/Fysiek/Mentaal) + een pedagogische laag
+   (Gedrag & beleving), zoals 4-Skills en het Jeugdbeleidsplan ASV'33 voorstaan:
+   "Leren voetballen, met plezier als basis en groei als doel."
+   De pedagogische laag komt uit §5 (normen & waarden, teamgevoel, inzet, plezier). */
+export const SKILLS = [
+  {id:'TE', naam:'Technisch', omschrijving:'Balbeheersing, traptechniek, 1v1 — elke 1v1 durven aangaan'},
+  {id:'TA', naam:'Tactisch',  omschrijving:'Inzicht, positiespel, keuzes maken, omschakelen'},
+  {id:'FY', naam:'Fysiek',    omschrijving:'Snelheid, actiesnelheid, duelkracht, fitheid'},
+  {id:'ME', naam:'Mentaal',   omschrijving:'Zelfvertrouwen, durven kiezen, spelen onder weerstand'},
+  {id:'GE', naam:'Gedrag & beleving', omschrijving:'Inzet, teamgevoel, normen & waarden, plezier'},
+];
+export function skillDomein(id){ return SKILLS.find(s => s.id === id) || null; }
+/* alias voor compatibiliteit met eerdere code die 'tipsDomein' aanriep */
+export const TIPS = SKILLS;
+export function tipsDomein(id){ return skillDomein(id); }
+
+/* ==================== LEERCURVE (Jeugdbeleidsplan §3.3) ====================
+   De 14 leerthema's met de leeftijd waarop ze "aan" gaan. Per thema geven we
+   de minimale leeftijd (O-getal) en het bijbehorende skill-domein, zodat de app
+   leerpunten kan voorstellen die passen bij de leeftijdscategorie van het team.
+   Alle thema's blijven altijd kiesbaar; de leeftijdsrelevante worden gemarkeerd. */
+export const LEERCURVE = [
+  {thema:'Teamsport en plezier',     vanaf:6,  domein:'GE'},
+  {thema:'Technische vaardigheden',  vanaf:6,  domein:'TE'},
+  {thema:'Uitspelen 1:1',            vanaf:8,  domein:'TE'},
+  {thema:'Scoren',                   vanaf:8,  domein:'TE'},
+  {thema:'Positiespel opbouw',       vanaf:8,  domein:'TA'},
+  {thema:'Dieptespel opbouw',        vanaf:8,  domein:'TA'},
+  {thema:'Storen en veroveren',      vanaf:10, domein:'TA'},
+  {thema:'Verdedigen dieptespel',    vanaf:10, domein:'TA'},
+  {thema:'Verdedigen 1:1',           vanaf:10, domein:'TE'},
+  {thema:'Voorkomen van doelpunten', vanaf:10, domein:'TA'},
+  {thema:'Aanvallen met voorzet',    vanaf:11, domein:'TA'},
+  {thema:'Verdedigen van voorzet',   vanaf:11, domein:'TA'},
+  {thema:'Omschakelen balwinst',     vanaf:14, domein:'TA'},
+  {thema:'Omschakelen balverlies',   vanaf:14, domein:'TA'},
+];
+
+/* haal het leeftijdsgetal uit een categorie: 'JO11' → 11, 'MO13' → 13, 'Senioren' → 99 */
+export function leeftijdVanCategorie(categorie){
+  const m = String(categorie||'').match(/O(\d+)/);
+  if (m) return Number(m[1]);
+  return 99; // Senioren / Vrouwen → alles relevant
+}
+/* is een leercurve-thema relevant voor deze categorie? */
+export function leercurveRelevant(thema, categorie){
+  const lft = leeftijdVanCategorie(categorie);
+  return lft >= thema.vanaf;
+}
+
+/* Gouden regels (§3.1) — als inspiratie/placeholder bij het maken van leerpunten. */
+export const GOUDEN_REGELS = [
+  'Beide benen leren gebruiken',
+  'Veel balcontacten en herhalingen',
+  'Succesbeleving — veel kunnen scoren',
+  'Positief coachen en samenspel',
+  'Regels naleven',
+];
 
 /* niveau 1..5 → kleur + label. Index 0 blijft leeg (scores beginnen bij 1). */
 export const NIVEAUS = [
@@ -382,19 +437,10 @@ export const NIVEAUS = [
 export function niveau(n){ return NIVEAUS[n] || null; }
 export function niveauKleur(n){ return NIVEAUS[n]?.kleur || '#EFEFED'; }
 
-/* KNVB TIPS-domeinen voor de volledige beoordeling. */
-export const TIPS = [
-  {id:'T', naam:'Techniek',       omschrijving:'Balbeheersing, passen, traptechniek, aannames'},
-  {id:'I', naam:'Inzicht',        omschrijving:'Tactisch begrip, positiespel, keuzes, overzicht'},
-  {id:'P', naam:'Persoonlijkheid',omschrijving:'Mentaliteit, gedrag, coachbaarheid, beleving'},
-  {id:'S', naam:'Snelheid',       omschrijving:'Fysiek, actiesnelheid, omschakeling, duelkracht'},
-];
-export function tipsDomein(id){ return TIPS.find(t => t.id === id) || null; }
-
 /* Snelle 'opvallend'-tags (optioneel aan te tikken na een wedstrijd/training). */
 export const SNEL_TAGS = [
   {id:'inzet',    emoji:'💪', label:'Goede inzet'},
-  {id:'duel',     emoji:'🎯', label:'Sterk in duel'},
+  {id:'duel',     emoji:'🎯', label:'Sterk in 1v1'},
   {id:'team',     emoji:'🤝', label:'Teamspeler'},
   {id:'snel',     emoji:'⚡', label:'Snel'},
   {id:'inzicht',  emoji:'🧠', label:'Goed inzicht'},

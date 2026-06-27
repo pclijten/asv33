@@ -8,7 +8,8 @@ import {
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
   KNVB_SEIZOEN, knvbKalenderVoorTeam,
-  NIVEAUS, niveau, niveauKleur, TIPS, tipsDomein, SNEL_TAGS, snelTag } from './config.js';
+  NIVEAUS, niveau, niveauKleur, SKILLS, skillDomein,
+  LEERCURVE, leercurveRelevant, SNEL_TAGS, snelTag } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
@@ -509,14 +510,14 @@ function htmlProfiel(){
 
       <div class="kaart">
         <div class="veldlabel" style="margin-top:0">Ontwikkelprofiel${vol ? ` · ${datumNL(vol.datum)}` : ''}</div>
-        ${vol ? TIPS.map(d => `
+        ${vol ? SKILLS.map(d => `
           <div class="tips-rij">
             <div class="tips-letter">${d.id}</div>
             <div class="tips-naam">${d.naam}</div>
             ${tipsBalk(vol.scores?.[d.id] || 0)}
             <div class="tips-score">${vol.scores?.[d.id] || '—'}</div>
           </div>`).join('')
-        : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">Nog geen volledige beoordeling. Maak er één om het TIPS-profiel te zien.</p>`}
+        : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">Nog geen volledige beoordeling. Maak er één om het ontwikkelprofiel te zien.</p>`}
       </div>
 
       <div class="fab-rij">
@@ -546,7 +547,7 @@ function htmlLeerlijn(p){
     <div class="kaart">
       <div class="veldlabel" style="margin-top:0">Leerpunten</div>
       ${lp.length ? lp.map(l => {
-        const d = tipsDomein(l.domein);
+        const d = skillDomein(l.domein);
         return `
         <div class="leerpunt ${l.klaar?'klaar':''}">
           <button class="lp-check ${l.klaar?'klaar':''}" data-lp-toggle="${l.id}">${l.klaar?'✓':''}</button>
@@ -579,7 +580,7 @@ function htmlTijdlijnItem(b){
         </div>
       </div>`;
   }
-  const scores = TIPS.map(d => d.id+(b.scores?.[d.id]||'–')).join(' · ');
+  const scores = SKILLS.map(d => d.id+(b.scores?.[d.id]||'–')).join(' · ');
   return `
     <div class="tijdlijn-item" data-open-beoordeling="${b.id}">
       <div class="tl-stip" style="background:var(--n5)"></div>
@@ -1455,7 +1456,7 @@ function volgendeSnelRonde(){
   modalSnelBeoordeling(r.ids[r.index]);
 }
 
-/* --- Volledige beoordeling (TIPS) --- */
+/* --- Volledige beoordeling (5 ontwikkeldomeinen) --- */
 function modalVolledigeBeoordeling(spelerId, bestaande = null){
   const p = speler(spelerId); if (!p) return;
   const scores = {...(bestaande?.scores || {})};
@@ -1476,7 +1477,7 @@ function modalVolledigeBeoordeling(spelerId, bestaande = null){
     <p style="font-size:13px;color:var(--ink-2);margin-bottom:10px">${esc(p.naam)}${p.nummer!=null&&p.nummer!==''?' · #'+esc(p.nummer):''}</p>
     <div class="veldgroep"><label>Moment</label>
       <input class="invoer" id="mVbMoment" value="${esc(moment)}" placeholder="Bijv. Kwartaalmeting Q3"></div>
-    ${TIPS.map(domeinKaart).join('')}
+    ${SKILLS.map(domeinKaart).join('')}
     <button class="knop vol fluo" id="mVbOk" style="margin-top:6px">${bestaande?'Bijwerken':'Beoordeling opslaan'}</button>
     ${bestaande?`<button class="knop vol gevaar" id="mVbWeg" style="margin-top:8px">Verwijderen</button>`:''}
     <p style="font-size:11.5px;color:var(--ink-2);margin-top:10px;line-height:1.45">Tip: leerpunten beheer je in het tabblad <b>Leerlijn</b> van de speler — die lopen door over meerdere beoordelingen.</p>`);
@@ -1491,7 +1492,7 @@ function modalVolledigeBeoordeling(spelerId, bestaande = null){
 
   $('#mVbOk').onclick = async () => {
     if (!Object.keys(scores).length) return meld('Geef minstens één score');
-    TIPS.forEach(d => { const t = $(`[data-not="${d.id}"]`); if (t) notities[d.id] = t.value.trim(); });
+    SKILLS.forEach(d => { const t = $(`[data-not="${d.id}"]`); if (t) notities[d.id] = t.value.trim(); });
     const data = {
       soort:'volledig', spelerId, datum:bestaande?.datum || vandaagISO(),
       bron:{type:'los', label:$('#mVbMoment').value.trim() || 'Periodieke meting'},
@@ -1514,18 +1515,41 @@ function modalVolledigeBeoordeling(spelerId, bestaande = null){
 /* --- Leerpunten (array op spelerdoc) --- */
 function modalLeerpunt(spelerId){
   const p = speler(spelerId); if (!p) return;
-  let domein = 'I';
+  const cat = S.team.categorie || '';
+  let domein = 'TA';
+  // leercurve: relevante thema's eerst, daarna de overige (altijd zichtbaar)
+  const themas = LEERCURVE
+    .map(t => ({...t, rel: leercurveRelevant(t, cat)}))
+    .sort((a,b) => (b.rel?1:0)-(a.rel?1:0));
+
   openModal(`
     <h2>Leerpunt toevoegen</h2>
-    <p style="font-size:13px;color:var(--ink-2);margin-bottom:10px">Formuleer een concreet, observeerbaar doel voor ${esc(p.naam)}.</p>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:10px">Formuleer een concreet, observeerbaar doel voor ${esc(p.naam)}. Kies een thema uit de leerlijn of schrijf je eigen leerpunt.</p>
+
+    <div class="veldlabel">Uit de leerlijn${cat?` · ${esc(cat)}`:''}</div>
+    <div class="leercurve-keuze" id="mLpCurve">
+      ${themas.map(t => {
+        const d = skillDomein(t.domein);
+        return `<button class="lc-thema ${t.rel?'rel':''}" data-thema="${esc(t.thema)}" data-dom="${t.domein}" title="${esc(d?.naam||'')}${t.rel?'':' · vanaf O'+t.vanaf}">
+          <span class="lc-dot" style="background:${t.rel?'var(--n5)':'var(--line-d)'}"></span>${esc(t.thema)}</button>`;
+      }).join('')}
+    </div>
+    <p style="font-size:11px;color:var(--ink-2);margin:2px 0 12px">🟢 = hoort bij deze leeftijd volgens het jeugdbeleidsplan. Overige thema's blijven kiesbaar.</p>
+
     <div class="veldlabel">Domein</div>
-    <div class="segment klein-seg" id="mLpDom">${TIPS.map(d =>
-      `<button data-d="${d.id}" class="${d.id==='I'?'actief':''}" title="${esc(d.naam)}">${d.id}</button>`).join('')}</div>
+    <div class="segment klein-seg" id="mLpDom">${SKILLS.map(d =>
+      `<button data-d="${d.id}" class="${d.id==='TA'?'actief':''}" title="${esc(d.naam)}">${d.id}</button>`).join('')}</div>
+
     <div class="veldgroep"><label>Leerpunt</label>
       <textarea class="invoer" id="mLpTekst" rows="3" placeholder="Bijv. eerder het hoofd omhoog vóór de aanname"></textarea></div>
     <button class="knop vol fluo" id="mLpOk">Toevoegen</button>`);
-  $$('#mLpDom [data-d]').forEach(b => b.onclick = () => {
-    domein = b.dataset.d; $$('#mLpDom [data-d]').forEach(x => x.classList.toggle('actief', x===b));
+
+  const zetDomein = (d) => { domein = d; $$('#mLpDom [data-d]').forEach(x => x.classList.toggle('actief', x.dataset.d===d)); };
+  $$('#mLpDom [data-d]').forEach(b => b.onclick = () => zetDomein(b.dataset.d));
+  $$('#mLpCurve [data-thema]').forEach(b => b.onclick = () => {
+    $('#mLpTekst').value = b.dataset.thema;
+    zetDomein(b.dataset.dom);
+    $$('#mLpCurve .lc-thema').forEach(x => x.classList.toggle('gekozen', x===b));
   });
   $('#mLpTekst').focus();
   $('#mLpOk').onclick = async () => {
