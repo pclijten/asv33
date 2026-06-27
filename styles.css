@@ -903,8 +903,8 @@ body{ background:var(--bg); color:var(--ink); }
 
 /* TIPS balken */
 .tips-rij{display:flex;align-items:center;gap:10px;margin-bottom:11px}
-.tips-letter{width:30px;height:30px;border-radius:8px;background:var(--surface-2);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:17px;flex-shrink:0}
-.tips-naam{font-size:12px;font-weight:600;width:80px;flex-shrink:0}
+.tips-letter{width:32px;height:30px;border-radius:8px;background:var(--surface-2);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:13px;letter-spacing:.5px;flex-shrink:0}
+.tips-naam{font-size:12px;font-weight:600;width:84px;flex-shrink:0}
 .tips-track{flex:1;height:10px;background:var(--surface-2);border-radius:6px;overflow:hidden;display:flex;gap:2px}
 .tips-seg{flex:1;border-radius:2px}
 .tips-score{font-family:'Barlow Condensed';font-weight:700;font-size:16px;width:20px;text-align:right}
@@ -930,3 +930,11 @@ body{ background:var(--bg); color:var(--ink); }
 
 /* fab-rij */
 .fab-rij{display:flex;gap:9px;margin-bottom:10px}
+
+/* leercurve-keuze in leerpunt-modal */
+.leercurve-keuze{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.lc-thema{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:18px;font-size:12px;font-weight:600;background:var(--surface-2);color:var(--ink-2);border:1.5px solid var(--line-d)}
+.lc-thema.rel{color:var(--ink)}
+.lc-thema.gekozen{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lc-thema.gekozen .lc-dot{background:#fff !important}
+.lc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
