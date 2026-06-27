@@ -15,6 +15,17 @@ import {
   openWedstrijd, modalNieuweWedstrijd, htmlStats, renderWedstrijd
 } from './wedstrijd.js';
 
+/* Strakke lijn-iconen voor de onderbalk (laatste layout) */
+const NAV_ICON = {
+  wedstrijden:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l4.2 3-1.6 4.9H9.4L7.8 10.2z"/><path d="M12 7.2 9.5 5M12 7.2 14.5 5M16.2 10.2l2.6-.6M14.6 15.1l1.7 2.1M9.4 15.1l-1.7 2.1M7.8 10.2l-2.6-.6"/></svg>',
+  spelers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>',
+  planning:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><circle cx="12" cy="14.5" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  trainingen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="2.2"/><path d="M9 3.2h6v3H9z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>',
+  videos:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.2"/><path d="M16 10l5-3v10l-5-3z"/></svg>',
+  stats:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  help:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.3 9.3a2.7 2.7 0 0 1 5.2 1c0 1.8-2.5 2.2-2.5 4"/><circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none"/></svg>',
+};
+
 /* ==================== TEAMS-OVERZICHT ==================== */
 export function startTeams(){
   stopUnsubs('teams','clubs','gelezen');
@@ -334,8 +345,8 @@ export function renderTeam(){
       <button class="terug" id="teamInstel" title="Teaminstellingen">⚙️</button></div>
     ${inhoud}
     <nav class="onderbalk">
-      ${[['wedstrijden','📋','Wedstr.'],['spelers','👕','Spelers'],['planning','📅','Planning'],['trainingen','📄','Training'],['videos','🎬','Video'],['stats','⏱','Stats'],['help','❓','Help']]
-        .map(([id,ico,naam]) => `<button data-tab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span><span class="tablabel">${naam}${id==='trainingen' && ongelezen ? '<span class="puntje"></span>' : ''}</span></button>`).join('')}
+      ${[['wedstrijden','Wedstr.'],['spelers','Spelers'],['planning','Planning'],['trainingen','Training'],['videos','Video'],['stats','Stats'],['help','Help']]
+        .map(([id,naam]) => `<button data-tab="${id}" class="${tab===id?'actief':''}"><span class="ico">${NAV_ICON[id]}</span><span class="tablabel">${naam}${id==='trainingen' && ongelezen ? '<span class="puntje"></span>' : ''}</span></button>`).join('')}
     </nav>`;
 
   v.querySelector('#naarTeams').onclick = verlaatTeamView;
