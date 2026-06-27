@@ -1,6 +1,6 @@
 import {
   db, collection, doc, addDoc, deleteDoc, updateDoc, deleteField,
-  setDoc, getDocs, query, where, onSnapshot, serverTimestamp
+  setDoc, getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen, isBeheerder,
@@ -290,6 +290,7 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
+    if (S.team.club && !S.unsub.uitleningen) startUitleningenListener(teamId);
     if (!S.wedstrijdId) renderTeam();
   });
   S.unsub.spelers = onSnapshot(collection(db,'teams',teamId,'spelers'), snap => {
@@ -325,9 +326,22 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   });
   toon('team');
 }
+
+function startUitleningenListener(teamId){
+  const clubId = S.team?.club;
+  if (!clubId){ return; }              // los team zonder club: geen uitleningen
+  if (S.unsub.uitleningen){ S.unsub.uitleningen(); delete S.unsub.uitleningen; }
+  S.unsub.uitleningen = onSnapshot(collection(db,'clubs',clubId,'uitleningen'), snap => {
+    const alle = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    S.uitleningenUit = alle.filter(u => u.vanTeam === teamId);
+    S.uitleningenIn  = alle.filter(u => u.naarTeam === teamId);
+    if (!S.wedstrijdId && (S.teamTab === 'spelers' || S._beoordeelProfiel)) renderTeam();
+  });
+}
 export function verlaatTeamView(){
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','uitleningen');
   S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = []; S.planning = [];
+  S.uitleningenUit = []; S.uitleningenIn = [];
   renderTeams(); toon('teams');
 }
 
@@ -337,7 +351,7 @@ export function renderTeam(){
   const tab = S.teamTab;
   let inhoud = '';
   if (tab === 'wedstrijden') inhoud = htmlWedstrijden();
-  if (tab === 'spelers')     inhoud = S._beoordeelProfiel ? htmlProfiel() : htmlSpelers();
+  if (tab === 'spelers')     inhoud = S._leenProfiel ? htmlLeenProfiel() : (S._beoordeelProfiel ? htmlProfiel() : htmlSpelers());
   if (tab === 'planning')    inhoud = htmlPlanning();
   if (tab === 'stats')       inhoud = htmlStats();
   if (tab === 'trainingen')  inhoud = htmlTeamTrainingen();
@@ -348,7 +362,7 @@ export function renderTeam(){
   const teamTrainingen = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
   const ongelezen = teamTrainingen.filter(t => !S.trainingenGelezen[t.id]).length;
 
-  const profielOpen = (tab === 'spelers' && S._beoordeelProfiel);
+  const profielOpen = (tab === 'spelers' && (S._beoordeelProfiel || S._leenProfiel));
   v.innerHTML = `
     ${profielOpen ? '' : `<div class="kop"><button class="terug" id="naarTeams">‹</button>
       <h1>${esc(S.team.naam)}<span class="sub">${S.team.categorie ? esc(S.team.categorie)+' · ' : ''}${esc(S.team.format)} tegen ${esc(S.team.format)}</span></h1>
@@ -363,7 +377,7 @@ export function renderTeam(){
   if (naarTeamsBtn) naarTeamsBtn.onclick = verlaatTeamView;
   const teamInstelBtn = v.querySelector('#teamInstel');
   if (teamInstelBtn) teamInstelBtn.onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
-  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S._beoordeelProfiel = null; S.teamTab = b.dataset.tab; renderTeam(); });
+  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S._beoordeelProfiel = null; S._leenProfiel = null; S.teamTab = b.dataset.tab; renderTeam(); });
   koppelTeamTab(v, tab);
 }
 
@@ -430,6 +444,24 @@ function htmlSpelers(){
     }).join('')
     : `<div class="kaart leeg">Nog geen spelers.<br>Voeg je selectie toe — naam en rugnummer is genoeg.</div>`}
 
+    ${(() => {
+      const nu = vandaagIso();
+      const actief = (S.uitleningenIn||[]).filter(u => u.van <= nu && nu <= u.tot);
+      if (!actief.length) return '';
+      return `
+        <div class="sectie-kop" style="margin:18px 0 10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-2)">⇄ Geleend (tijdelijk)</div>
+        ${actief.map(u => {
+          const s = u.snapshot || {};
+          const nm = s.voorletter ? `${s.naam} ${s.voorletter}.` : (s.naam||'Speler');
+          return `
+          <button class="speler-rij" data-open-leen="${u.id}">
+            <div class="mini-shirt" style="background:var(--ink-2)">${esc(s.nummer ?? '·')}</div>
+            <div class="n">${esc(nm)}<div style="font-size:11px;color:var(--ink-2);font-weight:400">van ${esc(u.vanTeamNaam||'ander team')} · t/m ${datumNL(u.tot)}</div></div>
+            <span class="pijl">›</span>
+          </button>`;
+        }).join('')}`;
+    })()}
+
     <p style="font-size:12px;color:var(--ink-2);margin-top:12px;line-height:1.5">
       Het gekleurde stipje toont de laatste snelle beoordeling. Tik op een speler voor het volledige profiel met statistieken, leerlijn en historie.</p>`;
 }
@@ -475,6 +507,55 @@ function tipsBalk(score){
 }
 
 /* ---------- Spelerprofiel ---------- */
+/* Read-only profiel van een geleende speler (snapshot uit clubs/{clubId}/uitleningen). */
+function htmlLeenProfiel(){
+  const u = (S.uitleningenIn||[]).find(x => x.id === S._leenProfiel);
+  if (!u) { S._leenProfiel = null; return htmlSpelers(); }
+  const s = u.snapshot || {};
+  const nm = s.voorletter ? `${s.naam} ${s.voorletter}.` : (s.naam || 'Speler');
+  const st = s.stats || {};
+  const sc = s.profielScores || null;
+  const lijn = s.nummer != null && s.nummer !== '' ? '#'+esc(s.nummer) : '';
+  return `
+    <button class="profiel-terug" id="leenTerug">‹ Terug naar spelers</button>
+    <div class="profiel-top">
+      <div class="pt-shirt" style="background:var(--ink-2)">${esc(s.nummer ?? '·')}</div>
+      <div><h2>${esc(nm)}</h2><div class="meta">${lijn?lijn+' · ':''}geleend van ${esc(u.vanTeamNaam||'ander team')}</div></div>
+    </div>
+
+    <div class="avg-balk"><span class="slot">🔒</span>
+      <span>Tijdelijk geleende speler · alleen-lezen. Zichtbaar t/m ${datumNL(u.tot)}, daarna verdwijnt hij automatisch.</span></div>
+
+    <div class="kaart" style="margin-bottom:12px">
+      <div class="veldlabel" style="margin-top:0">Profiel</div>
+      <div class="kv-rij" style="display:flex;justify-content:space-between;padding:8px 0">
+        <span style="color:var(--ink-2)">Voorkeurspositie</span>
+        <span style="font-weight:600">${s.positie ? esc(s.positie) : '—'}</span></div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-box"><div class="v">${st.wedstrijden ?? 0}</div><div class="l">Wedstr.</div></div>
+      <div class="stat-box"><div class="v">${st.tijd ? uurMin(st.tijd) : '—'}</div><div class="l">Speeltijd</div></div>
+      <div class="stat-box"><div class="v">${st.goals ?? 0}</div><div class="l">Goals</div></div>
+      <div class="stat-box"><div class="v">${st.opkomst != null ? st.opkomst+'%' : '—'}</div><div class="l">Training</div></div>
+    </div>
+
+    <div class="kaart">
+      <div class="veldlabel" style="margin-top:0">Ontwikkelprofiel${s.profielDatum ? ` · ${datumNL(s.profielDatum)}` : ''}</div>
+      ${sc ? SKILLS.map(d => `
+        <div class="tips-rij">
+          <div class="tips-letter">${d.id}</div>
+          <div class="tips-naam">${d.naam}</div>
+          ${tipsBalk(sc[d.id] || 0)}
+          <div class="tips-score">${sc[d.id] || '—'}</div>
+        </div>`).join('')
+      : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">De uitlenende coach heeft (nog) geen volledige beoordeling gedeeld.</p>`}
+    </div>
+
+    <p style="font-size:12px;color:var(--ink-2);margin-top:12px;line-height:1.5">
+      Deze gegevens zijn een momentopname van het moment van uitlenen, gedeeld door ${esc(u.vanTeamNaam||'het andere team')}.</p>`;
+}
+
 function htmlProfiel(){
   const p = speler(S._beoordeelProfiel);
   if (!p) { S._beoordeelProfiel = null; return htmlSpelers(); }
@@ -490,6 +571,15 @@ function htmlProfiel(){
       <div class="pt-shirt">${esc(p.nummer ?? '·')}</div>
       <div><h2>${esc(p.naam)}</h2><div class="meta">${lijn?lijn+' · ':''}${esc(S.team.naam)}</div></div>
     </div>
+    ${(() => {
+      const u = actieveUitleningVoor(p.id);
+      if (!u) return '';
+      return `<div class="leen-strook">
+        <span class="ic">⇄</span>
+        <span class="tx">Uitgeleend aan <b>${esc(u.naarTeamNaam)}</b> · t/m ${datumNL(u.tot)}</span>
+        <button data-uitleen-intrek="${u.id}">Intrekken</button>
+      </div>`;
+    })()}
 
     <div class="avg-balk"><span class="slot">🔒</span>
       <span>Coach-only. Deel niets uit dit profiel buiten het technisch kader.</span></div>
@@ -529,6 +619,7 @@ function htmlProfiel(){
         <button class="knop licht klein" data-bewerk-speler="${p.id}">✏️ Speler bewerken</button>
         <button class="knop gevaar klein" data-weg-speler="${p.id}">🗑 Verwijderen</button>
       </div>
+      ${S.team?.club ? `<button class="knop klein" style="margin-top:4px;width:100%" data-uitleen-speler="${p.id}">⇄ Uitlenen aan ander team</button>` : ''}
     ` : ''}
 
     ${tab === 'leerlijn' ? htmlLeerlijn(p) : ''}
@@ -1124,6 +1215,24 @@ function htmlHandleiding(){
       <li>Met een powerbank langs de lijn ben je verzekerd van een hele wedstrijd.</li>
     </ul>
 
+    <h3>⇄ Spelers uitlenen</h3>
+    <p>Speelt een speler een keer mee met een ander team binnen de club? Open zijn profiel (tab Spelers → tik op de speler) en kies <b>⇄ Uitlenen aan ander team</b>. Je kiest het ontvangende team en de wedstrijddag.</p>
+    <ul>
+      <li>De andere coach ziet de speler automatisch vanaf <b>3 dagen vóór</b> tot <b>3 dagen ná</b> die dag, onder het kopje "Geleend" — daarna verdwijnt hij vanzelf.</li>
+      <li>De ontvangende coach ziet alleen <b>voornaam + voorletter</b> (bijv. "Tim B."), de voorkeurspositie, de statistieken en het ontwikkelprofiel. Alles read-only.</li>
+      <li>Je kunt een uitlening op elk moment <b>intrekken</b> vanaf het spelerprofiel.</li>
+    </ul>
+
+    <h3>🔒 Privacy &amp; namen</h3>
+    <p>Cluppie gaat zorgvuldig om met de gegevens van (vaak minderjarige) spelers:</p>
+    <ul>
+      <li>In de app zie je standaard alleen <b>voornamen</b>. De achternaam wordt wél opgeslagen, maar nergens in de app getoond.</li>
+      <li>De achternaam blijft <b>binnen je eigen team</b> en is alleen zichtbaar voor de coaches van dat team. Leen je een speler uit, dan ziet de andere coach alleen de voorletter.</li>
+      <li>Beoordelingen en leerpunten zijn <b>coach-only</b>: spelers en ouders zien deze niet.</li>
+      <li>Verwijder je een speler, dan worden zijn gegevens (inclusief beoordelingen en leerpunten) verwijderd.</li>
+    </ul>
+    <div class="tip">Deel gegevens uit spelersprofielen niet buiten het technisch kader. Heb je vragen over privacy binnen de club? Stem af met je hoofdcoach of clubbeheerder.</div>
+
     <p style="font-size:12.5px;color:var(--ink-2);text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid var(--hair)">
       Vragen of ideeën? Geef ze door aan je hoofdcoach.<br>Veel succes langs de lijn! ⚽
     </p>
@@ -1225,13 +1334,20 @@ function koppelTeamTab(v, tab){
     v.querySelector('#nieuweWedstrijd').onclick = modalNieuweWedstrijd;
     v.querySelectorAll('[data-open-w]').forEach(b => b.onclick = () => openWedstrijd(b.dataset.openW));
   }
-  if (tab === 'spelers' && S._beoordeelProfiel){
+  if (tab === 'spelers' && S._leenProfiel){
+    // --- read-only leen-profiel ---
+    const t = v.querySelector('#leenTerug');
+    if (t) t.onclick = () => { S._leenProfiel = null; renderTeam(); };
+  }
+  else if (tab === 'spelers' && S._beoordeelProfiel){
     // --- profielscherm ---
     v.querySelector('#profielTerug').onclick = () => { S._beoordeelProfiel = null; S._profielTab = 'overzicht'; renderTeam(); };
     v.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { S._profielTab = b.dataset.ptab; renderTeam(); });
     v.querySelectorAll('[data-snel-speler]').forEach(b => b.onclick = () => modalSnelBeoordeling(b.dataset.snelSpeler));
     v.querySelectorAll('[data-volledig-speler]').forEach(b => b.onclick = () => modalVolledigeBeoordeling(b.dataset.volledigSpeler));
     v.querySelectorAll('[data-bewerk-speler]').forEach(b => b.onclick = () => modalSpeler(speler(b.dataset.bewerkSpeler)));
+    v.querySelectorAll('[data-uitleen-speler]').forEach(b => b.onclick = () => modalUitlenen(b.dataset.uitleenSpeler));
+    v.querySelectorAll('[data-uitleen-intrek]').forEach(b => b.onclick = () => trekUitleningIn(b.dataset.uitleenIntrek));
     v.querySelectorAll('[data-weg-speler]').forEach(b => b.onclick = async () => {
       const p = speler(b.dataset.wegSpeler);
       if (p && confirm(`${p.naam} verwijderen uit de selectie? Beoordelingen en leerpunten gaan ook verloren.`)){
@@ -1252,6 +1368,9 @@ function koppelTeamTab(v, tab){
     v.querySelector('#nieuweSpeler').onclick = () => modalSpeler();
     v.querySelectorAll('[data-open-profiel]').forEach(b => b.onclick = () => {
       S._beoordeelProfiel = b.dataset.openProfiel; S._profielTab = 'overzicht'; renderTeam();
+    });
+    v.querySelectorAll('[data-open-leen]').forEach(b => b.onclick = () => {
+      S._leenProfiel = b.dataset.openLeen; renderTeam();
     });
     v.querySelectorAll('#spelersModus [data-modus]').forEach(b => b.onclick = () => {
       if (b.dataset.modus === 'snel') startSnelRonde();
@@ -1629,6 +1748,135 @@ function modalSpeler(p){
   const enterAdd = e => { if (e.key === 'Enter') ok(false); };
   $('#mSpNaam').addEventListener('keydown', enterAdd);
   $('#mSpAchter').addEventListener('keydown', enterAdd);
+}
+
+/* ===================== Uitlenen ===================== *
+ * Leen-records leven centraal onder clubs/{clubId}/uitleningen.
+ * Een record bevat een afgeschermde momentopname (snapshot) van de speler,
+ * zodat de ontvangende coach hem read-only ziet zonder toegang tot het bronteam.
+ * Venster: 3 dagen vóór t/m 3 dagen ná de wedstrijddag (vast).
+ */
+const LEEN_VENSTER_DAGEN = 3;
+
+function isoDatum(d){ return d.toISOString().slice(0,10); }
+function plusDagen(isoStr, n){
+  const d = new Date(isoStr + 'T12:00'); d.setDate(d.getDate() + n); return isoDatum(d);
+}
+function vandaagIso(){ return isoDatum(new Date()); }
+
+// Actieve uitlening (binnen venster) voor een speler van het EIGEN team.
+function actieveUitleningVoor(spelerId){
+  const nu = vandaagIso();
+  return (S.uitleningenUit||[]).find(u =>
+    u.spelerId === spelerId && u.van <= nu && nu <= u.tot) || null;
+}
+
+// Voornaam + voorletter achternaam, bv. "Tim B." — privacy-vriendelijke weergave.
+function leenNaam(naam, achternaam){
+  const vl = (achternaam||'').trim().charAt(0).toUpperCase();
+  return vl ? `${naam} ${vl}.` : naam;
+}
+
+// Bouw de afgeschermde snapshot die de andere coach mag zien.
+function bouwLeenSnapshot(p){
+  const st = spelerStats(p.id);
+  const vol = laatsteVolledig(p.id);   // laatste volledige beoordeling (ontwikkelprofiel) of null
+  const scores = {};
+  if (vol && vol.scores) for (const s of SKILLS) if (vol.scores[s.id] != null) scores[s.id] = vol.scores[s.id];
+  return {
+    naam: p.naam,
+    voorletter: (p.achternaam||'').trim().charAt(0).toUpperCase() || null,
+    nummer: p.nummer ?? null,
+    positie: p.positie || null,
+    stats: { wedstrijden: st.wedstrijden, tijd: st.tijd, goals: st.goals, keeper: st.keeper, opkomst: st.opkomst },
+    profielScores: Object.keys(scores).length ? scores : null,
+    profielDatum: vol?.datum || null,
+  };
+}
+
+async function modalUitlenen(spelerId){
+  const p = speler(spelerId);
+  if (!p) return;
+  const clubId = S.team?.club;
+  if (!clubId) return meld('Dit team hoort niet bij een club');
+
+  openModal(`
+    <h2>${esc(p.naam)} uitlenen</h2>
+    <div class="veldgroep"><label>Aan welk team?</label>
+      <select class="invoer" id="mUlTeam"><option value="">Teams laden…</option></select></div>
+    <div class="veldgroep"><label>Wedstrijddag</label>
+      <input class="invoer" id="mUlDatum" type="date" value="${vandaagIso()}"></div>
+    <div class="avg-balk"><span class="slot">🔒</span>
+      <span>De ontvangende coach ziet <b>${esc(leenNaam(p.naam,p.achternaam))}</b> alleen van 3 dagen vóór t/m 3 dagen ná deze dag, en alleen positie, statistieken en ontwikkelprofiel — read-only.</span></div>
+    <button class="knop vol" id="mUlOk" disabled>Uitlenen bevestigen</button>`);
+
+  // Doelteams ophalen: alle teams van de club behalve het eigen team.
+  let doelTeams = [];
+  try {
+    const csnap = await getDoc(doc(db,'clubs',clubId));
+    const ids = csnap.exists() ? Object.keys(csnap.data().teams || {}) : [];
+    const andere = ids.filter(id => id !== S.teamId);
+    for (let i=0;i<andere.length;i+=30){
+      const chunk = andere.slice(i,i+30);
+      if (!chunk.length) break;
+      const tsnap = await getDocs(query(collection(db,'teams'), where(documentId(),'in',chunk)));
+      tsnap.docs.forEach(d => doelTeams.push({id:d.id, naam:d.data().naam || '?'}));
+    }
+    doelTeams.sort((a,b)=> a.naam.localeCompare(b.naam));
+  } catch(e){
+    meld('Teams ophalen mislukt: ' + (e.code||e.message));
+  }
+
+  const sel = $('#mUlTeam');
+  if (!doelTeams.length){
+    sel.innerHTML = '<option value="">Geen andere teams gevonden</option>';
+  } else {
+    sel.innerHTML = '<option value="">Kies een team…</option>' +
+      doelTeams.map(t => `<option value="${t.id}|${esc(t.naam)}">${esc(t.naam)}</option>`).join('');
+  }
+
+  const okBtn = $('#mUlOk');
+  const check = () => { okBtn.disabled = !(sel.value && $('#mUlDatum').value); };
+  sel.onchange = check; $('#mUlDatum').oninput = check;
+
+  okBtn.onclick = async () => {
+    const [naarTeam, naarTeamNaam] = sel.value.split('|');
+    const dag = $('#mUlDatum').value;
+    if (!naarTeam || !dag) return;
+    okBtn.disabled = true; okBtn.textContent = 'Bezig…';
+    try {
+      await addDoc(collection(db,'clubs',clubId,'uitleningen'), {
+        spelerId: p.id,
+        vanTeam: S.teamId,
+        vanTeamNaam: S.team.naam,
+        naarTeam,
+        naarTeamNaam,
+        dag,
+        van: plusDagen(dag, -LEEN_VENSTER_DAGEN),
+        tot: plusDagen(dag,  LEEN_VENSTER_DAGEN),
+        snapshot: bouwLeenSnapshot(p),
+        door: S.user?.uid || null,
+        gemaakt: serverTimestamp(),
+      });
+      sluitModal();
+      meld(`${p.naam} uitgeleend aan ${naarTeamNaam}`);
+    } catch(e){
+      okBtn.disabled = false; okBtn.textContent = 'Uitlenen bevestigen';
+      meld('Uitlenen mislukt: ' + (e.code||e.message));
+    }
+  };
+}
+
+async function trekUitleningIn(uitleenId){
+  const clubId = S.team?.club;
+  if (!clubId) return;
+  if (!confirm('Uitlening intrekken? De speler verdwijnt direct bij het andere team.')) return;
+  try {
+    await deleteDoc(doc(db,'clubs',clubId,'uitleningen',uitleenId));
+    meld('Uitlening ingetrokken');
+  } catch(e){
+    meld('Intrekken mislukt: ' + (e.code||e.message));
+  }
 }
 
 /* Teamcode handmatig wijzigen. Controleert eerst of de nieuwe code nog vrij is. */

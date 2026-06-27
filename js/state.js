@@ -19,6 +19,7 @@ export const S = {
   trainingen:[], trainingenGelezen:{}, videos:[], presentie:[],
   beoordelingen:[], _beoordeelProfiel:null, _profielTab:'overzicht',
   planning:[], _planningFilter:'alles', _planningDichteMaanden:null,
+  uitleningenUit:[], uitleningenIn:[], _leenProfiel:null,
   unsub:{}, klokInterval:null, saveTimer:null, lokaalTot:0,
 };
 
