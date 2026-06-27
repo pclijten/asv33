@@ -364,3 +364,42 @@ export function knvbKalenderVoorTeam(team){
   const kol = kalenderKolomVoorCategorie(team?.categorie);
   return KNVB_KALENDER[kol] || KNVB_KALENDER.jun;
 }
+
+/* ==================== BEOORDELINGEN ====================
+   Vijf-niveau kleurenschaal (zachte labels) + KNVB TIPS-domeinen.
+   Gebruikt door de snelle wedstrijd-/trainingbeoordeling én de volledige
+   periodieke beoordeling in het spelerprofiel. */
+
+/* niveau 1..5 → kleur + label. Index 0 blijft leeg (scores beginnen bij 1). */
+export const NIVEAUS = [
+  null,
+  {n:1, kleur:'#E5484D', label:'Aandacht',  kort:'AAND'},
+  {n:2, kleur:'#F2913C', label:'Op weg',    kort:'OPW'},
+  {n:3, kleur:'#F2C94C', label:'Prima',     kort:'PRIMA'},
+  {n:4, kleur:'#7DCB6A', label:'Sterk',     kort:'STERK'},
+  {n:5, kleur:'#2EA043', label:'Uitblinker',kort:'UITBL'},
+];
+export function niveau(n){ return NIVEAUS[n] || null; }
+export function niveauKleur(n){ return NIVEAUS[n]?.kleur || '#EFEFED'; }
+
+/* KNVB TIPS-domeinen voor de volledige beoordeling. */
+export const TIPS = [
+  {id:'T', naam:'Techniek',       omschrijving:'Balbeheersing, passen, traptechniek, aannames'},
+  {id:'I', naam:'Inzicht',        omschrijving:'Tactisch begrip, positiespel, keuzes, overzicht'},
+  {id:'P', naam:'Persoonlijkheid',omschrijving:'Mentaliteit, gedrag, coachbaarheid, beleving'},
+  {id:'S', naam:'Snelheid',       omschrijving:'Fysiek, actiesnelheid, omschakeling, duelkracht'},
+];
+export function tipsDomein(id){ return TIPS.find(t => t.id === id) || null; }
+
+/* Snelle 'opvallend'-tags (optioneel aan te tikken na een wedstrijd/training). */
+export const SNEL_TAGS = [
+  {id:'inzet',    emoji:'💪', label:'Goede inzet'},
+  {id:'duel',     emoji:'🎯', label:'Sterk in duel'},
+  {id:'team',     emoji:'🤝', label:'Teamspeler'},
+  {id:'snel',     emoji:'⚡', label:'Snel'},
+  {id:'inzicht',  emoji:'🧠', label:'Goed inzicht'},
+  {id:'coach',    emoji:'📣', label:'Coachbaar'},
+  {id:'plezier',  emoji:'😄', label:'Veel plezier'},
+  {id:'leider',   emoji:'👑', label:'Neemt leiding'},
+];
+export function snelTag(id){ return SNEL_TAGS.find(t => t.id === id) || null; }

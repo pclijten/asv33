@@ -4,10 +4,11 @@ import {
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen, isBeheerder,
-  openModal, sluitModal, toon, stopUnsubs
+  openModal, sluitModal, toon, stopUnsubs, uurMin
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
-  KNVB_SEIZOEN, knvbKalenderVoorTeam } from './config.js';
+  KNVB_SEIZOEN, knvbKalenderVoorTeam,
+  NIVEAUS, niveau, niveauKleur, TIPS, tipsDomein, SNEL_TAGS, snelTag } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
@@ -284,7 +285,7 @@ function modalJoinTeam(){
 export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   S.teamId = teamId; S.teamTab = beginTab;
   S._pendingNieuweWedstrijd = !!opties.nieuweWedstrijd;
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen');
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
@@ -314,10 +315,17 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
     S.planning = snap.docs.map(d => ({id:d.id, ...d.data()}));
     if (!S.wedstrijdId && S.teamTab === 'planning') renderTeam();
   });
+  // Eigen listener voor beoordelingen — los van de wedstrijd-listener, zodat
+  // updates van een andere coach niet wegvallen (zie listener-architectuur).
+  S.unsub.beoordelingen = onSnapshot(collection(db,'teams',teamId,'beoordelingen'), snap => {
+    S.beoordelingen = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (b.datum||'').localeCompare(a.datum||'') || (b.gemaaktMs||0) - (a.gemaaktMs||0));
+    if (!S.wedstrijdId && (S.teamTab === 'spelers' || S._beoordeelProfiel)) renderTeam();
+  });
   toon('team');
 }
 export function verlaatTeamView(){
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen');
   S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = []; S.planning = [];
   renderTeams(); toon('teams');
 }
@@ -328,7 +336,7 @@ export function renderTeam(){
   const tab = S.teamTab;
   let inhoud = '';
   if (tab === 'wedstrijden') inhoud = htmlWedstrijden();
-  if (tab === 'spelers')     inhoud = htmlSpelers();
+  if (tab === 'spelers')     inhoud = S._beoordeelProfiel ? htmlProfiel() : htmlSpelers();
   if (tab === 'planning')    inhoud = htmlPlanning();
   if (tab === 'stats')       inhoud = htmlStats();
   if (tab === 'trainingen')  inhoud = htmlTeamTrainingen();
@@ -339,19 +347,22 @@ export function renderTeam(){
   const teamTrainingen = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
   const ongelezen = teamTrainingen.filter(t => !S.trainingenGelezen[t.id]).length;
 
+  const profielOpen = (tab === 'spelers' && S._beoordeelProfiel);
   v.innerHTML = `
-    <div class="kop"><button class="terug" id="naarTeams">‹</button>
+    ${profielOpen ? '' : `<div class="kop"><button class="terug" id="naarTeams">‹</button>
       <h1>${esc(S.team.naam)}<span class="sub">${S.team.categorie ? esc(S.team.categorie)+' · ' : ''}${esc(S.team.format)} tegen ${esc(S.team.format)}</span></h1>
-      <button class="terug" id="teamInstel" title="Teaminstellingen">⚙️</button></div>
+      <button class="terug" id="teamInstel" title="Teaminstellingen">⚙️</button></div>`}
     ${inhoud}
     <nav class="onderbalk">
       ${[['wedstrijden','Wedstr.'],['spelers','Spelers'],['planning','Planning'],['trainingen','Training'],['videos','Video'],['stats','Stats'],['help','Help']]
         .map(([id,naam]) => `<button data-tab="${id}" class="${tab===id?'actief':''}"><span class="ico">${NAV_ICON[id]}</span><span class="tablabel">${naam}${id==='trainingen' && ongelezen ? '<span class="puntje"></span>' : ''}</span></button>`).join('')}
     </nav>`;
 
-  v.querySelector('#naarTeams').onclick = verlaatTeamView;
-  v.querySelector('#teamInstel').onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
-  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.teamTab = b.dataset.tab; renderTeam(); });
+  const naarTeamsBtn = v.querySelector('#naarTeams');
+  if (naarTeamsBtn) naarTeamsBtn.onclick = verlaatTeamView;
+  const teamInstelBtn = v.querySelector('#teamInstel');
+  if (teamInstelBtn) teamInstelBtn.onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
+  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S._beoordeelProfiel = null; S.teamTab = b.dataset.tab; renderTeam(); });
   koppelTeamTab(v, tab);
 }
 
@@ -382,16 +393,202 @@ function htmlWedstrijden(){
 
 /* ---------- Tab: spelers ---------- */
 function htmlSpelers(){
+  // laatste snelle beoordeling per speler → kleurstip
+  const laatsteSnel = {};
+  for (const b of S.beoordelingen){
+    if (b.soort !== 'snel') continue;
+    if (!laatsteSnel[b.spelerId]) laatsteSnel[b.spelerId] = b;   // lijst is al op datum gesorteerd
+  }
+  const openLeerpunten = pid => ((speler(pid)?.leerpunten)||[]).filter(l => !l.klaar).length;
+
   return `
-    <button class="knop vol" id="nieuweSpeler" style="margin-bottom:14px">+ Speler toevoegen</button>
-    ${S.spelers.length ? S.spelers.map(p => `
-      <div class="speler-rij">
+    <div class="segment" id="spelersModus" style="margin-bottom:14px">
+      <button data-modus="selectie" class="actief">Selectie</button>
+      <button data-modus="snel">⚡ Snel beoordelen</button>
+    </div>
+
+    <div class="avg-balk">
+      <span class="slot">🔒</span>
+      <span>Beoordelingen en leerpunten zijn alleen zichtbaar voor coaches van dit team. Spelers en ouders zien deze gegevens niet.</span>
+    </div>
+
+    <button class="knop vol licht" id="nieuweSpeler" style="margin-bottom:14px">+ Speler toevoegen</button>
+    ${S.spelers.length ? S.spelers.map(p => {
+      const b = laatsteSnel[p.id];
+      const stip = b ? `<span class="beoordeel-stip" style="background:${niveauKleur(b.niveau)}" title="Laatste: ${esc(niveau(b.niveau)?.label||'')}"></span>`
+                     : `<span class="beoordeel-stip leeg" title="Nog niet beoordeeld"></span>`;
+      const lp = openLeerpunten(p.id);
+      return `
+      <button class="speler-rij" data-open-profiel="${p.id}">
         <div class="mini-shirt">${esc(p.nummer ?? '·')}</div>
         <div class="n">${esc(p.naam)}</div>
-        <button class="actie" data-bewerk-p="${p.id}">✏️</button>
-        <button class="actie" data-weg-p="${p.id}">🗑</button>
-      </div>`).join('')
-    : `<div class="kaart leeg">Nog geen spelers.<br>Voeg je selectie toe — naam en rugnummer is genoeg.</div>`}`;
+        ${lp ? `<span class="chip-info">${lp} leerpunt${lp===1?'':'en'}</span>` : ''}
+        ${stip}
+        <span class="pijl">›</span>
+      </button>`;
+    }).join('')
+    : `<div class="kaart leeg">Nog geen spelers.<br>Voeg je selectie toe — naam en rugnummer is genoeg.</div>`}
+
+    <p style="font-size:12px;color:var(--ink-2);margin-top:12px;line-height:1.5">
+      Het gekleurde stipje toont de laatste snelle beoordeling. Tik op een speler voor het volledige profiel met statistieken, leerlijn en historie.</p>`;
+}
+
+/* ==================== BEOORDELINGEN ====================
+   Datamodel (Firestore: teams/{teamId}/beoordelingen/{id}):
+     soort:    'snel' | 'volledig'
+     spelerId, datum:'YYYY-MM-DD'
+     bron:     {type:'wedstrijd'|'training'|'los', id, label}
+     niveau:   1..5            (soort 'snel')
+     tags:     ['inzet',...]   (soort 'snel')
+     scores:   {T,I,P,S}       (soort 'volledig')
+     notities: {algemeen} of {T,I,P,S}
+     door:     {uid, naam}, gemaaktMs
+   Leerpunten leven als array op het spelerdoc (lopen dóór over beoordelingen):
+     {id, domein, tekst, sinds, klaar, klaarOp} */
+
+function spelerStats(pid){
+  let wedstrijden = 0, tijd = 0, keeper = 0, goals = 0;
+  for (const w of S.wedstrijden){
+    for (const g of (w.goals||[])) if (g.type === 'voor' && g.pid === pid) goals++;
+    const a = analyseWedstrijd(w);
+    if (!a.kwarten) continue;
+    if (a.tijd[pid]){ tijd += a.tijd[pid]; wedstrijden++; }
+    if (a.keeper[pid]) keeper += a.keeper[pid];
+  }
+  const totTr = (S.presentie||[]).length;
+  let aanwezig = 0;
+  for (const sessie of (S.presentie||[])) if (!(sessie.afwezig||[]).includes(pid)) aanwezig++;
+  const opkomst = totTr ? Math.round((aanwezig/totTr)*100) : null;
+  return {wedstrijden, tijd, keeper, goals, opkomst, totTr};
+}
+
+function laatsteVolledig(pid){
+  return S.beoordelingen.find(b => b.spelerId === pid && b.soort === 'volledig') || null;
+}
+
+function tipsBalk(score){
+  let segs = '';
+  for (let i = 1; i <= 5; i++)
+    segs += `<div class="tips-seg" style="background:${i <= score ? niveauKleur(score) : '#EFEFED'}"></div>`;
+  return `<div class="tips-track">${segs}</div>`;
+}
+
+/* ---------- Spelerprofiel ---------- */
+function htmlProfiel(){
+  const p = speler(S._beoordeelProfiel);
+  if (!p) { S._beoordeelProfiel = null; return htmlSpelers(); }
+  const tab = S._profielTab || 'overzicht';
+  const st = spelerStats(p.id);
+  const vol = laatsteVolledig(p.id);
+  const eigen = S.beoordelingen.filter(b => b.spelerId === p.id);
+
+  const lijn = p.nummer != null && p.nummer !== '' ? '#'+esc(p.nummer) : '';
+  return `
+    <button class="profiel-terug" id="profielTerug">‹ Terug naar spelers</button>
+    <div class="profiel-top">
+      <div class="pt-shirt">${esc(p.nummer ?? '·')}</div>
+      <div><h2>${esc(p.naam)}</h2><div class="meta">${lijn?lijn+' · ':''}${esc(S.team.naam)}</div></div>
+    </div>
+
+    <div class="avg-balk"><span class="slot">🔒</span>
+      <span>Coach-only. Deel niets uit dit profiel buiten het technisch kader.</span></div>
+
+    <div class="segment" id="profielTabs" style="margin-bottom:14px">
+      <button data-ptab="overzicht" class="${tab==='overzicht'?'actief':''}">Overzicht</button>
+      <button data-ptab="leerlijn" class="${tab==='leerlijn'?'actief':''}">Leerlijn</button>
+      <button data-ptab="historie" class="${tab==='historie'?'actief':''}">Historie</button>
+    </div>
+
+    ${tab === 'overzicht' ? `
+      <div class="stat-grid">
+        <div class="stat-box"><div class="v">${st.wedstrijden}</div><div class="l">Wedstr.</div></div>
+        <div class="stat-box"><div class="v">${st.tijd ? uurMin(st.tijd) : '—'}</div><div class="l">Speeltijd</div></div>
+        <div class="stat-box"><div class="v">${st.goals}</div><div class="l">Goals</div></div>
+        <div class="stat-box"><div class="v">${st.opkomst != null ? st.opkomst+'%' : '—'}</div><div class="l">Training</div></div>
+      </div>
+
+      <div class="kaart">
+        <div class="veldlabel" style="margin-top:0">Ontwikkelprofiel${vol ? ` · ${datumNL(vol.datum)}` : ''}</div>
+        ${vol ? TIPS.map(d => `
+          <div class="tips-rij">
+            <div class="tips-letter">${d.id}</div>
+            <div class="tips-naam">${d.naam}</div>
+            ${tipsBalk(vol.scores?.[d.id] || 0)}
+            <div class="tips-score">${vol.scores?.[d.id] || '—'}</div>
+          </div>`).join('')
+        : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">Nog geen volledige beoordeling. Maak er één om het TIPS-profiel te zien.</p>`}
+      </div>
+
+      <div class="fab-rij">
+        <button class="knop fluo klein" style="flex:1" data-snel-speler="${p.id}">⚡ Snel beoordelen</button>
+        <button class="knop klein" style="flex:1" data-volledig-speler="${p.id}">📋 Volledige beoordeling</button>
+      </div>
+
+      <div class="rij" style="margin-top:4px">
+        <button class="knop licht klein" data-bewerk-speler="${p.id}">✏️ Speler bewerken</button>
+        <button class="knop gevaar klein" data-weg-speler="${p.id}">🗑 Verwijderen</button>
+      </div>
+    ` : ''}
+
+    ${tab === 'leerlijn' ? htmlLeerlijn(p) : ''}
+
+    ${tab === 'historie' ? `
+      <div class="kaart">
+        <div class="veldlabel" style="margin-top:0">Tijdlijn</div>
+        ${eigen.length ? eigen.map(b => htmlTijdlijnItem(b)).join('')
+          : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">Nog geen beoordelingen vastgelegd.</p>`}
+      </div>` : ''}`;
+}
+
+function htmlLeerlijn(p){
+  const lp = (p.leerpunten || []).slice().sort((a,b) => (a.klaar?1:0)-(b.klaar?1:0) || (b.sinds||'').localeCompare(a.sinds||''));
+  return `
+    <div class="kaart">
+      <div class="veldlabel" style="margin-top:0">Leerpunten</div>
+      ${lp.length ? lp.map(l => {
+        const d = tipsDomein(l.domein);
+        return `
+        <div class="leerpunt ${l.klaar?'klaar':''}">
+          <button class="lp-check ${l.klaar?'klaar':''}" data-lp-toggle="${l.id}">${l.klaar?'✓':''}</button>
+          <div class="lp-tekst">
+            <div class="lp-domein">${d ? esc(d.naam) : 'Algemeen'}</div>
+            <div class="t">${esc(l.tekst)}</div>
+            <div class="d">${l.klaar ? 'Afgerond op '+datumNL(l.klaarOp||l.sinds)+' 🎉' : 'Sinds '+datumNL(l.sinds)}</div>
+          </div>
+          <button class="lp-weg" data-lp-weg="${l.id}" title="Verwijderen">🗑</button>
+        </div>`;
+      }).join('')
+      : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0 10px">Nog geen leerpunten. Voeg een concreet, observeerbaar ontwikkeldoel toe.</p>`}
+      <button class="knop licht klein" style="width:100%;margin-top:6px" data-lp-nieuw="${p.id}">+ Leerpunt toevoegen</button>
+    </div>
+    <p style="font-size:12px;color:var(--ink-2);line-height:1.5">Leerpunten lopen door over meerdere wedstrijden en beoordelingen. Vink ze af zodra ze beheerst zijn.</p>`;
+}
+
+function htmlTijdlijnItem(b){
+  if (b.soort === 'snel'){
+    const nv = niveau(b.niveau);
+    const tags = (b.tags||[]).map(t => { const s = snelTag(t); return s ? s.emoji+' '+s.label : ''; }).filter(Boolean).join(' · ');
+    const not = b.notities?.algemeen ? ` — "${esc(b.notities.algemeen)}"` : '';
+    return `
+      <div class="tijdlijn-item" data-open-beoordeling="${b.id}">
+        <div class="tl-stip" style="background:${niveauKleur(b.niveau)}"></div>
+        <div class="tl-lijn">
+          <div class="dat">${datumNL(b.datum)} · Snelle beoordeling</div>
+          <div class="wat">${esc(b.bron?.label || 'Los')}${nv ? ' · '+nv.label : ''}</div>
+          ${tags || not ? `<div class="det">${tags}${not}</div>` : ''}
+        </div>
+      </div>`;
+  }
+  const scores = TIPS.map(d => d.id+(b.scores?.[d.id]||'–')).join(' · ');
+  return `
+    <div class="tijdlijn-item" data-open-beoordeling="${b.id}">
+      <div class="tl-stip" style="background:var(--n5)"></div>
+      <div class="tl-lijn">
+        <div class="dat">${datumNL(b.datum)} · Volledige beoordeling</div>
+        <div class="wat">${esc(b.bron?.label || 'Periodieke meting')}</div>
+        <div class="det">${scores}</div>
+      </div>
+    </div>`;
 }
 
 /* ---------- Tab: seizoensplanning ---------- */
@@ -1027,13 +1224,36 @@ function koppelTeamTab(v, tab){
     v.querySelector('#nieuweWedstrijd').onclick = modalNieuweWedstrijd;
     v.querySelectorAll('[data-open-w]').forEach(b => b.onclick = () => openWedstrijd(b.dataset.openW));
   }
-  if (tab === 'spelers'){
-    v.querySelector('#nieuweSpeler').onclick = () => modalSpeler();
-    v.querySelectorAll('[data-bewerk-p]').forEach(b => b.onclick = () => modalSpeler(speler(b.dataset.bewerkP)));
-    v.querySelectorAll('[data-weg-p]').forEach(b => b.onclick = async () => {
-      const p = speler(b.dataset.wegP);
-      if (confirm(`${p.naam} verwijderen uit de selectie?`))
+  if (tab === 'spelers' && S._beoordeelProfiel){
+    // --- profielscherm ---
+    v.querySelector('#profielTerug').onclick = () => { S._beoordeelProfiel = null; S._profielTab = 'overzicht'; renderTeam(); };
+    v.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { S._profielTab = b.dataset.ptab; renderTeam(); });
+    v.querySelectorAll('[data-snel-speler]').forEach(b => b.onclick = () => modalSnelBeoordeling(b.dataset.snelSpeler));
+    v.querySelectorAll('[data-volledig-speler]').forEach(b => b.onclick = () => modalVolledigeBeoordeling(b.dataset.volledigSpeler));
+    v.querySelectorAll('[data-bewerk-speler]').forEach(b => b.onclick = () => modalSpeler(speler(b.dataset.bewerkSpeler)));
+    v.querySelectorAll('[data-weg-speler]').forEach(b => b.onclick = async () => {
+      const p = speler(b.dataset.wegSpeler);
+      if (p && confirm(`${p.naam} verwijderen uit de selectie? Beoordelingen en leerpunten gaan ook verloren.`)){
         await deleteDoc(doc(db,'teams',S.teamId,'spelers',p.id));
+        S._beoordeelProfiel = null; renderTeam();
+      }
+    });
+    v.querySelectorAll('[data-lp-nieuw]').forEach(b => b.onclick = () => modalLeerpunt(b.dataset.lpNieuw));
+    v.querySelectorAll('[data-lp-toggle]').forEach(b => b.onclick = () => toggleLeerpunt(b.dataset.lpToggle));
+    v.querySelectorAll('[data-lp-weg]').forEach(b => b.onclick = () => verwijderLeerpunt(b.dataset.lpWeg));
+    v.querySelectorAll('[data-open-beoordeling]').forEach(b => b.onclick = () => {
+      const bo = S.beoordelingen.find(x => x.id === b.dataset.openBeoordeling);
+      if (bo?.soort === 'volledig') modalVolledigeBeoordeling(bo.spelerId, bo);
+      else if (bo) modalSnelBeoordeling(bo.spelerId, bo);
+    });
+  }
+  else if (tab === 'spelers'){
+    v.querySelector('#nieuweSpeler').onclick = () => modalSpeler();
+    v.querySelectorAll('[data-open-profiel]').forEach(b => b.onclick = () => {
+      S._beoordeelProfiel = b.dataset.openProfiel; S._profielTab = 'overzicht'; renderTeam();
+    });
+    v.querySelectorAll('#spelersModus [data-modus]').forEach(b => b.onclick = () => {
+      if (b.dataset.modus === 'snel') startSnelRonde();
     });
   }
   if (tab === 'instellingen'){
@@ -1097,6 +1317,239 @@ function koppelTeamTab(v, tab){
       verlaatTeamView();
     };
   }
+}
+
+/* ==================== BEOORDELING — ACTIES & MODALS ==================== */
+
+/* gemeenschappelijke bron-opties: laatste wedstrijden + trainingen + los */
+function bronOpties(){
+  const opts = [];
+  for (const w of S.wedstrijden.slice(0, 8)){
+    const tit = w.type === 'toernooi' ? '🏆 '+(w.tegenstander||'Toernooi')
+      : (w.thuis ? S.team.naam+' – '+w.tegenstander : w.tegenstander+' – '+S.team.naam);
+    opts.push({type:'wedstrijd', id:w.id, datum:w.datum, label:tit});
+  }
+  for (const t of (S.presentie||[]).slice(0, 8)){
+    opts.push({type:'training', id:t.id, datum:t.datum, label:'Training '+datumNL(t.datum)});
+  }
+  opts.sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+  return opts;
+}
+
+function vandaagISO(){ return new Date().toISOString().slice(0,10); }
+function deelnemer(){ return {uid:S.user.uid, naam:(S.team.ledenInfo?.[S.user.uid]?.naam)||S.user.displayName||S.user.email||''}; }
+
+/* --- Snelle beoordeling (één speler) --- */
+function modalSnelBeoordeling(spelerId, bestaande = null){
+  const p = speler(spelerId); if (!p) return;
+  const opts = bronOpties();
+  let gekozenNiveau = bestaande?.niveau || 0;
+  let gekozenTags = new Set(bestaande?.tags || []);
+  // standaard bron: bestaande bron, anders meest recente wedstrijd/training, anders los
+  let bronType = bestaande?.bron?.type || (opts[0]?.type || 'los');
+  let bronId   = bestaande?.bron?.id   || (opts[0]?.id || '');
+
+  const bronSelect = () => {
+    const lijst = opts.filter(o => o.type === bronType);
+    return lijst.length
+      ? `<select class="invoer" id="mSnBron">${lijst.map(o =>
+          `<option value="${o.id}" ${o.id===bronId?'selected':''}>${esc(o.label)} · ${datumNL(o.datum)}</option>`).join('')}</select>`
+      : `<p style="font-size:12.5px;color:var(--ink-2);padding:4px 0">Geen ${bronType==='wedstrijd'?'wedstrijden':'trainingen'} gevonden — kies "Los".</p>`;
+  };
+
+  const kleurbalk = () => `<div class="kleurbalk" id="mSnNiveau">${NIVEAUS.slice(1).map(n =>
+    `<button data-niv="${n.n}" class="kn${n.n} ${gekozenNiveau===n.n?'gekozen':''}"><span class="lbl">${n.label.toUpperCase()}</span></button>`).join('')}</div>`;
+
+  const tagRij = () => `<div class="tag-rij" id="mSnTags">${SNEL_TAGS.map(t =>
+    `<button class="tag ${gekozenTags.has(t.id)?'aan':''}" data-tag="${t.id}">${t.emoji} ${t.label}</button>`).join('')}</div>`;
+
+  openModal(`
+    <h2>Snel beoordelen</h2>
+    <div class="snel-kop">
+      <div class="mini-shirt">${esc(p.nummer ?? '·')}</div>
+      <div><div class="nm">${esc(p.naam)}</div><div class="pos" id="mSnPos"></div></div>
+    </div>
+
+    <div class="veldlabel">Koppelen aan</div>
+    <div class="segment klein-seg" id="mSnBronType">
+      <button data-bt="wedstrijd" class="${bronType==='wedstrijd'?'actief':''}">Wedstrijd</button>
+      <button data-bt="training" class="${bronType==='training'?'actief':''}">Training</button>
+      <button data-bt="los" class="${bronType==='los'?'actief':''}">Los</button>
+    </div>
+    <div id="mSnBronWrap" style="margin-bottom:4px">${bronType==='los'?'':bronSelect()}</div>
+
+    <div class="veldlabel">Hoe ging het?</div>
+    ${kleurbalk()}
+
+    <div class="veldlabel">Opvallend (optioneel)</div>
+    ${tagRij()}
+
+    <div class="veldlabel">Korte notitie (optioneel)</div>
+    <textarea class="invoer" id="mSnNotitie" rows="2" placeholder="Bijv. durfde aan de bal te komen...">${esc(bestaande?.notities?.algemeen||'')}</textarea>
+
+    <button class="knop vol fluo" id="mSnOk" style="margin-top:12px">${bestaande?'Bijwerken':'Opslaan'}</button>
+    ${bestaande?`<button class="knop vol gevaar" id="mSnWeg" style="margin-top:8px">Verwijderen</button>`:''}`);
+
+  const updatePos = () => {
+    const o = opts.find(x => x.id === bronId && x.type === bronType);
+    $('#mSnPos').textContent = bronType==='los' ? 'Losse beoordeling' : (o ? o.label : '');
+  };
+  const koppelBron = () => {
+    $('#mSnBronWrap').innerHTML = bronType==='los' ? '' : bronSelect();
+    const sel = $('#mSnBron');
+    if (sel){ bronId = sel.value; sel.onchange = () => { bronId = sel.value; updatePos(); }; }
+    else bronId = '';
+    updatePos();
+  };
+  $$('#mSnBronType [data-bt]').forEach(b => b.onclick = () => {
+    bronType = b.dataset.bt;
+    $$('#mSnBronType [data-bt]').forEach(x => x.classList.toggle('actief', x===b));
+    koppelBron();
+  });
+  $$('#mSnNiveau [data-niv]').forEach(b => b.onclick = () => {
+    gekozenNiveau = Number(b.dataset.niv);
+    $$('#mSnNiveau [data-niv]').forEach(x => x.classList.toggle('gekozen', x===b));
+  });
+  $$('#mSnTags [data-tag]').forEach(b => b.onclick = () => {
+    const id = b.dataset.tag;
+    if (gekozenTags.has(id)) gekozenTags.delete(id); else gekozenTags.add(id);
+    b.classList.toggle('aan');
+  });
+  koppelBron();
+
+  $('#mSnOk').onclick = async () => {
+    if (!gekozenNiveau) return meld('Kies een niveau');
+    const o = opts.find(x => x.id === bronId && x.type === bronType);
+    const bron = bronType==='los' ? {type:'los'} : (o ? {type:bronType, id:o.id, label:o.label} : {type:'los'});
+    const datum = o?.datum || vandaagISO();
+    const data = {
+      soort:'snel', spelerId, datum, bron, niveau:gekozenNiveau,
+      tags:[...gekozenTags], notities:{algemeen:$('#mSnNotitie').value.trim()},
+      door:deelnemer(), gemaaktMs:Date.now(),
+    };
+    try {
+      if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id), data);
+      else await addDoc(collection(db,'teams',S.teamId,'beoordelingen'), data);
+      sluitModal();
+      if (S._snelRonde) volgendeSnelRonde(); else { renderTeam(); meld(p.naam+' beoordeeld'); }
+    } catch(e){ meld('Opslaan mislukt: '+(e.code||e.message)); }
+  };
+  const wegBtn = $('#mSnWeg');
+  if (wegBtn) wegBtn.onclick = async () => {
+    if (!confirm('Deze beoordeling verwijderen?')) return;
+    await deleteDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id));
+    sluitModal(); renderTeam();
+  };
+}
+
+/* --- Snelle ronde: hele selectie aflopen --- */
+function startSnelRonde(){
+  if (!S.spelers.length) return meld('Voeg eerst spelers toe');
+  S._snelRonde = {index:0, ids:S.spelers.map(p => p.id)};
+  modalSnelBeoordeling(S._snelRonde.ids[0]);
+}
+function volgendeSnelRonde(){
+  const r = S._snelRonde; if (!r) return;
+  r.index++;
+  if (r.index >= r.ids.length){ S._snelRonde = null; renderTeam(); meld('Ronde klaar ✓'); return; }
+  modalSnelBeoordeling(r.ids[r.index]);
+}
+
+/* --- Volledige beoordeling (TIPS) --- */
+function modalVolledigeBeoordeling(spelerId, bestaande = null){
+  const p = speler(spelerId); if (!p) return;
+  const scores = {...(bestaande?.scores || {})};
+  const notities = {...(bestaande?.notities || {})};
+  const moment = bestaande?.bron?.label || '';
+
+  const domeinKaart = (d) => `
+    <div class="kaart">
+      <div class="veldlabel" style="margin-top:0">${d.id} · ${d.naam}</div>
+      <p style="font-size:11.5px;color:var(--ink-2);margin:-2px 0 4px">${esc(d.omschrijving)}</p>
+      <div class="kleurbalk dom" data-dom="${d.id}">${NIVEAUS.slice(1).map(n =>
+        `<button data-niv="${n.n}" class="kn${n.n} ${scores[d.id]===n.n?'gekozen':''}"><span class="lbl">${n.kort}</span></button>`).join('')}</div>
+      <textarea class="invoer" data-not="${d.id}" rows="2" placeholder="Toelichting ${d.naam.toLowerCase()}...">${esc(notities[d.id]||'')}</textarea>
+    </div>`;
+
+  openModal(`
+    <h2>Volledige beoordeling</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:10px">${esc(p.naam)}${p.nummer!=null&&p.nummer!==''?' · #'+esc(p.nummer):''}</p>
+    <div class="veldgroep"><label>Moment</label>
+      <input class="invoer" id="mVbMoment" value="${esc(moment)}" placeholder="Bijv. Kwartaalmeting Q3"></div>
+    ${TIPS.map(domeinKaart).join('')}
+    <button class="knop vol fluo" id="mVbOk" style="margin-top:6px">${bestaande?'Bijwerken':'Beoordeling opslaan'}</button>
+    ${bestaande?`<button class="knop vol gevaar" id="mVbWeg" style="margin-top:8px">Verwijderen</button>`:''}
+    <p style="font-size:11.5px;color:var(--ink-2);margin-top:10px;line-height:1.45">Tip: leerpunten beheer je in het tabblad <b>Leerlijn</b> van de speler — die lopen door over meerdere beoordelingen.</p>`);
+
+  $$('.kleurbalk.dom').forEach(balk => {
+    const dom = balk.dataset.dom;
+    balk.querySelectorAll('[data-niv]').forEach(b => b.onclick = () => {
+      scores[dom] = Number(b.dataset.niv);
+      balk.querySelectorAll('[data-niv]').forEach(x => x.classList.toggle('gekozen', x===b));
+    });
+  });
+
+  $('#mVbOk').onclick = async () => {
+    if (!Object.keys(scores).length) return meld('Geef minstens één score');
+    TIPS.forEach(d => { const t = $(`[data-not="${d.id}"]`); if (t) notities[d.id] = t.value.trim(); });
+    const data = {
+      soort:'volledig', spelerId, datum:bestaande?.datum || vandaagISO(),
+      bron:{type:'los', label:$('#mVbMoment').value.trim() || 'Periodieke meting'},
+      scores, notities, door:deelnemer(), gemaaktMs:Date.now(),
+    };
+    try {
+      if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id), data);
+      else await addDoc(collection(db,'teams',S.teamId,'beoordelingen'), data);
+      sluitModal(); renderTeam(); meld('Beoordeling opgeslagen');
+    } catch(e){ meld('Opslaan mislukt: '+(e.code||e.message)); }
+  };
+  const wegBtn = $('#mVbWeg');
+  if (wegBtn) wegBtn.onclick = async () => {
+    if (!confirm('Deze beoordeling verwijderen?')) return;
+    await deleteDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id));
+    sluitModal(); renderTeam();
+  };
+}
+
+/* --- Leerpunten (array op spelerdoc) --- */
+function modalLeerpunt(spelerId){
+  const p = speler(spelerId); if (!p) return;
+  let domein = 'I';
+  openModal(`
+    <h2>Leerpunt toevoegen</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:10px">Formuleer een concreet, observeerbaar doel voor ${esc(p.naam)}.</p>
+    <div class="veldlabel">Domein</div>
+    <div class="segment klein-seg" id="mLpDom">${TIPS.map(d =>
+      `<button data-d="${d.id}" class="${d.id==='I'?'actief':''}" title="${esc(d.naam)}">${d.id}</button>`).join('')}</div>
+    <div class="veldgroep"><label>Leerpunt</label>
+      <textarea class="invoer" id="mLpTekst" rows="3" placeholder="Bijv. eerder het hoofd omhoog vóór de aanname"></textarea></div>
+    <button class="knop vol fluo" id="mLpOk">Toevoegen</button>`);
+  $$('#mLpDom [data-d]').forEach(b => b.onclick = () => {
+    domein = b.dataset.d; $$('#mLpDom [data-d]').forEach(x => x.classList.toggle('actief', x===b));
+  });
+  $('#mLpTekst').focus();
+  $('#mLpOk').onclick = async () => {
+    const tekst = $('#mLpTekst').value.trim();
+    if (tekst.length < 3) return meld('Vul een leerpunt in');
+    const nieuw = {id:'lp_'+Date.now().toString(36), domein, tekst, sinds:vandaagISO(), klaar:false};
+    const lp = [...(p.leerpunten||[]), nieuw];
+    try {
+      await updateDoc(doc(db,'teams',S.teamId,'spelers',spelerId), {leerpunten: lp});
+      sluitModal(); renderTeam(); meld('Leerpunt toegevoegd');
+    } catch(e){ meld('Opslaan mislukt: '+(e.code||e.message)); }
+  };
+}
+async function toggleLeerpunt(lpId){
+  const p = speler(S._beoordeelProfiel); if (!p) return;
+  const lp = (p.leerpunten||[]).map(l => l.id === lpId
+    ? {...l, klaar:!l.klaar, klaarOp: !l.klaar ? vandaagISO() : null} : l);
+  await updateDoc(doc(db,'teams',S.teamId,'spelers',p.id), {leerpunten: lp});
+}
+async function verwijderLeerpunt(lpId){
+  const p = speler(S._beoordeelProfiel); if (!p) return;
+  if (!confirm('Dit leerpunt verwijderen?')) return;
+  const lp = (p.leerpunten||[]).filter(l => l.id !== lpId);
+  await updateDoc(doc(db,'teams',S.teamId,'spelers',p.id), {leerpunten: lp});
 }
 
 function modalSpeler(p){
