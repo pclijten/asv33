@@ -676,3 +676,167 @@ input,select{font:inherit;color:inherit}
 .tok-invoer button:disabled{opacity:.6}
 .tok-laatste{font-size:11px;color:var(--ink-2)}
 .tok-laatste b{color:#1d8a3f;font-weight:600}
+
+/* ==================================================================
+   DARK THEME — "Pitch × Scoreboard" laatste layout
+   Donkere bankapp-stijl met ASV'33-rood als identiteit,
+   amber voor afwezig/let-op, groen voor aanwezig/goed.
+================================================================== */
+:root{
+  --bg:#0e1116;
+  --surface:#181d24;
+  --surface-2:#1f262f;
+  --line-d:rgba(255,255,255,.06);
+
+  --paper:#0e1116;          /* body achtergrond donker */
+  --card:#181d24;           /* alle kaarten donker */
+  --ink:#f5f6f8;            /* hoofdtekst licht */
+  --ink-2:#8b95a1;          /* gedempte tekst */
+  --hair:rgba(255,255,255,.08);
+  --pitch-ink:#1f262f;      /* donkere vlakken iets lichter dan bg voor contrast */
+
+  --accent:#e2342f;         /* ASV'33 rood — identiteit */
+  --grass:#e2342f;
+  --grass-2:#b3211d;
+
+  --ok:#35c47a;             /* aanwezig / goed */
+  --warn:#f5b13d;           /* afwezig / let op */
+  --uit:#f5b13d;            /* "uit/afwezig" wordt amber i.p.v. rood */
+  --in:#35c47a;
+  --veld:#16361f;           /* veld donkerder groen */
+  --veld-2:#11291a;
+  --keeper:#f5b13d;
+  --fluo:#ffffff;
+
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+}
+
+body{ background:var(--bg); color:var(--ink); }
+
+/* ---- Kop ---- */
+.kop h1{ color:var(--ink); }
+.terug{ background:var(--surface); color:#cbd2da; box-shadow:none; border:1px solid var(--line-d); }
+
+/* ---- Knoppen ---- */
+.knop{ background:var(--surface-2); color:#fff; box-shadow:none; }
+.knop.licht{ background:var(--surface-2); color:var(--ink); }
+.knop.fluo{ background:var(--accent); color:#fff; box-shadow:0 8px 22px rgba(226,52,47,.32); }
+.knop.gevaar{ background:var(--surface-2); color:var(--warn); }
+
+/* ---- Kaarten / lijst-items ---- */
+.kaart{ background:var(--surface); border:1px solid var(--line-d);
+  box-shadow:0 6px 18px rgba(0,0,0,.3); }
+.lijst-item{ background:var(--surface); border:1px solid var(--line-d);
+  box-shadow:0 6px 18px rgba(0,0,0,.3); }
+.lijst-item:hover{ border-color:color-mix(in srgb,var(--accent) 55%, transparent);
+  box-shadow:0 8px 26px rgba(226,52,47,.18); }
+.lijst-item .titel{ color:var(--ink); }
+.lijst-item .pijl{ background:var(--accent); color:#fff; }
+.leeg{ color:var(--ink-2); } .leeg b{ color:var(--ink); }
+
+/* ---- Formulieren ---- */
+.invoer{ background:var(--surface-2); border-color:var(--line-d); color:var(--ink); }
+.invoer:focus{ border-color:var(--accent); }
+
+/* ---- Segment ---- */
+.segment{ background:var(--surface-2); }
+.segment button{ color:var(--ink-2); }
+.segment button.actief{ background:var(--accent); color:#fff; box-shadow:none; }
+
+/* ---- Kwart-tabs ---- */
+.kwarten button{ background:var(--surface); color:var(--ink-2); box-shadow:none; border:1px solid var(--line-d); }
+.kwarten button.actief{ background:var(--accent); color:#fff; }
+
+/* ---- Welkom-kop / overzicht ---- */
+.welkom-kop{ background:linear-gradient(150deg,var(--accent),var(--grass-2)); }
+.ov-blok{ background:var(--surface); border:1px solid var(--line-d); box-shadow:none; }
+.ov-getal{ color:var(--accent); }
+.ov-label{ color:var(--ink-2); }
+.ov-blok.ov-actief{ background:color-mix(in srgb,var(--warn) 12%, var(--surface)); }
+.ov-blok.ov-actief .ov-getal{ color:var(--warn); }
+.ov-blok.ov-wedstrijden .ov-getal{ color:var(--ok); }
+
+/* ---- Shirts in lijsten ---- */
+.team-shirt{ background:var(--accent); box-shadow:0 3px 8px rgba(226,52,47,.3); }
+.club-shirt{ background:var(--surface-2); color:#fff; }
+
+/* ---- Scorebord / klok / bank (waren al donker, nu consistent) ---- */
+.scorebord{ background:var(--surface); border:1px solid var(--line-d); }
+.scorebord .sb-cijfers{ color:#fff; }
+.klok{ background:var(--surface); border:1px solid var(--line-d); }
+.klok .tijd{ color:#fff; }
+.klok .acties button.primair{ background:var(--accent); }
+.bank{ background:var(--surface); border:1px solid var(--line-d); }
+
+/* ---- Speler/training/video/lid-rijen ---- */
+.speler-rij,.training-rij,.video-rij,.lid-rij{ background:var(--surface); border:1px solid var(--line-d); box-shadow:none; }
+.speler-rij:hover,.training-rij:hover,.video-rij:hover{
+  border-color:color-mix(in srgb,var(--accent) 50%, transparent);
+  box-shadow:0 4px 16px rgba(226,52,47,.18); }
+.speler-rij .mini-shirt{ background:var(--surface-2); }
+.training-rij .ico{ background:color-mix(in srgb,var(--accent) 16%, var(--surface)); color:var(--accent); }
+.training-rij.ongelezen{ border-left:3px solid var(--accent); }
+.training-rij.ongelezen .ico{ background:var(--accent); color:#fff; }
+.training-rij button,.video-rij .acties button{ color:var(--ink-2); }
+
+/* ---- Stats-tabel ---- */
+.stat-tabel{ background:var(--surface); border:1px solid var(--line-d); box-shadow:none; }
+.stat-tabel th{ color:var(--ink-2); border-bottom-color:var(--line-d); }
+.stat-tabel td{ border-bottom-color:var(--line-d); color:var(--ink); }
+.opkomst-cel.goed{ color:var(--ok); }
+.opkomst-cel.matig{ color:var(--warn); }
+.opkomst-cel.laag{ color:var(--warn); }
+
+/* ---- Presentie ---- */
+.presentie-rij{ background:var(--surface); border:1px solid var(--line-d); box-shadow:none; }
+.pr-dag{ color:var(--ink); }
+.pr-afw{ color:var(--warn); }
+.pr-allen{ color:var(--ok); }
+.pres-speler.aanwezig{ background:color-mix(in srgb,var(--ok) 12%, var(--surface)); border-color:color-mix(in srgb,var(--ok) 28%, transparent); }
+.pres-speler.afwezig{ background:color-mix(in srgb,var(--warn) 12%, var(--surface)); border-color:color-mix(in srgb,var(--warn) 32%, transparent); }
+.pres-speler.aanwezig .pres-shirt{ background:var(--ok); }
+.pres-speler.afwezig .pres-shirt{ background:var(--warn); color:#1a1206; }
+.pres-naam{ color:var(--ink); }
+.pres-speler.aanwezig .pres-status{ color:var(--ok); }
+.pres-speler.afwezig .pres-status{ color:var(--warn); }
+
+/* ---- Diverse kleine vlakken ---- */
+.badge{ background:var(--surface-2); color:var(--ink-2); }
+.sectie-kop{ color:var(--ink-2); }
+.uitklap summary{ background:var(--surface); box-shadow:none; border:1px solid var(--line-d); }
+.uitklap summary::after{ color:var(--ink-2); }
+.melding{ background:var(--surface-2); border:1px solid var(--line-d); }
+.team-chip-kies label{ background:var(--surface); box-shadow:none; }
+.team-chip-kies label.aan{ border-color:var(--accent); background:color-mix(in srgb,var(--accent) 10%, transparent); color:#ff7d78; }
+.upload-knop{ background:var(--surface); border-color:var(--line-d); color:var(--ink-2); }
+.upload-knop.bezig{ border-color:var(--accent); color:var(--accent); background:color-mix(in srgb,var(--accent) 8%, transparent); }
+.lid-rij .lid-avatar{ background:var(--accent); }
+.link-rij{ background:var(--surface); border:1px solid var(--line-d); box-shadow:none; }
+.link-rij .link-actie button{ background:var(--surface-2); box-shadow:none; }
+.link-rij .link-actie .wa{ background:var(--accent); }
+.teamcode{ background:var(--surface-2); }
+.modal{ background:var(--bg); }
+.modal .sluitbalk{ background:var(--surface-2); }
+
+/* ---- Handleiding ---- */
+.hl{ color:var(--ink); }
+.hl b{ color:#fff; }
+.hl .tip{ background:color-mix(in srgb,var(--warn) 12%, var(--surface)); border-left-color:var(--warn); }
+.hl .tip b{ color:var(--warn); }
+.hl kbd{ background:var(--surface-2); border-color:var(--line-d); color:var(--ink); }
+
+/* ---- Chip-namen op het veld op donkere achtergrond ---- */
+.chip .naam{ background:rgba(0,0,0,.55); }
+
+/* ==================================================================
+   ONDERBALK — strakke SVG-iconen (laatste layout)
+================================================================== */
+.onderbalk{ background:rgba(14,17,22,.93); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border-top:1px solid var(--line-d); padding:9px 4px calc(12px + env(safe-area-inset-bottom)); }
+.onderbalk button{ color:var(--ink-2); gap:3px; }
+.onderbalk button.actief{ color:var(--accent); }
+.onderbalk .ico{ display:grid; place-items:center; line-height:1; }
+.onderbalk .ico svg{ width:22px; height:22px; display:block; }
+.onderbalk button.actief .ico svg{ filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 50%, transparent)); }
+.onderbalk button.actief::after{ background:var(--accent); }
+.tablabel .puntje{ background:var(--accent); }
