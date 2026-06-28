@@ -9,10 +9,7 @@ import {
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
   KNVB_SEIZOEN, knvbKalenderVoorTeam,
   NIVEAUS, niveau, niveauKleur, SKILLS, skillDomein,
-  LEERCURVE, leercurveRelevant, SNEL_TAGS, snelTag,
-  BLESSURE_ZONES, blessureZone, BLESSURE_TYPE, BLESSURE_ONTSTAAN, BLESSURE_ERNST, ernstInfo,
-  BLESSURE_HERSTEL, BLESSURE_ACTIE, actieInfo, RTP_FASEN, rtpInfo, BLESSURE_STATUS,
-  isRodeVlagZone, RECIDIEF_WEKEN, BLESSURE_BEWAARMAANDEN } from './config.js';
+  LEERCURVE, leercurveRelevant, SNEL_TAGS, snelTag } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
@@ -292,7 +289,7 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   // presentie altijd ingeklapt openen bij elke teamopening (alle maanden dicht)
   S._presentieOpen = new Set();
   S._presentieToonAlles = new Set();
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','blessures');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen');
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
@@ -330,13 +327,6 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
       .sort((a,b) => (b.datum||'').localeCompare(a.datum||'') || (b.gemaaktMs||0) - (a.gemaaktMs||0));
     if (!S.wedstrijdId && (S.teamTab === 'spelers' || S._beoordeelProfiel)) renderTeam();
   });
-  // Eigen listener voor blessures (gezondheidsgegevens, AVG art. 9) — los van
-  // de overige listeners, zodat updates van een andere coach niet wegvallen.
-  S.unsub.blessures = onSnapshot(collection(db,'teams',teamId,'blessures'), snap => {
-    S.blessures = snap.docs.map(d => ({id:d.id, ...d.data()}))
-      .sort((a,b) => (b.datum||'').localeCompare(a.datum||'') || (b.gemaaktMs||0) - (a.gemaaktMs||0));
-    if (!S.wedstrijdId && (S.teamTab === 'spelers' || S._beoordeelProfiel || S._fitDash)) renderTeam();
-  });
   toon('team');
 }
 
@@ -352,7 +342,7 @@ function startUitleningenListener(teamId){
   });
 }
 export function verlaatTeamView(){
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','uitleningen','blessures');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','uitleningen');
   S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = []; S.planning = [];
   S.uitleningenUit = []; S.uitleningenIn = [];
   renderTeams(); toon('teams');
@@ -364,7 +354,7 @@ export function renderTeam(){
   const tab = S.teamTab;
   let inhoud = '';
   if (tab === 'wedstrijden') inhoud = htmlWedstrijden();
-  if (tab === 'spelers')     inhoud = S._fitDash ? htmlFitDashboard() : (S._leenProfiel ? htmlLeenProfiel() : (S._beoordeelProfiel ? htmlProfiel() : htmlSpelers()));
+  if (tab === 'spelers')     inhoud = S._leenProfiel ? htmlLeenProfiel() : (S._beoordeelProfiel ? htmlProfiel() : htmlSpelers());
   if (tab === 'planning')    inhoud = htmlPlanning();
   if (tab === 'stats')       inhoud = htmlStats();
   if (tab === 'trainingen')  inhoud = htmlTeamTrainingen();
@@ -375,7 +365,7 @@ export function renderTeam(){
   const teamTrainingen = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
   const ongelezen = teamTrainingen.filter(t => !S.trainingenGelezen[t.id]).length;
 
-  const profielOpen = (tab === 'spelers' && (S._beoordeelProfiel || S._leenProfiel || S._fitDash));
+  const profielOpen = (tab === 'spelers' && (S._beoordeelProfiel || S._leenProfiel));
   v.innerHTML = `
     ${profielOpen ? '' : `<div class="kop"><button class="terug" id="naarTeams">‹</button>
       <h1>${esc(S.team.naam)}<span class="sub">${S.team.categorie ? esc(S.team.categorie)+' · ' : ''}${esc(S.team.format)} tegen ${esc(S.team.format)}</span></h1>
@@ -391,7 +381,7 @@ export function renderTeam(){
   const teamInstelBtn = v.querySelector('#teamInstel');
   if (teamInstelBtn) teamInstelBtn.onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
   v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
-    S._beoordeelProfiel = null; S._leenProfiel = null; S._fitDash = false;
+    S._beoordeelProfiel = null; S._leenProfiel = null;
     // presentie altijd ingeklapt tonen zodra je (terug) op de Trainingen-tab klikt
     if (b.dataset.tab === 'trainingen'){ S._presentieOpen = new Set(); S._presentieToonAlles = new Set(); }
     S.teamTab = b.dataset.tab; renderTeam();
@@ -446,7 +436,6 @@ function htmlSpelers(){
     </div>
 
     <button class="knop vol licht" id="nieuweSpeler" style="margin-bottom:14px">+ Speler toevoegen</button>
-    <button class="knop vol licht" id="fitDashBtn" style="margin-bottom:14px">🩹 Fitheid & blessures (team)</button>
     ${S.spelers.length ? S.spelers.map(p => {
       const b = laatsteSnel[p.id];
       const stip = b ? `<span class="beoordeel-stip" style="background:${niveauKleur(b.niveau)}" title="Laatste: ${esc(niveau(b.niveau)?.label||'')}"></span>`
@@ -606,7 +595,6 @@ function htmlProfiel(){
     <div class="segment" id="profielTabs" style="margin-bottom:14px">
       <button data-ptab="overzicht" class="${tab==='overzicht'?'actief':''}">Overzicht</button>
       <button data-ptab="leerlijn" class="${tab==='leerlijn'?'actief':''}">Leerlijn</button>
-      <button data-ptab="fitheid" class="${tab==='fitheid'?'actief':''}">Fitheid${blessuresVanSpeler(p.id, 'actief').length ? ' <span class="fit-dot"></span>' : ''}</button>
       <button data-ptab="historie" class="${tab==='historie'?'actief':''}">Historie</button>
     </div>
 
@@ -643,8 +631,6 @@ function htmlProfiel(){
     ` : ''}
 
     ${tab === 'leerlijn' ? htmlLeerlijn(p) : ''}
-
-    ${tab === 'fitheid' ? htmlFitheid(p) : ''}
 
     ${tab === 'historie' ? `
       <div class="kaart">
@@ -1389,19 +1375,9 @@ function koppelTeamTab(v, tab){
       if (bo?.soort === 'volledig') modalVolledigeBeoordeling(bo.spelerId, bo);
       else if (bo) modalSnelBeoordeling(bo.spelerId, bo);
     });
-    // --- fitheid / blessures ---
-    koppelFitheid(v);
-  }
-  else if (tab === 'spelers' && S._fitDash){
-    // --- team fitheid-dashboard ---
-    const ft = v.querySelector('#fitTerug');
-    if (ft) ft.onclick = () => { S._fitDash = false; renderTeam(); };
-    koppelFitheid(v);
   }
   else if (tab === 'spelers'){
     v.querySelector('#nieuweSpeler').onclick = () => modalSpeler();
-    const fd = v.querySelector('#fitDashBtn');
-    if (fd) fd.onclick = () => { S._fitDash = true; renderTeam(); };
     v.querySelectorAll('[data-open-profiel]').forEach(b => b.onclick = () => {
       S._beoordeelProfiel = b.dataset.openProfiel; S._profielTab = 'overzicht'; renderTeam();
     });
@@ -2144,552 +2120,3 @@ function modalPlanDag(it){
   };
 }
 
-/* ====================================================================
-   BLESSUREMODULE
-   Gezondheidsgegevens (AVG art. 9). Coach-only, toestemming vereist,
-   dataminimalisatie, bewaartermijn. Opslag onder teams/{teamId}/blessures,
-   valt onder bestaande isTeamMember-rules + extra rule-checks (zie .rules).
-==================================================================== */
-
-/* ---- helpers ---- */
-function blessuresVanSpeler(pid, status){
-  let lijst = (S.blessures||[]).filter(b => b.spelerId === pid);
-  if (status) lijst = lijst.filter(b => (b.status||'actief') === status);
-  return lijst;
-}
-function actieveBlessures(){
-  return (S.blessures||[]).filter(b => (b.status||'actief') !== 'hersteld');
-}
-function ernstKleur(id){ return ernstInfo(id)?.kleur || 'var(--ink-2)'; }
-function statusInfo(id){ return BLESSURE_STATUS[id||'actief'] || BLESSURE_STATUS.actief; }
-
-function dagenGeleden(iso){
-  if (!iso) return 0;
-  const d = Math.floor((Date.now() - new Date(iso+'T12:00').getTime()) / 86400000);
-  return Math.max(0, d);
-}
-function zoneLabel(b){
-  const z = blessureZone(b.zone);
-  const naam = z ? z.naam : (b.zoneNaam || b.zone || 'Onbekend');
-  return b.zij ? `${b.zij} · ${naam}` : naam;
-}
-
-/* Terugkerend? Zelfde speler + zone, eerdere blessure binnen RECIDIEF_WEKEN. */
-function isTerugkerend(pid, zone, datum, negeerId){
-  const grens = plusDagen(datum, -RECIDIEF_WEKEN*7);
-  return (S.blessures||[]).some(b =>
-    b.id !== negeerId && b.spelerId === pid && b.zone === zone &&
-    (b.datum||'') >= grens && (b.datum||'') < datum);
-}
-/* Hoeveel klachten op dezelfde zone, ooit (voor 'hotspot'). */
-function zoneTelling(pid){
-  const tel = {};
-  for (const b of blessuresVanSpeler(pid)) tel[b.zone] = (tel[b.zone]||0) + 1;
-  return tel;
-}
-
-/* AVG: heeft dit team toestemming geregistreerd voor gezondheidsregistratie?
-   Vastgelegd op het team-document (door coach, na akkoord van ouders/speler). */
-function heeftBlessureToestemming(){
-  return !!(S.team && S.team.blessureToestemming && S.team.blessureToestemming.akkoord);
-}
-
-/* ---- Profiel-tab: Fitheid ---- */
-function htmlFitheid(p){
-  if (!heeftBlessureToestemming()){
-    return htmlBlessureConsentGate();
-  }
-  const actief = blessuresVanSpeler(p.id).filter(b => (b.status||'actief') !== 'hersteld');
-  const afgesloten = blessuresVanSpeler(p.id).filter(b => (b.status||'actief') === 'hersteld');
-  const tel = zoneTelling(p.id);
-  const hotspots = Object.entries(tel).filter(([,n]) => n >= 2).sort((a,b)=>b[1]-a[1]);
-
-  return `
-    <div class="avg-balk gezond"><span class="slot">🔒</span>
-      <span>Gezondheidsgegevens — extra vertrouwelijk. Alleen voor zorg rond training/wedstrijd, niet delen.</span></div>
-
-    <button class="knop vol" style="margin-bottom:14px" data-blessure-nieuw="${p.id}">+ Blessure / klacht registreren</button>
-
-    ${actief.length ? `
-      <div class="veldlabel" style="margin-top:0">Actief & herstellend</div>
-      ${actief.map(b => blessureKaart(b)).join('')}
-    ` : `<div class="kaart leeg" style="margin-bottom:14px">Geen actieve klachten. 💪</div>`}
-
-    ${hotspots.length ? `
-      <div class="kaart hotspot-kaart">
-        <div class="veldlabel" style="margin-top:0">⚠️ Terugkerende plekken</div>
-        ${hotspots.map(([z,n]) => {
-          const zi = blessureZone(z);
-          return `<div class="hotspot-rij"><span class="hs-naam">${esc(zi?zi.naam:z)}</span><span class="hs-tel">${n}× geregistreerd</span></div>`;
-        }).join('')}
-        <p class="hint">Meerdere klachten op dezelfde plek kunnen wijzen op onderliggende overbelasting. Overweeg een fysiotherapeut.</p>
-      </div>` : ''}
-
-    ${afgesloten.length ? `
-      <div class="veldlabel">Afgesloten (${afgesloten.length})</div>
-      ${afgesloten.slice(0,8).map(b => blessureKaart(b, true)).join('')}
-    ` : ''}`;
-}
-
-function htmlBlessureConsentGate(){
-  return `
-    <div class="kaart consent-kaart">
-      <div class="veldlabel" style="margin-top:0">🔒 Toestemming vereist</div>
-      <p style="font-size:13.5px;line-height:1.6;color:var(--ink)">
-        Het bijhouden van blessures en klachten betekent het vastleggen van
-        <b>gezondheidsgegevens</b>. Dat zijn bijzondere persoonsgegevens (AVG art. 9).
-        Voor minderjarigen mag dat alleen met expliciete toestemming van speler en/of ouder(s).</p>
-      <ul class="consent-lijst">
-        <li>Gegevens zijn <b>alleen zichtbaar voor coaches</b> van dit team.</li>
-        <li>Ze worden gebruikt voor <b>zorg en belasting rond training/wedstrijd</b> — niet medisch, geen diagnose.</li>
-        <li>Een speler/ouder kan altijd <b>inzage of verwijdering</b> vragen; jij wist de gegevens dan hier.</li>
-        <li>Afgesloten klachten worden na <b>${BLESSURE_BEWAARMAANDEN} maanden</b> automatisch als verwijderbaar gemarkeerd.</li>
-      </ul>
-      <label class="consent-check">
-        <input type="checkbox" id="consentVink">
-        <span>Ik heb toestemming van speler/ouder(s) en ga akkoord met bovenstaande.</span>
-      </label>
-      <button class="knop vol" id="consentOk" disabled style="margin-top:12px">Fitheidsregistratie inschakelen</button>
-      <p class="hint" style="margin-top:10px">Bespreek dit vooraf met je club. Bij twijfel: niet vastleggen.</p>
-    </div>`;
-}
-
-/* ---- blessurekaart (lijstitem) ---- */
-function blessureKaart(b, dim=false){
-  const ei = ernstInfo(b.ernst);
-  const si = statusInfo(b.status);
-  const dagen = b.status === 'hersteld'
-    ? (b.afgesloten ? `afgesloten ${datumNL(b.afgesloten)}` : 'afgesloten')
-    : `loopt ${dagenGeleden(b.datum)} ${dagenGeleden(b.datum)===1?'dag':'dagen'}`;
-  const rtp = b.rtpFase ? rtpInfo(b.rtpFase) : null;
-  return `
-    <button class="blessure-kaart ${dim?'dim':''}" data-blessure-detail="${b.id}">
-      <span class="bk-ernst" style="background:${ei?ei.kleur:'var(--ink-2)'}"></span>
-      <div class="bk-mid">
-        <div class="bk-loc">${esc(zoneLabel(b))}${b.terugkerend?' <span class="bk-recidief">↻</span>':''}</div>
-        <div class="bk-meta">${esc(ei?ei.label:'—')} · ${esc(dagen)}${rtp?` · ${esc(rtp.label)}`:''}</div>
-      </div>
-      <span class="bk-status" style="color:${si.kleur}">${si.label}</span>
-    </button>`;
-}
-
-/* ---- Registratie-modal met body-map ---- */
-let _blReg = null;   // tijdelijke invoerstaat tijdens registratie
-function modalBlessureNieuw(pid){
-  const p = speler(pid); if (!p) return;
-  _blReg = { spelerId:pid, datum:vandaagIso(), aanzicht:'voor', zone:null, zij:null,
-             type:null, ontstaan:null, pijn:3, ernst:null,
-             kanTrainen:true, kanSpelen:true, herstel:null, actie:null, opmerking:'' };
-  openModal(blessureModalHtml(p));
-  koppelBlessureModal(p);
-}
-
-function blessureModalHtml(p){
-  const r = _blReg;
-  const zones = BLESSURE_ZONES[r.aanzicht];
-  return `
-    <h2>🩹 Klacht registreren — ${esc(p.naam)}</h2>
-    <div class="bl-view">
-      <button data-blview="voor"   class="${r.aanzicht==='voor'?'actief':''}">Voorkant</button>
-      <button data-blview="achter" class="${r.aanzicht==='achter'?'actief':''}">Achterkant</button>
-    </div>
-    <div class="bl-bodywrap">${bodyMapSvg(r.aanzicht, r.zone, r.ernst)}</div>
-    <div class="bl-zonelijst">
-      ${zones.map(z => `<button class="bl-zone-btn ${r.zone===z.id?'aan':''}" data-blzone="${z.id}">${esc(z.naam)}</button>`).join('')}
-    </div>
-    <div id="blFlow">${blessureFlowHtml(p)}</div>`;
-}
-
-/* compacte SVG body-map; gekozen zone licht op of toont ernst-kleur */
-function bodyMapSvg(aanzicht, zoneSel, ernstSel){
-  const fill = ernstSel ? ernstKleur(ernstSel) : 'var(--accent)';
-  // map zone-id → svg snippet (vereenvoudigd silhouet met tikbare regio's)
-  const Z = (id, el) => {
-    const sel = zoneSel === id;
-    return el.replace('§CLS§', `bm-zone${sel?' sel':''}`).replace('§FILL§', sel?`style="fill:${fill}"`:'');
-  };
-  if (aanzicht === 'voor'){
-    return `<svg class="bm-svg" viewBox="0 0 200 380" xmlns="http://www.w3.org/2000/svg">
-      <text class="bm-lr" x="16" y="13">RECHTS</text><text class="bm-lr" x="152" y="13">LINKS</text>
-      ${Z('hoofd','<ellipse class="§CLS§" §FILL§ data-blzone="hoofd" cx="100" cy="32" rx="17" ry="20"/>')}
-      ${Z('schouder','<ellipse class="§CLS§" §FILL§ data-blzone="schouder" cx="68" cy="72" rx="14" ry="11"/>')}
-      ${Z('schouder','<ellipse class="§CLS§" §FILL§ data-blzone="schouder" cx="132" cy="72" rx="14" ry="11"/>')}
-      ${Z('borst','<path class="§CLS§" §FILL§ data-blzone="borst" d="M78 64 H122 Q128 64 128 74 V120 Q128 128 118 128 H82 Q72 128 72 120 V74 Q72 64 78 64 Z"/>')}
-      ${Z('arm','<rect class="§CLS§" §FILL§ data-blzone="arm" x="52" y="80" width="14" height="90" rx="7"/>')}
-      ${Z('arm','<rect class="§CLS§" §FILL§ data-blzone="arm" x="134" y="80" width="14" height="90" rx="7"/>')}
-      ${Z('lies','<path class="§CLS§" §FILL§ data-blzone="lies" d="M80 130 H99 V152 Q99 158 90 158 H82 Q76 158 76 150 V138 Q76 130 80 130 Z"/>')}
-      ${Z('lies','<path class="§CLS§" §FILL§ data-blzone="lies" d="M101 130 H120 Q124 130 124 138 V150 Q124 158 118 158 H110 Q101 158 101 152 Z"/>')}
-      ${Z('quad','<rect class="§CLS§" §FILL§ data-blzone="quad" x="78" y="160" width="18" height="64" rx="8"/>')}
-      ${Z('quad','<rect class="§CLS§" §FILL§ data-blzone="quad" x="104" y="160" width="18" height="64" rx="8"/>')}
-      ${Z('knie','<ellipse class="§CLS§" §FILL§ data-blzone="knie" cx="87" cy="234" rx="11" ry="12"/>')}
-      ${Z('knie','<ellipse class="§CLS§" §FILL§ data-blzone="knie" cx="113" cy="234" rx="11" ry="12"/>')}
-      ${Z('scheen','<rect class="§CLS§" §FILL§ data-blzone="scheen" x="79" y="248" width="16" height="62" rx="7"/>')}
-      ${Z('scheen','<rect class="§CLS§" §FILL§ data-blzone="scheen" x="105" y="248" width="16" height="62" rx="7"/>')}
-      ${Z('enkel','<ellipse class="§CLS§" §FILL§ data-blzone="enkel" cx="87" cy="320" rx="9" ry="9"/>')}
-      ${Z('enkel','<ellipse class="§CLS§" §FILL§ data-blzone="enkel" cx="113" cy="320" rx="9" ry="9"/>')}
-      ${Z('voet','<path class="§CLS§" §FILL§ data-blzone="voet" d="M80 330 H94 V346 Q94 352 86 352 H78 Q74 352 74 346 Z"/>')}
-      ${Z('voet','<path class="§CLS§" §FILL§ data-blzone="voet" d="M106 330 H120 Q126 330 126 346 Q126 352 122 352 H106 Z"/>')}
-    </svg>`;
-  }
-  return `<svg class="bm-svg" viewBox="0 0 200 380" xmlns="http://www.w3.org/2000/svg">
-    <text class="bm-lr" x="16" y="13">LINKS</text><text class="bm-lr" x="152" y="13">RECHTS</text>
-    ${Z('nek','<rect class="§CLS§" §FILL§ data-blzone="nek" x="92" y="50" width="16" height="12" rx="4"/>')}
-    ${Z('schoudera','<ellipse class="§CLS§" §FILL§ data-blzone="schoudera" cx="68" cy="72" rx="14" ry="11"/>')}
-    ${Z('schoudera','<ellipse class="§CLS§" §FILL§ data-blzone="schoudera" cx="132" cy="72" rx="14" ry="11"/>')}
-    ${Z('nek','<ellipse class="§CLS§" §FILL§ data-blzone="nek" cx="100" cy="32" rx="17" ry="20"/>')}
-    ${Z('bovenrug','<path class="§CLS§" §FILL§ data-blzone="bovenrug" d="M78 64 H122 Q128 64 128 74 V98 H72 V74 Q72 64 78 64 Z"/>')}
-    ${Z('onderrug','<path class="§CLS§" §FILL§ data-blzone="onderrug" d="M72 100 H128 V120 Q128 128 118 128 H82 Q72 128 72 120 Z"/>')}
-    ${Z('arm','<rect class="§CLS§" §FILL§ data-blzone="arm" x="52" y="80" width="14" height="90" rx="7"/>')}
-    ${Z('arm','<rect class="§CLS§" §FILL§ data-blzone="arm" x="134" y="80" width="14" height="90" rx="7"/>')}
-    ${Z('bil','<path class="§CLS§" §FILL§ data-blzone="bil" d="M78 130 H99 V156 Q99 162 88 162 H80 Q74 160 74 150 V138 Q74 130 78 130 Z"/>')}
-    ${Z('bil','<path class="§CLS§" §FILL§ data-blzone="bil" d="M101 130 H122 Q126 130 126 138 V150 Q126 160 120 162 H112 Q101 162 101 156 Z"/>')}
-    ${Z('hamstring','<rect class="§CLS§" §FILL§ data-blzone="hamstring" x="78" y="164" width="18" height="60" rx="8"/>')}
-    ${Z('hamstring','<rect class="§CLS§" §FILL§ data-blzone="hamstring" x="104" y="164" width="18" height="60" rx="8"/>')}
-    ${Z('knieachter','<ellipse class="§CLS§" §FILL§ data-blzone="knieachter" cx="87" cy="234" rx="11" ry="11"/>')}
-    ${Z('knieachter','<ellipse class="§CLS§" §FILL§ data-blzone="knieachter" cx="113" cy="234" rx="11" ry="11"/>')}
-    ${Z('kuit','<rect class="§CLS§" §FILL§ data-blzone="kuit" x="79" y="248" width="16" height="50" rx="7"/>')}
-    ${Z('kuit','<rect class="§CLS§" §FILL§ data-blzone="kuit" x="105" y="248" width="16" height="50" rx="7"/>')}
-    ${Z('achilles','<rect class="§CLS§" §FILL§ data-blzone="achilles" x="83" y="300" width="9" height="22" rx="4"/>')}
-    ${Z('achilles','<rect class="§CLS§" §FILL§ data-blzone="achilles" x="108" y="300" width="9" height="22" rx="4"/>')}
-    ${Z('hiel','<ellipse class="§CLS§" §FILL§ data-blzone="hiel" cx="87" cy="332" rx="9" ry="10"/>')}
-    ${Z('hiel','<ellipse class="§CLS§" §FILL§ data-blzone="hiel" cx="113" cy="332" rx="9" ry="10"/>')}
-  </svg>`;
-}
-
-function blessureFlowHtml(p){
-  const r = _blReg;
-  if (!r.zone){
-    return `<p class="bl-prompt">👆 Tik hierboven op het lichaam of kies een plek uit de lijst.</p>`;
-  }
-  const z = blessureZone(r.zone);
-  const rodeVlag = isRodeVlagZone(r.zone);
-  const chips = (lbl, opts, key) => `
-    <div class="bl-veld"><div class="bl-lbl">${lbl}</div><div class="bl-chips">${
-      opts.map(o => `<button class="bl-chip ${r[key]===o.id?'aan':''}" data-blset="${key}" data-blval="${o.id}">${esc(o.label)}</button>`).join('')
-    }</div></div>`;
-  const pk = r.pijn>=7?'h':r.pijn>=4?'m':'l';
-  return `
-    <div class="bl-gekozen">
-      <span class="blg-loc">${z && z.zij && r.zij ? `<b>${r.zij}</b> · ` : ''}${esc(z?z.naam:r.zone)}</span>
-      ${z && z.zij ? `<div class="bl-zij">
-        <button class="${r.zij==='Links'?'aan':''}" data-blzij="Links">Links</button>
-        <button class="${r.zij==='Rechts'?'aan':''}" data-blzij="Rechts">Rechts</button>
-      </div>` : ''}
-    </div>
-    ${rodeVlag ? `<div class="bl-rodevlag">⚠️ <b>Let op:</b> klachten aan hoofd/nek/rug zijn altijd reden voor voorzichtigheid. Bij duizeligheid, misselijkheid of uitstraling: niet door laten spelen en huisarts raadplegen.</div>` : ''}
-    ${chips('Type klacht', BLESSURE_TYPE, 'type')}
-    ${chips('Ontstaan', BLESSURE_ONTSTAAN, 'ontstaan')}
-    <div class="bl-veld"><div class="bl-lbl">Pijnscore (0–10)</div>
-      <div class="bl-pijn"><input type="range" min="0" max="10" value="${r.pijn}" id="blPijn">
-        <span class="blp-waarde ${pk}" id="blPijnUit">${r.pijn}</span></div></div>
-    ${chips('Ernst', BLESSURE_ERNST, 'ernst')}
-    <div class="bl-veld"><div class="bl-lbl">Inzetbaarheid</div>
-      <div class="bl-toggles">
-        <button class="bl-toggle ${r.kanTrainen?'ja':'nee'}" data-bltoggle="kanTrainen">${r.kanTrainen?'✓ Kan trainen':'✕ Niet trainen'}</button>
-        <button class="bl-toggle ${r.kanSpelen?'ja':'nee'}" data-bltoggle="kanSpelen">${r.kanSpelen?'✓ Kan spelen':'✕ Niet spelen'}</button>
-      </div></div>
-    ${chips('Verwachte hersteltijd', BLESSURE_HERSTEL, 'herstel')}
-    ${chips('Actie', BLESSURE_ACTIE.map(a=>({id:a.id,label:`${a.emoji} ${a.label}`})), 'actie')}
-    <div class="bl-veld"><div class="bl-lbl">Opmerking (optioneel)</div>
-      <textarea class="invoer" id="blOpm" rows="2" placeholder="Bijv. tijdens sprint, zwikte om">${esc(r.opmerking)}</textarea></div>
-    <button class="knop vol" id="blOpslaan" ${r.zone && r.ernst ? '' : 'disabled'} style="margin-top:6px">✓ Blessure opslaan</button>
-    <p class="hint" style="text-align:center;margin-top:8px">Locatie + ernst is genoeg. De rest kun je later aanvullen.</p>`;
-}
-
-function hertekenFlow(p){ const f = $('#blFlow'); if (f){ f.innerHTML = blessureFlowHtml(p); koppelBlessureFlow(p); } }
-function hertekenBody(){ const w = document.querySelector('.bl-bodywrap'); if (w){ w.innerHTML = bodyMapSvg(_blReg.aanzicht, _blReg.zone, _blReg.ernst); koppelBodyZones(); } }
-
-function koppelBlessureModal(p){
-  document.querySelectorAll('[data-blview]').forEach(b => b.onclick = () => {
-    _blReg.aanzicht = b.dataset.blview;
-    // hertekenen van modal-body (view-knoppen + zonelijst + map)
-    $('#modalInhoud').innerHTML = blessureModalHtml(p);
-    koppelBlessureModal(p);
-  });
-  koppelBodyZones();
-  document.querySelectorAll('[data-blzone]').forEach(b => { if (b.tagName.toLowerCase()==='button') b.onclick = () => kiesZone(b.dataset.blzone, p); });
-  koppelBlessureFlow(p);
-}
-function koppelBodyZones(){
-  document.querySelectorAll('.bm-zone[data-blzone]').forEach(z => z.onclick = () => kiesZone(z.dataset.blzone, speler(_blReg.spelerId)));
-}
-function kiesZone(zoneId, p){
-  const z = blessureZone(zoneId);
-  _blReg.zone = zoneId;
-  if (z && !z.zij) _blReg.zij = null;
-  hertekenBody(); hertekenFlow(p);
-}
-function koppelBlessureFlow(p){
-  document.querySelectorAll('[data-blset]').forEach(b => b.onclick = () => {
-    const k = b.dataset.blset, val = b.dataset.blval;
-    _blReg[k] = _blReg[k] === val ? null : val;
-    if (k === 'ernst') hertekenBody();
-    hertekenFlow(p);
-  });
-  document.querySelectorAll('[data-blzij]').forEach(b => b.onclick = () => { _blReg.zij = b.dataset.blzij; hertekenFlow(p); });
-  document.querySelectorAll('[data-bltoggle]').forEach(b => b.onclick = () => { _blReg[b.dataset.bltoggle] = !_blReg[b.dataset.bltoggle]; hertekenFlow(p); });
-  const pijn = $('#blPijn');
-  if (pijn) pijn.oninput = e => {
-    _blReg.pijn = +e.target.value;
-    const u = $('#blPijnUit'); u.textContent = _blReg.pijn;
-    u.className = 'blp-waarde ' + (_blReg.pijn>=7?'h':_blReg.pijn>=4?'m':'l');
-  };
-  const opm = $('#blOpm'); if (opm) opm.oninput = e => { _blReg.opmerking = e.target.value; };
-  const ok = $('#blOpslaan'); if (ok) ok.onclick = () => {
-    if (_blReg._bewerkId) updateBlessure(p, _blReg._bewerkId);
-    else slaBlessureOp(p);
-  };
-}
-
-async function slaBlessureOp(p){
-  const r = _blReg;
-  if (!r.zone || !r.ernst){ meld('Kies minimaal een plek en de ernst'); return; }
-  const z = blessureZone(r.zone);
-  const terugkerend = isTerugkerend(r.spelerId, r.zone, r.datum, null);
-  // Dataminimalisatie: alleen relevante velden, geen vrije medische tekst verplicht.
-  const data = {
-    spelerId: r.spelerId,
-    datum: r.datum,
-    zone: r.zone, zoneNaam: z?z.naam:r.zone,
-    zij: (z && z.zij) ? (r.zij || null) : null,
-    aanzicht: r.aanzicht,
-    type: r.type || null,
-    ontstaan: r.ontstaan || null,
-    pijn: r.pijn,
-    ernst: r.ernst,
-    kanTrainen: !!r.kanTrainen,
-    kanSpelen: !!r.kanSpelen,
-    herstel: r.herstel || null,
-    actie: r.actie || null,
-    opmerking: (r.opmerking||'').trim().slice(0, 500),
-    status: 'actief',
-    rtpFase: r.kanSpelen ? null : 'rust',
-    terugkerend,
-    door: S.user?.uid || null,
-    gemaakt: serverTimestamp(),
-    gemaaktMs: Date.now(),
-  };
-  try {
-    await addDoc(collection(db,'teams',S.teamId,'blessures'), data);
-    sluitModal();
-    meld(terugkerend ? 'Opgeslagen — let op: terugkerende klacht' : 'Blessure opgeslagen');
-  } catch(e){ meld('Opslaan mislukt: ' + (e.code||e.message)); }
-}
-
-/* ---- Detail / bewerken / herstel ---- */
-function modalBlessureDetail(blessureId){
-  const b = (S.blessures||[]).find(x => x.id === blessureId);
-  if (!b) return;
-  const p = speler(b.spelerId);
-  const ei = ernstInfo(b.ernst);
-  const huidigeFase = b.rtpFase || (b.status==='hersteld' ? 'wedstrijd-vol' : 'rust');
-  openModal(`
-    <h2>${esc(zoneLabel(b))}</h2>
-    <div class="bd-top">
-      <span class="bd-ernst" style="background:${ei?ei.kleur:'var(--ink-2)'}">${ei?esc(ei.label):'—'}</span>
-      <span class="bd-status" style="color:${statusInfo(b.status).kleur}">${statusInfo(b.status).label}</span>
-      ${b.terugkerend?'<span class="bd-recidief">↻ terugkerend</span>':''}
-    </div>
-    <div class="bd-grid">
-      <div><span class="l">Speler</span><span class="v">${esc(p?p.naam:'—')}</span></div>
-      <div><span class="l">Datum</span><span class="v">${datumNL(b.datum)}</span></div>
-      <div><span class="l">Type</span><span class="v">${esc(BLESSURE_TYPE.find(t=>t.id===b.type)?.label||'—')}</span></div>
-      <div><span class="l">Ontstaan</span><span class="v">${esc(BLESSURE_ONTSTAAN.find(o=>o.id===b.ontstaan)?.label||'—')}</span></div>
-      <div><span class="l">Pijn</span><span class="v">${b.pijn ?? '—'}/10</span></div>
-      <div><span class="l">Hersteltijd</span><span class="v">${esc(BLESSURE_HERSTEL.find(h=>h.id===b.herstel)?.label||'—')}</span></div>
-      <div><span class="l">Trainen</span><span class="v">${b.kanTrainen?'Ja':'Nee'}</span></div>
-      <div><span class="l">Spelen</span><span class="v">${b.kanSpelen?'Ja':'Nee'}</span></div>
-      <div><span class="l">Actie</span><span class="v">${esc(actieInfo(b.actie) ? actieInfo(b.actie).emoji+' '+actieInfo(b.actie).label : '—')}</span></div>
-    </div>
-    ${b.opmerking ? `<div class="bd-opm"><span class="l">Opmerking</span><p>${esc(b.opmerking)}</p></div>` : ''}
-
-    <div class="bd-rtp">
-      <div class="bl-lbl">Terugkeer (return-to-play)</div>
-      <div class="rtp-balk">
-        ${RTP_FASEN.map(f => {
-          const huidig = rtpInfo(huidigeFase);
-          const actief = huidig && f.stap <= huidig.stap;
-          return `<button class="rtp-stap ${actief?'aan':''} ${f.id===huidigeFase?'nu':''}" data-rtp="${f.id}" data-bl="${b.id}" title="${esc(f.label)}">
-            <span class="rtp-dot"></span><span class="rtp-lbl">${esc(f.label)}</span></button>`;
-        }).join('')}
-      </div>
-    </div>
-
-    <div class="rij" style="margin-top:14px">
-      ${b.status!=='hersteld'
-        ? `<button class="knop fluo klein" style="flex:1" data-bl-herstel="${b.id}">✓ Markeer hersteld</button>`
-        : `<button class="knop licht klein" style="flex:1" data-bl-heropen="${b.id}">↩ Heropenen</button>`}
-      <button class="knop licht klein" style="flex:1" data-bl-bewerk="${b.id}">✏️ Bewerken</button>
-    </div>
-    <button class="knop gevaar klein" style="width:100%;margin-top:6px" data-bl-weg="${b.id}">🗑 Verwijderen (AVG)</button>
-    <p class="hint" style="margin-top:8px">Verwijderen wist deze registratie definitief — gebruik dit bij een inzage-/verwijderverzoek.</p>
-  `);
-  koppelBlessureDetail(b);
-}
-
-function koppelBlessureDetail(b){
-  document.querySelectorAll('[data-rtp]').forEach(btn => btn.onclick = async () => {
-    const fase = btn.dataset.rtp;
-    const nieuwStatus = fase === 'wedstrijd-vol' ? 'herstellend' : (b.status==='hersteld'?'herstellend':b.status||'actief');
-    try {
-      await updateDoc(doc(db,'teams',S.teamId,'blessures',b.id), { rtpFase: fase, status: nieuwStatus });
-      modalBlessureDetail(b.id);
-    } catch(e){ meld('Mislukt: '+(e.code||e.message)); }
-  });
-  const h = document.querySelector('[data-bl-herstel]');
-  if (h) h.onclick = async () => {
-    try {
-      await updateDoc(doc(db,'teams',S.teamId,'blessures',b.id), {
-        status:'hersteld', rtpFase:'wedstrijd-vol', afgesloten: vandaagIso(),
-      });
-      sluitModal(); meld('Gemarkeerd als hersteld 🎉');
-    } catch(e){ meld('Mislukt: '+(e.code||e.message)); }
-  };
-  const ho = document.querySelector('[data-bl-heropen]');
-  if (ho) ho.onclick = async () => {
-    try { await updateDoc(doc(db,'teams',S.teamId,'blessures',b.id), { status:'actief', afgesloten:null }); modalBlessureDetail(b.id); }
-    catch(e){ meld('Mislukt: '+(e.code||e.message)); }
-  };
-  const bw = document.querySelector('[data-bl-bewerk]');
-  if (bw) bw.onclick = () => modalBlessureBewerk(b.id);
-  const wg = document.querySelector('[data-bl-weg]');
-  if (wg) wg.onclick = async () => {
-    if (!confirm('Deze blessure definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')) return;
-    try { await deleteDoc(doc(db,'teams',S.teamId,'blessures',b.id)); sluitModal(); meld('Verwijderd'); }
-    catch(e){ meld('Mislukt: '+(e.code||e.message)); }
-  };
-}
-
-/* bewerken = registratiemodal voorgevuld, slaat met updateDoc op.
-   _bewerkId in _blReg zorgt dat de opslaan-knop naar updateBlessure gaat. */
-function modalBlessureBewerk(blessureId){
-  const b = (S.blessures||[]).find(x => x.id === blessureId);
-  if (!b) return;
-  const p = speler(b.spelerId); if (!p) return;
-  _blReg = { spelerId:b.spelerId, datum:b.datum, aanzicht:b.aanzicht||'voor',
-    zone:b.zone, zij:b.zij, type:b.type, ontstaan:b.ontstaan, pijn:b.pijn??3, ernst:b.ernst,
-    kanTrainen:b.kanTrainen!==false, kanSpelen:b.kanSpelen!==false, herstel:b.herstel, actie:b.actie,
-    opmerking:b.opmerking||'', _bewerkId:b.id };
-  openModal(blessureModalHtml(p));
-  koppelBlessureModal(p);
-}
-async function updateBlessure(p, id){
-  const r = _blReg;
-  if (!r.zone || !r.ernst){ meld('Kies minimaal een plek en de ernst'); return; }
-  const z = blessureZone(r.zone);
-  try {
-    await updateDoc(doc(db,'teams',S.teamId,'blessures',id), {
-      datum:r.datum, zone:r.zone, zoneNaam:z?z.naam:r.zone,
-      zij:(z&&z.zij)?(r.zij||null):null, aanzicht:r.aanzicht,
-      type:r.type||null, ontstaan:r.ontstaan||null, pijn:r.pijn, ernst:r.ernst,
-      kanTrainen:!!r.kanTrainen, kanSpelen:!!r.kanSpelen,
-      herstel:r.herstel||null, actie:r.actie||null,
-      opmerking:(r.opmerking||'').trim().slice(0,500),
-      terugkerend: isTerugkerend(r.spelerId, r.zone, r.datum, id),
-    });
-    sluitModal(); meld('Bijgewerkt');
-  } catch(e){ meld('Mislukt: '+(e.code||e.message)); }
-}
-
-/* ---- Team-dashboard Fitheid ---- */
-function htmlFitDashboard(){
-  if (!heeftBlessureToestemming()){
-    return `<button class="profiel-terug" id="fitTerug">‹ Terug naar spelers</button>
-      <div class="kop2">🩹 Fitheid — team</div>${htmlBlessureConsentGate()}`;
-  }
-  const actief = actieveBlessures();
-  const perSpeler = {};
-  for (const b of actief){ (perSpeler[b.spelerId] = perSpeler[b.spelerId]||[]).push(b); }
-  const risico = [];
-  for (const p of S.spelers){
-    const recidief = blessuresVanSpeler(p.id).filter(b => b.terugkerend).length;
-    const open = (perSpeler[p.id]||[]).length;
-    if (recidief || open) risico.push({p, recidief, open});
-  }
-  risico.sort((a,b)=> (b.recidief-b.open*0) - (a.recidief) || b.open-a.open);
-
-  // meest voorkomende zones (team)
-  const zoneTel = {};
-  for (const b of (S.blessures||[])) zoneTel[b.zone] = (zoneTel[b.zone]||0)+1;
-  const topZones = Object.entries(zoneTel).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const maxZone = topZones.length ? topZones[0][1] : 1;
-
-  const fitCount = S.spelers.length - Object.keys(perSpeler).length;
-
-  return `
-    <button class="profiel-terug" id="fitTerug">‹ Terug naar spelers</button>
-    <div class="kop2">🩹 Fitheid — ${esc(S.team.naam)}</div>
-
-    <div class="fit-tellers">
-      <div class="ft-box rood"><div class="v">${Object.keys(perSpeler).length}</div><div class="l">Actief</div></div>
-      <div class="ft-box geel"><div class="v">${risico.filter(r=>r.recidief).length}</div><div class="l">Aandacht</div></div>
-      <div class="ft-box groen"><div class="v">${Math.max(0,fitCount)}</div><div class="l">Fit</div></div>
-    </div>
-
-    ${actief.length ? `
-      <div class="veldlabel">Actieve klachten</div>
-      ${actief.map(b => {
-        const p = speler(b.spelerId);
-        return `<button class="blessure-kaart" data-blessure-detail="${b.id}">
-          <span class="bk-ernst" style="background:${ernstKleur(b.ernst)}"></span>
-          <div class="bk-mid"><div class="bk-loc">${esc(p?p.naam:'—')} · ${esc(zoneLabel(b))}</div>
-            <div class="bk-meta">${esc(ernstInfo(b.ernst)?.label||'—')} · loopt ${dagenGeleden(b.datum)} d${b.kanSpelen?'':' · niet inzetbaar'}</div></div>
-          <span class="bk-status">›</span></button>`;
-      }).join('')}` : `<div class="kaart leeg">Geen actieve klachten in het team. 💪</div>`}
-
-    ${risico.filter(r=>r.recidief).length ? `
-      <div class="kaart hotspot-kaart">
-        <div class="veldlabel" style="margin-top:0">⚠️ Verhoogd risico</div>
-        ${risico.filter(r=>r.recidief).map(r =>
-          `<div class="hotspot-rij"><span class="hs-naam">${esc(r.p.naam)}</span><span class="hs-tel">${r.recidief}× terugkerend</span></div>`).join('')}
-        <p class="hint">Terugkerende klachten kunnen wijzen op te snelle terugkeer of onderliggende overbelasting.</p>
-      </div>` : ''}
-
-    ${topZones.length ? `
-      <div class="kaart">
-        <div class="veldlabel" style="margin-top:0">Meest voorkomende klachten</div>
-        ${topZones.map(([z,n]) => {
-          const zi = blessureZone(z);
-          return `<div class="zonebar-rij"><span class="zb-naam">${esc(zi?zi.naam:z)}</span>
-            <span class="zb-balk"><span style="width:${Math.round(n/maxZone*100)}%"></span></span>
-            <span class="zb-n">${n}</span></div>`;
-        }).join('')}
-        <p class="hint">Veel klachten op één plek? Overweeg gerichte preventie (bv. hamstrings → Nordic-oefeningen, enkels → balanstraining).</p>
-      </div>` : ''}
-
-    <div class="kaart preventie-kaart">
-      <div class="veldlabel" style="margin-top:0">💡 Preventie-principes</div>
-      <ul class="prev-lijst">
-        <li><b>Belasting opbouwen, niet springen.</b> Na vakantie of een toernooi: rustig opbouwen.</li>
-        <li><b>Vaste warming-up</b> met loop-, sprong- en balansoefeningen (FIFA 11+ Kids).</li>
-        <li><b>Terugkeer in stappen:</b> rust → aangepast → volledig trainen → wedstrijd.</li>
-        <li><b>Rode vlaggen</b> (hoofd, aanhoudende pijn, niet kunnen steunen) → huisarts/fysio.</li>
-      </ul>
-      <p class="hint">Deze module signaleert en registreert — ze vervangt geen medisch advies en stelt geen diagnose.</p>
-    </div>`;
-}
-
-/* Event-handlers voor alle fitheid-onderdelen (profiel-tab én team-dashboard) */
-function koppelFitheid(v){
-  // consent gate
-  const vink = v.querySelector('#consentVink');
-  const cok = v.querySelector('#consentOk');
-  if (vink && cok){
-    vink.onchange = () => { cok.disabled = !vink.checked; };
-    cok.onclick = async () => {
-      cok.disabled = true; cok.textContent = 'Inschakelen…';
-      try {
-        await updateDoc(doc(db,'teams',S.teamId), {
-          blessureToestemming: { akkoord:true, door:S.user?.uid||null, op:vandaagIso() },
-        });
-        meld('Fitheidsregistratie ingeschakeld');
-        // team-listener werkt S.team bij → render volgt automatisch; forceer voor de zekerheid
-        renderTeam();
-      } catch(e){ cok.disabled=false; cok.textContent='Fitheidsregistratie inschakelen'; meld('Mislukt: '+(e.code||e.message)); }
-    };
-  }
-  // nieuwe blessure
-  v.querySelectorAll('[data-blessure-nieuw]').forEach(b => b.onclick = () => modalBlessureNieuw(b.dataset.blessureNieuw));
-  // detail openen
-  v.querySelectorAll('[data-blessure-detail]').forEach(b => b.onclick = () => modalBlessureDetail(b.dataset.blessureDetail));
-}
