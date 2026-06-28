@@ -101,7 +101,6 @@ input,select{font:inherit;color:inherit}
 .veld{
   position:relative;aspect-ratio:3/4;width:100%;
   background:repeating-linear-gradient(0deg,var(--veld) 0 12.5%,var(--veld-2) 12.5% 25%);
-  touch-action:none;
 }
 .veld .lijn{position:absolute;border:2px solid var(--line)}
 .veld .midden{left:0;right:0;top:50%;border-width:1px 0 0}
@@ -115,7 +114,7 @@ input,select{font:inherit;color:inherit}
 .slot{position:absolute;transform:translate(-50%,-50%);width:64px;display:flex;flex-direction:column;align-items:center;gap:3px}
 .slot .ring{width:46px;height:46px;border-radius:50%;border:2px dashed rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:600;font-size:14px;color:rgba(255,255,255,.75);letter-spacing:.5px}
 .slot.doel ring{border-color:rgba(242,163,60,.8)}
-.chip{display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:none;user-select:none;-webkit-user-select:none}
+.chip{display:flex;flex-direction:column;align-items:center;gap:3px;user-select:none;-webkit-user-select:none;cursor:pointer}
 .chip .shirt{
   width:46px;height:46px;border-radius:50%;
   background:#fff;color:var(--pitch-ink);
@@ -585,10 +584,10 @@ input,select{font:inherit;color:inherit}
 
 .plan-rij{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--card);border:1px solid var(--hair);border-left:4px solid var(--ink-2);border-radius:11px;padding:9px 12px;box-shadow:var(--shadow)}
 .plan-rij.wd{border-left-color:var(--veld)}
-.plan-rij.wedstrijd{border-left-color:#E20613;background:#FFF6F6}
+.plan-rij.wedstrijd{border-left-color:#E20613;background:var(--surface-2)}
 .plan-rij.beker{border-left-color:#7C4DBC}
 .plan-rij.inhaal{border-left-color:var(--keeper)}
-.plan-rij.vrij{border-left-color:#B7B7B2;background:#FAFAF8}
+.plan-rij.vrij{border-left-color:#B7B7B2;background:var(--surface-2)}
 .plan-rij.eigen{border-left-color:var(--grass)}
 .plan-rij.verleden{opacity:.55}
 
@@ -597,6 +596,7 @@ input,select{font:inherit;color:inherit}
 .plan-datum .w{display:block;font-size:9.5px;text-transform:uppercase;color:var(--ink-2);letter-spacing:.3px}
 .plan-tekst{flex:1;min-width:0}
 .plan-titel{font-size:13.5px;font-weight:600;color:var(--ink)}
+.plan-rij.wedstrijd .plan-titel{font-weight:800;font-size:14px}
 .plan-mark{font-size:11px;font-weight:600;color:var(--ink-2)}
 .plan-sub{font-size:11.5px;color:var(--ink-2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plan-sub.eigen{color:var(--grass)}
