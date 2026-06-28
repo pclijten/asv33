@@ -18,6 +18,7 @@ export const S = {
   clubs:[], club:null, clubId:null, clubTab:'teams', clubTrainBouw:'onder', clubTeams:[], clubTrainingen:[],
   trainingen:[], trainingenGelezen:{}, videos:[], presentie:[],
   beoordelingen:[], _beoordeelProfiel:null, _profielTab:'overzicht',
+  blessures:[], _blessureModal:null, _fitDash:false,
   planning:[], _planningFilter:'alles', _planningDichteMaanden:null,
   uitleningenUit:[], uitleningenIn:[], _leenProfiel:null,
   unsub:{}, klokInterval:null, saveTimer:null, lokaalTot:0,
@@ -178,6 +179,11 @@ export function bewaakTerug(){
 function stapTerug(){
   if (modalOpen()){ sluitModal(); return true; }
   const view = actieveView();
+  if (view === 'team' && S._fitDash){
+    S._fitDash = false;
+    S._navRerender?.();
+    return true;
+  }
   if (view === 'team' && (S._beoordeelProfiel || S._leenProfiel)){
     S._beoordeelProfiel = null; S._leenProfiel = null; S._profielTab = 'overzicht';
     S._navRerender?.();
