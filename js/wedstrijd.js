@@ -1016,74 +1016,29 @@ function modalSelectie(){
   };
 }
 
-/* ==================== SLEPEN & TIKKEN ==================== */
+/* ==================== TIKKEN (geen slepen meer — verticaal scrollen blijft werken) ==================== */
 function koppelSleep(v){
   const veld = v.querySelector('#veld');
   const bank = v.querySelector('#bank');
-  let drag = null;
 
-  const doelOnder = (x, y) => {
-    const el = document.elementFromPoint(x, y);
-    if (!el) return null;
-    const slot = el.closest('.slot');
-    if (slot && veld.contains(slot)) return {type:'slot', id:slot.dataset.slot, el:slot};
-    if (el.closest('#bank')) return {type:'bank', el:bank};
-    return null;
-  };
-  const wisHighlight = () => { $$('.slot.doelwit').forEach(s => s.classList.remove('doelwit')); bank.classList.remove('doelwit'); };
-
+  // tik op een chip: selecteer/deselecteer, of wissel met al-geselecteerde speler
   v.querySelectorAll('[data-chip]').forEach(chip => {
-    chip.addEventListener('pointerdown', ev => {
-      ev.preventDefault();
-      drag = {pid: chip.dataset.chip, bron: chip.dataset.bron, chip,
-              x0: ev.clientX, y0: ev.clientY, actief: false};
+    chip.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const pid = chip.dataset.chip;
+      const bron = chip.dataset.bron;
+      if (S.geselecteerd && S.geselecteerd.pid !== pid){
+        // staat de getikte speler op het veld? dan ruilen we van plek
+        const k = huidigKwart(), l = effectieveLineup(k);
+        const slot = Object.keys(l).find(s => l[s] === pid);
+        if (slot){ plaats(S.geselecteerd.pid, slot); return; }
+      }
+      S.geselecteerd = S.geselecteerd?.pid === pid ? null : {pid, bron};
+      renderWedstrijd();
     });
   });
 
-  const beweeg = ev => {
-    if (!drag) return;
-    const dx = ev.clientX - drag.x0, dy = ev.clientY - drag.y0;
-    if (!drag.actief && Math.hypot(dx,dy) > 8){
-      drag.actief = true;
-      drag.chip.classList.add('sleept');
-      const kloon = $('#sleepKloon');
-      kloon.innerHTML = drag.chip.outerHTML.replace('sleept','');
-      kloon.style.display = '';
-    }
-    if (drag.actief){
-      const kloon = $('#sleepKloon');
-      kloon.style.left = ev.clientX + 'px';
-      kloon.style.top  = ev.clientY + 'px';
-      wisHighlight();
-      const d = doelOnder(ev.clientX, ev.clientY);
-      if (d?.type === 'slot') d.el.classList.add('doelwit');
-      if (d?.type === 'bank' && drag.bron === 'veld') bank.classList.add('doelwit');
-    }
-  };
-  const los = ev => {
-    if (!drag) return;
-    const d = drag; drag = null;
-    $('#sleepKloon').style.display = 'none';
-    wisHighlight();
-    d.chip.classList.remove('sleept');
-    if (d.actief){
-      const doelP = doelOnder(ev.clientX, ev.clientY);
-      if (doelP?.type === 'slot') plaats(d.pid, doelP.id);
-      else if (doelP?.type === 'bank' && d.bron === 'veld') naarBank(d.pid);
-    } else {
-      if (S.geselecteerd && S.geselecteerd.pid !== d.pid){
-        const k = huidigKwart(), l = effectieveLineup(k);
-        const slot = Object.keys(l).find(s => l[s] === d.pid);
-        if (slot){ plaats(S.geselecteerd.pid, slot); return; }
-      }
-      S.geselecteerd = S.geselecteerd?.pid === d.pid ? null : {pid: d.pid, bron: d.bron};
-      renderWedstrijd();
-    }
-  };
-  document.onpointermove = beweeg;
-  document.onpointerup = los;
-  document.onpointercancel = los;
-
+  // tik op een leeg veldvak: plaats de geselecteerde speler daar
   veld.querySelectorAll('.slot').forEach(slot => {
     slot.addEventListener('click', ev => {
       if (!S.geselecteerd) return;
@@ -1091,6 +1046,8 @@ function koppelSleep(v){
       plaats(S.geselecteerd.pid, slot.dataset.slot);
     });
   });
+
+  // tik op de bank: haal de geselecteerde veldspeler naar de bank
   bank.addEventListener('click', ev => {
     if (!S.geselecteerd || S.geselecteerd.bron !== 'veld') return;
     if (ev.target.closest('[data-chip],button')) return;

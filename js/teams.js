@@ -742,10 +742,13 @@ function planningItems(){
     const tegen = (w.goals||[]).filter(g => g.type==='tegen').length;
     const heeftUitslag = (w.goals||[]).length > 0;
     const uitslag = heeftUitslag ? (w.thuis ? `${voor}–${tegen}` : `${tegen}–${voor}`) : '';
+    const eigen = team.naam || 'ASV\'33';
+    const tegenstander = w.tegenstander || '?';
+    // thuis kan bij een nog niet geopende geïmporteerde wedstrijd ontbreken;
+    // standaard tonen we eigen team links (thuis), zodat 'wie tegen wie' altijd in beeld is.
     const label = w.type === 'toernooi'
       ? '🏆 ' + (w.tegenstander || 'Toernooi')
-      : (w.thuis ? (team.naam||'') + ' – ' + (w.tegenstander||'?')
-                 : (w.tegenstander||'?') + ' – ' + (team.naam||''));
+      : (w.thuis === false ? `${tegenstander} – ${eigen}` : `${eigen} – ${tegenstander}`);
     const sub = [w.tijd || '', uitslag].filter(Boolean).join(' · ');
     items.push({
       bron: 'wedstrijd', docId: w.id, datum: w.datum,
