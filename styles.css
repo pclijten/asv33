@@ -833,6 +833,8 @@ body{ background:var(--bg); color:var(--ink); }
 
 /* ---- Chip-namen op het veld op donkere achtergrond ---- */
 .chip .naam{ background:rgba(0,0,0,.55); }
+/* "Wie scoorde er?"-paneel: lichte tekst op donkere pill (was wit-op-lichtgrijs) */
+.goal-kies .chip .naam{ color:var(--ink); background:var(--surface-2); }
 
 /* ==================================================================
    ONDERBALK — strakke SVG-iconen (laatste layout)
