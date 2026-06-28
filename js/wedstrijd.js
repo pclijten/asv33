@@ -29,6 +29,123 @@ function laatsteOpstelling(format){
   return null;
 }
 
+/* ---- Vorige confrontatie tegen dezelfde tegenstander ----
+   Genormaliseerde naamvergelijking: negeert hoofdletters, spaties, leestekens
+   en het eigen clubvoorvoegsel (ASV'33), zodat "ASV'33 JO11-2" en "jo11 2"
+   als dezelfde tegenstander gelden. */
+function normTegenstander(naam){
+  if (!naam) return '';
+  let s = String(naam).toLowerCase();
+  s = s.replace(/asv['’`]?\s*33/g, ' ');     // eigen club weglaten
+  s = s.replace(/[^a-z0-9]+/g, '');          // alleen letters/cijfers
+  return s;
+}
+
+/* Telt een wedstrijd als "gespeeld"? Uitslag (goals) of een ingevulde
+   startopstelling. Lege/toekomstige (geïmporteerde) wedstrijden tellen niet. */
+function isGespeeld(w){
+  if (Array.isArray(w.goals) && w.goals.length) return true;
+  for (const k of Object.values(w.kwarten || {}))
+    if (Object.keys(k.lineup || {}).length) return true;
+  return false;
+}
+
+/* Zoekt de meest recente gespeelde wedstrijd tegen dezelfde tegenstander,
+   exclusief de huidige wedstrijd. Toernooien slaan we over (geen vaste
+   tegenstander op wedstrijdniveau). Geeft het bron-wedstrijddocument terug. */
+function vorigeConfrontatie(huidige){
+  if (!huidige || isToernooi(huidige)) return null;
+  const doel = normTegenstander(huidige.tegenstander);
+  if (!doel) return null;
+  for (const w of S.wedstrijden){            // gesorteerd nieuw → oud
+    if (w.id === S.wedstrijdId) continue;
+    if (isToernooi(w)) continue;
+    if (normTegenstander(w.tegenstander) !== doel) continue;
+    if (!isGespeeld(w)) continue;
+    return w;
+  }
+  return null;
+}
+
+/* Startopstelling (kwart 1) van een bronwedstrijd als [{pid,slot,keeper}]. */
+function startOpstelling(w){
+  const k1 = w.kwarten?.['1'];
+  if (!k1) return [];
+  return Object.entries(k1.lineup || {})
+    .map(([slot, pid]) => ({ pid, slot, keeper: slot === 'K' }))
+    .sort((a, b) => (a.keeper ? -1 : b.keeper ? 1 : 0));
+}
+
+/* Bouwt het kleine regeltje + uitklappaneel voor de vorige confrontatie.
+   Geeft '' terug als er geen eerdere ontmoeting is. Open/dicht-stand wordt
+   bewaard in S._confroOpen zodat het paneel niet dichtklapt bij elke rerender. */
+function bouwConfrontatie(w){
+  const v = vorigeConfrontatie(w);
+  if (!v) return '';
+
+  const voor  = (v.goals||[]).filter(g => g.type==='voor').length;
+  const tegen = (v.goals||[]).filter(g => g.type==='tegen').length;
+  const heeftUitslag = (v.goals||[]).length > 0;
+
+  /* Uitslag vanuit óns perspectief; klasse stuurt de kleur. */
+  let kl = 'g', uitslagTekst = '—';
+  if (heeftUitslag){
+    uitslagTekst = `${voor}–${tegen}`;
+    kl = voor > tegen ? 'w' : voor < tegen ? 'v' : 'g';
+  }
+  const thuisuit = v.thuis ? 'thuis' : 'uit';
+  const open = S._confroOpen ? ' open' : '';
+
+  /* --- paneel-inhoud --- */
+  const teamNaam = esc(S.team.naam);
+  const tegenN   = esc(v.tegenstander);
+  const linksNaam  = v.thuis ? teamNaam : tegenN;
+  const rechtsNaam = v.thuis ? tegenN : teamNaam;
+  const scoreMid = heeftUitslag ? `${v.thuis ? voor : tegen} – ${v.thuis ? tegen : voor}` : '–';
+
+  const opst = startOpstelling(v);
+  const opstHtml = opst.length
+    ? `<div class="confro-opst-titel"><span>Opstelling (start)</span><span>${esc(v.formatie||'')}</span></div>
+       <div class="confro-opst">${opst.map(o => `
+         <div class="confro-pchip${o.keeper ? ' keeper' : ''}">
+           <span class="nr">${esc(spelerNr(o.pid))}</span><span class="nm">${esc(spelerNaam(o.pid))}</span>
+         </div>`).join('')}</div>`
+    : '';
+
+  const doelHtml = v.doel
+    ? `<div class="confro-rij doel"><div class="lbl">🎯 Wedstrijddoel</div><div class="val">${esc(v.doel)}</div></div>`
+    : '';
+  const notitieHtml = v.notitie
+    ? `<div class="confro-rij"><div class="lbl">📝 Notitie</div><div class="val">${esc(v.notitie)}</div></div>`
+    : '';
+
+  /* Overnemen-knop alleen tonen als er een startopstelling én een lege huidige
+     kwart-1 is (anders zou je een bestaande opstelling overschrijven). */
+  const huidigK1Leeg = !Object.keys(w.kwarten?.['1']?.lineup || {}).length;
+  const overnemenHtml = (opst.length && huidigK1Leeg)
+    ? `<button class="confro-overnemen" id="confroOvernemen">⧉ Neem deze opstelling over als start</button>`
+    : '';
+
+  return `
+    <button class="confro-regel${open}" id="confroRegel">
+      <span class="ico">↩︎</span>
+      <span class="confro-tekst"><b>Vorige keer:</b> ${esc(datumNL(v.datum))} · ${thuisuit}</span>
+      ${heeftUitslag ? `<span class="confro-uitslag ${kl}">${esc(uitslagTekst)}</span>` : ''}
+      <span class="confro-chev">▾</span>
+    </button>
+    <div class="confro-paneel${open}" id="confroPaneel">
+      <div class="confro-card">
+        <div class="confro-titel">↩︎ Vorige confrontatie · ${tegenN}</div>
+        <div class="confro-uitslagblok">
+          <div class="partij">${linksNaam}</div>
+          <div class="score">${scoreMid}</div>
+          <div class="partij r">${rechtsNaam}<span class="datum">${esc(datumNL(v.datum))} · ${thuisuit}</span></div>
+        </div>
+        ${doelHtml}${notitieHtml}${opstHtml}${overnemenHtml}
+      </div>
+    </div>`;
+}
+
 export function modalNieuweWedstrijd(){
   if (!S.spelers.length) return meld('Voeg eerst spelers toe onder het tabblad Spelers');
   const vandaag = new Date().toISOString().slice(0,10);
@@ -208,7 +325,7 @@ function normaliseerWedstrijd(w){
 }
 
 export function openWedstrijd(wid){
-  S.wedstrijdId = wid; S.kwart = '1'; S.geselecteerd = null;
+  S.wedstrijdId = wid; S.kwart = '1'; S.geselecteerd = null; S._confroOpen = false;
   stopUnsubs('wedstrijd');
   S.unsub.wedstrijd = onSnapshot(doc(db,'teams',S.teamId,'wedstrijden',wid), snap => {
     if (!snap.exists()){ sluitWedstrijd(); return; }
@@ -736,6 +853,8 @@ export function renderWedstrijd(){
   const sbLinks  = w.thuis ? {naam:S.team.naam, n:voor, knop:'goalVoor'}  : {naam:tegenNaam, n:tegen, knop:'goalTegen'};
   const sbRechts = w.thuis ? {naam:tegenNaam, n:tegen, knop:'goalTegen'} : {naam:S.team.naam, n:voor, knop:'goalVoor'};
 
+  const confroHtml = bouwConfrontatie(w);
+
   const v = $('#view-wedstrijd');
   v.innerHTML = `
     <div class="kop"><button class="terug" id="naarTeam">‹</button>
@@ -745,7 +864,7 @@ export function renderWedstrijd(){
       <span class="sub">${datumNL(w.datum)} · ${isToernooi(w) ? w.toernooi.wedstrijden+' wedstrijden · ' : ''}${esc(w.formatie)}</span></h1>
       <button class="terug" id="wInstellingen" title="Wedstrijdinstellingen">⚙️</button></div>
     ${w.doel ? `<div class="kaart" style="background:rgba(226,6,19,.08);border-left:3px solid var(--grass);font-size:13.5px;color:var(--ink);padding:9px 12px;margin-bottom:10px"><b>🎯 Doel:</b> ${esc(w.doel)}</div>` : ''}
-
+${confroHtml}
     <div class="scorebord">
       <button class="sb-goal" id="${sbLinks.knop}" title="Doelpunt ${esc(sbLinks.naam)}">⚽</button>
       <span class="sb-team" ${!w.thuis && isToernooi(w) ? 'id="sbTegenNaam" style="text-decoration:underline dotted;cursor:pointer"' : ''}>${esc(sbLinks.naam)}</span>
@@ -897,6 +1016,28 @@ export function renderWedstrijd(){
   v.querySelector('#klokStart').onclick = klokStartPauze;
   v.querySelector('#klokReset').onclick = klokReset;
   const kp = v.querySelector('#kopieerKwart'); if (kp) kp.onclick = kopieerVorigKwart;
+
+  /* Vorige confrontatie: regeltje klapt het paneel open/dicht (lokale UI-stand). */
+  const confroRegel = v.querySelector('#confroRegel');
+  if (confroRegel) confroRegel.onclick = () => {
+    S._confroOpen = !S._confroOpen;
+    v.querySelector('#confroRegel')?.classList.toggle('open', S._confroOpen);
+    v.querySelector('#confroPaneel')?.classList.toggle('open', S._confroOpen);
+  };
+  const confroOv = v.querySelector('#confroOvernemen');
+  if (confroOv) confroOv.onclick = () => {
+    const bron = vorigeConfrontatie(w);
+    if (!bron){ meld('Geen vorige confrontatie gevonden'); return; }
+    const lineup = {};
+    for (const [slot, pid] of Object.entries(bron.kwarten?.['1']?.lineup || {}))
+      if ((w.selectie||[]).includes(pid) && speler(pid)) lineup[slot] = pid;
+    if (!Object.keys(lineup).length){ meld('Geen spelers uit die opstelling zitten in deze selectie'); return; }
+    w.kwarten['1'].lineup = lineup;
+    if (FORMATIES[w.format]?.[bron.formatie]) w.formatie = bron.formatie;
+    S.kwart = '1'; S._confroOpen = false;
+    bewaarWedstrijd(); renderWedstrijd();
+    meld(`Opstelling overgenomen van vorige keer tegen ${bron.tegenstander} — pas aan waar nodig`);
+  };
   const nvo = v.querySelector('#neemVorigeOver');
   if (nvo) nvo.onclick = () => {
     const vorige = laatsteOpstelling(w.format);
@@ -937,6 +1078,8 @@ function modalWedstrijdInstellingen(){
       <input class="invoer" id="mITegen" value="${esc(w.tegenstander)}"></div>
     <div class="veldgroep"><label>🎯 Wedstrijddoel</label>
       <input class="invoer" id="mIDoel" value="${esc(w.doel||'')}" placeholder="Bijv. opbouw van achteruit, durven schieten"></div>
+    <div class="veldgroep"><label>📝 Notitie</label>
+      <textarea class="invoer" id="mINotitie" rows="3" placeholder="Bijv. sterke counter, druk zetten op hun nr. 7. Zichtbaar bij de volgende keer tegen deze tegenstander.">${esc(w.notitie||'')}</textarea></div>
     <div class="rij">
       <div class="veldgroep"><label>Datum</label><input class="invoer" type="date" id="mIDatum" value="${esc(w.datum)}"></div>
       <div class="veldgroep"><label>Minuten per periode</label><input class="invoer" id="mIDuur" inputmode="decimal" value="${esc(w.kwartduur)}"></div>
@@ -974,6 +1117,7 @@ function modalWedstrijdInstellingen(){
   $('#mIOk').onclick = () => {
     w.tegenstander = $('#mITegen').value.trim() || w.tegenstander;
     w.doel = $('#mIDoel').value.trim();
+    w.notitie = $('#mINotitie').value.trim();
     w.datum = $('#mIDatum').value || w.datum;
     w.kwartduur = parseFloat(($('#mIDuur').value||'').replace(',','.')) || w.kwartduur;
     const aanv = $('#mIAanvoerder').value;
