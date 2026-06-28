@@ -286,6 +286,9 @@ function modalJoinTeam(){
 export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   S.teamId = teamId; S.teamTab = beginTab;
   S._pendingNieuweWedstrijd = !!opties.nieuweWedstrijd;
+  // presentie altijd ingeklapt openen bij elke teamopening (alle maanden dicht)
+  S._presentieOpen = new Set();
+  S._presentieToonAlles = new Set();
   stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen');
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
@@ -377,7 +380,12 @@ export function renderTeam(){
   if (naarTeamsBtn) naarTeamsBtn.onclick = () => history.back();
   const teamInstelBtn = v.querySelector('#teamInstel');
   if (teamInstelBtn) teamInstelBtn.onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
-  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S._beoordeelProfiel = null; S._leenProfiel = null; S.teamTab = b.dataset.tab; renderTeam(); });
+  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+    S._beoordeelProfiel = null; S._leenProfiel = null;
+    // presentie altijd ingeklapt tonen zodra je (terug) op de Trainingen-tab klikt
+    if (b.dataset.tab === 'trainingen'){ S._presentieOpen = new Set(); S._presentieToonAlles = new Set(); }
+    S.teamTab = b.dataset.tab; renderTeam();
+  });
   koppelTeamTab(v, tab);
 }
 
@@ -880,9 +888,10 @@ function htmlTeamTrainingen(){
   const afg = afgelastGeldig();
   const afgelastSectie = afg ? afgelastBannerHtml(afg) : '';
 
-  // welke maanden zijn opengeklapt? standaard alleen de huidige maand.
+  // welke maanden zijn opengeklapt? standaard alles dicht; openTeam reset dit
+  // bij elke teamopening. Hier alleen een vangnet als de sets nog niet bestaan.
   if (!S._presentieOpen){
-    S._presentieOpen = new Set([vandaag.slice(0,7)]);   // 'YYYY-MM'
+    S._presentieOpen = new Set();                       // 'YYYY-MM' van opengeklapte maanden
     S._presentieToonAlles = new Set();                  // maanden waar alle items getoond worden
   }
   const TOON_PER_MAAND = 4;   // standaard aantal per maand voordat "toon meer" verschijnt
