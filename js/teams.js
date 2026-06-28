@@ -1886,6 +1886,11 @@ async function trekUitleningIn(uitleenId){
   if (!confirm('Uitlening intrekken? De speler verdwijnt direct bij het andere team.')) return;
   try {
     await deleteDoc(doc(db,'clubs',clubId,'uitleningen',uitleenId));
+    // Werk de lokale lijsten meteen bij en render, zodat de UI klopt ook als
+    // de listener-snapshot voor deze eigen delete (tijdelijk) uitblijft.
+    S.uitleningenUit = (S.uitleningenUit||[]).filter(u => u.id !== uitleenId);
+    S.uitleningenIn  = (S.uitleningenIn ||[]).filter(u => u.id !== uitleenId);
+    renderTeam();
     meld('Uitlening ingetrokken');
   } catch(e){
     meld('Intrekken mislukt: ' + (e.code||e.message));
