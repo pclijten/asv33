@@ -1,14 +1,23 @@
 import { auth, onAuthStateChanged } from './firebase.js';
-import { S, $, initModalSluiten, meld } from './state.js';
+import { S, $, initModalSluiten, meld, initTerugknop } from './state.js';
 import {
   initAuthUI, checkUitnodiging, handelPendingJoin, verwerkDeeplink
 } from './auth.js';
-import { startTeams, openTeam } from './teams.js';
-import { openClub } from './club.js';
+import { startTeams, openTeam, renderTeam, verlaatTeamView } from './teams.js';
+import { openClub, verlaatClubView } from './club.js';
+import { sluitWedstrijd } from './wedstrijd.js';
 
 /* knoppen en modal-gedrag één keer registreren */
 initModalSluiten();
 initAuthUI();
+
+/* Terugknop-afhandeling: koppel de abstracte hooks uit state.js aan de
+   echte navigatiefuncties (voorkomt circulaire imports in state.js). */
+S._navRerender       = renderTeam;
+S._navVerlaatTeam    = verlaatTeamView;
+S._navVerlaatClub    = verlaatClubView;
+S._navTerugWedstrijd = sluitWedstrijd;
+initTerugknop();
 
 onAuthStateChanged(auth, async user => {
   S.user = user;

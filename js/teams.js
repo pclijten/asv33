@@ -4,7 +4,7 @@ import {
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, datumNL, teamCode, clubAfkorting, speler, initialen, isBeheerder,
-  openModal, sluitModal, toon, stopUnsubs, uurMin
+  openModal, sluitModal, toon, stopUnsubs, uurMin, bewaakTerug
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
   KNVB_SEIZOEN, knvbKalenderVoorTeam,
@@ -374,7 +374,7 @@ export function renderTeam(){
     </nav>`;
 
   const naarTeamsBtn = v.querySelector('#naarTeams');
-  if (naarTeamsBtn) naarTeamsBtn.onclick = verlaatTeamView;
+  if (naarTeamsBtn) naarTeamsBtn.onclick = () => history.back();
   const teamInstelBtn = v.querySelector('#teamInstel');
   if (teamInstelBtn) teamInstelBtn.onclick = () => { S.teamTab = 'instellingen'; renderTeam(); };
   v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S._beoordeelProfiel = null; S._leenProfiel = null; S.teamTab = b.dataset.tab; renderTeam(); });
@@ -1340,11 +1340,11 @@ function koppelTeamTab(v, tab){
   if (tab === 'spelers' && S._leenProfiel){
     // --- read-only leen-profiel ---
     const t = v.querySelector('#leenTerug');
-    if (t) t.onclick = () => { S._leenProfiel = null; renderTeam(); };
+    if (t) t.onclick = () => history.back();
   }
   else if (tab === 'spelers' && S._beoordeelProfiel){
     // --- profielscherm ---
-    v.querySelector('#profielTerug').onclick = () => { S._beoordeelProfiel = null; S._profielTab = 'overzicht'; renderTeam(); };
+    v.querySelector('#profielTerug').onclick = () => history.back();
     v.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { S._profielTab = b.dataset.ptab; renderTeam(); });
     v.querySelectorAll('[data-snel-speler]').forEach(b => b.onclick = () => modalSnelBeoordeling(b.dataset.snelSpeler));
     v.querySelectorAll('[data-volledig-speler]').forEach(b => b.onclick = () => modalVolledigeBeoordeling(b.dataset.volledigSpeler));
@@ -1440,6 +1440,7 @@ function koppelTeamTab(v, tab){
       verlaatTeamView();
     };
   }
+  bewaakTerug();
 }
 
 /* ==================== BEOORDELING — ACTIES & MODALS ==================== */

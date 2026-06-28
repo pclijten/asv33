@@ -862,7 +862,7 @@ export function renderWedstrijd(){
     <button class="knop gevaar vol" id="wegWedstrijd" style="margin-top:10px">Wedstrijd verwijderen</button>`;
 
   /* ---- koppelingen ---- */
-  v.querySelector('#naarTeam').onclick = sluitWedstrijd;
+  v.querySelector('#naarTeam').onclick = () => history.back();
   v.querySelector('#wInstellingen').onclick = modalWedstrijdInstellingen;
   v.querySelectorAll('[data-kwart]').forEach(b => b.onclick = () => {
     S.kwart = b.dataset.kwart; S.geselecteerd = null;

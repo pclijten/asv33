@@ -99,17 +99,126 @@ export function clubAfkorting(clubnaam){
 export function openModal(html){
   $('#modalInhoud').innerHTML = '<div class="sluitbalk"></div>' + html;
   $('#modalAchter').classList.add('open');
+  bewaakTerug();
 }
-export function sluitModal(){ $('#modalAchter').classList.remove('open'); }
+export function sluitModal(){
+  const wasOpen = $('#modalAchter').classList.contains('open');
+  $('#modalAchter').classList.remove('open');
+  /* Modal met de knop/achtergrond gesloten (niet via terugknop): als er nu
+     géén dieper niveau meer is dat het vangnet rechtvaardigt, halen we het
+     vangnet weg zodat de eerstvolgende terugtik niet een extra niveau "opeet".
+     Bij sluiten via de terugknop is het vangnet al verbruikt en is dit een
+     no-op (_terugBezig voorkomt dubbel werk). */
+  if (wasOpen && _vangnetActief && !_terugBezig){
+    /* Vangnet stil terughalen zonder een navigatiestap te veroorzaken. */
+    _stilTerug = true;
+    history.back();
+  }
+}
 
 /* ---------- Navigatie ---------- */
 export function toon(viewId){
   $$('.view').forEach(v => v.classList.remove('actief'));
   $('#view-'+viewId).classList.add('actief');
   window.scrollTo(0,0);
+  bewaakTerug();
 }
 export function stopUnsubs(...keys){
   for (const k of keys){ if (S.unsub[k]){ S.unsub[k](); delete S.unsub[k]; } }
+}
+
+/* ==================== TERUGKNOP / GESCHIEDENIS ====================
+   Doel: de hardware-terugknop van de telefoon sluit niet meteen de hele app,
+   maar gaat één stap terug binnen de app.
+
+   Model (robuust en simpel): zodra de app "ergens binnen" zit (niet op het
+   teamsoverzicht én geen modal open), houden we precies één extra
+   history-entry vast — een "vangnet". Drukt de gebruiker op terug, dan vangt
+   onze popstate-listener dat op en voert hij één terug-stap uit volgens de
+   prioriteit hieronder. Daarna zetten we het vangnet opnieuw als er nóg iets
+   terug te gaan valt. Zo hoeven openModal/sluitModal en de losse views zich
+   nergens om history te bekommeren — alles loopt via bewaakTerug(). */
+
+function actieveView(){
+  const v = document.querySelector('.view.actief');
+  return v ? v.id.replace('view-','') : 'teams';
+}
+function modalOpen(){
+  return !!document.querySelector('#modalAchter')?.classList.contains('open');
+}
+
+/* Zit de app op dit moment "ergens binnen", d.w.z. valt er iets terug te gaan? */
+function kanTerug(){
+  if (!S.user) return false;
+  if (modalOpen()) return true;
+  const view = actieveView();
+  if (view !== 'teams') return true;          // team / wedstrijd / club
+  return false;                                // op het hoofdscherm
+}
+
+let _vangnetActief = false;   // ligt het vangnet op de history-stack?
+let _afsluitGewapend = false; // eerste terugtik op hoofdscherm gehad?
+let _stilTerug = false;       // history.back() zonder navigatiestap (modal-knop)
+let _terugBezig = false;      // voorkomt herentry tijdens afhandeling
+
+/* Zorg dat het vangnet de juiste status heeft voor de huidige UI-stand.
+   Aanroepen na elke navigatie/render/modalwissel. */
+export function bewaakTerug(){
+  if (!S.user) return;
+  if (kanTerug() && !_vangnetActief){
+    _vangnetActief = true;
+    history.pushState({ cluppie:true, vangnet:true }, '');
+  }
+  /* Als er niets meer terug te gaan valt laten we het vangnet liggen tot de
+     gebruiker daadwerkelijk terug drukt; opruimen hoeft niet en voorkomt
+     races met gelijktijdige navigatie. */
+}
+
+/* Eén terug-stap volgens prioriteit. true = afgehandeld (app blijft open). */
+function stapTerug(){
+  if (modalOpen()){ sluitModal(); return true; }
+  const view = actieveView();
+  if (view === 'team' && (S._beoordeelProfiel || S._leenProfiel)){
+    S._beoordeelProfiel = null; S._leenProfiel = null; S._profielTab = 'overzicht';
+    S._navRerender?.();
+    return true;
+  }
+  if (view === 'wedstrijd'){ S._navTerugWedstrijd?.(); return true; }
+  if (view === 'club'){      S._navVerlaatClub?.();    return true; }
+  if (view === 'team'){      S._navVerlaatTeam?.();    return true; }
+  return false; // hoofdscherm: niets meer
+}
+
+/* Eén keer registreren (vanuit main.js). */
+export function initTerugknop(){
+  history.replaceState({ cluppie:true, basis:true }, '');
+  window.addEventListener('popstate', () => {
+    _vangnetActief = false;            // het vangnet is zojuist verbruikt
+    /* Stille terughaal na modal-knop: geen navigatiestap, alleen vangnet
+       opnieuw afstemmen op de huidige (ondiepere) stand. */
+    if (_stilTerug){
+      _stilTerug = false;
+      bewaakTerug();
+      return;
+    }
+    _terugBezig = true;
+    const afgehandeld = stapTerug();
+    _terugBezig = false;
+    if (afgehandeld){
+      _afsluitGewapend = false;
+      bewaakTerug();                   // leg een nieuw vangnet als er nog dieper-zit
+      return;
+    }
+    // Hoofdscherm. 1A: dubbeltik om af te sluiten.
+    if (_afsluitGewapend){
+      history.back();                  // tweede tik: verlaat de pagina echt
+    } else {
+      _afsluitGewapend = true;
+      meld('Tik nog een keer op terug om af te sluiten');
+      history.pushState({ cluppie:true, basis:true }, '');
+      setTimeout(() => { _afsluitGewapend = false; }, 2000);
+    }
+  });
 }
 
 /* modal sluiten bij klik op de achtergrond — één keer registreren */
