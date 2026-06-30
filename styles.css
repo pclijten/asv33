@@ -1032,3 +1032,20 @@ body::before{
   z-index:0;
   pointer-events:none;
 }
+
+/* ---------- Help: zoekbalk ---------- */
+.hl-zoekbalk{position:relative;display:flex;align-items:center;margin-bottom:16px}
+.hl-zoek-ico{position:absolute;left:13px;font-size:15px;opacity:.6;pointer-events:none}
+.hl-zoek-input{width:100%;padding:11px 38px 11px 38px;border:1.5px solid var(--line-d);
+  border-radius:11px;background:var(--surface-2);color:var(--ink);font-size:15px;
+  -webkit-appearance:none;appearance:none}
+.hl-zoek-input::placeholder{color:var(--ink-2)}
+.hl-zoek-input:focus{outline:none;border-color:var(--grass)}
+.hl-zoek-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.hl-zoek-wis{position:absolute;right:8px;width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;color:var(--ink-2);font-size:14px}
+.hl-zoek-wis:active{background:var(--surface)}
+.hl-geen{background:var(--surface-2);border:1px solid var(--line-d);border-radius:11px;
+  padding:14px 16px;font-size:13.5px;color:var(--ink-2);text-align:center;margin-bottom:12px}
+.hl-geen b{color:var(--ink)}
+.hl-sec[hidden]{display:none}
