@@ -8,6 +8,11 @@ import {
   S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam, youtubeId, youtubeThumb, youtubeWatch } from './config.js';
+import { analyseWedstrijd } from './analyse.js';
+
+/* drempels voor het clubdashboard ("aandacht nodig") */
+const DASH_DAGEN_INACTIEF = 14;
+const DASH_OPKOMST_LAAG = 50;
 
 /* openTeam en modalNieuwTeam komen uit teams.js; om kringverwijzing te
    vermijden importeren we ze lui binnen de functies die ze nodig hebben. */
@@ -136,6 +141,145 @@ function afgKort(datum){
   catch { return datum; }
 }
 
+/* ==================== CLUBDASHBOARD ====================
+   Eén leesactie per team voor spelers/wedstrijden/presentie — alleen
+   uitgevoerd als het dashboard-tabblad ook echt open staat (zie renderClub),
+   net als de voetbal.nl-syncstatus die ook alleen op de instel-tab leest. */
+function dagenSinds(datum){
+  try { return Math.floor((Date.now() - new Date(datum+'T12:00').getTime()) / 86400000); }
+  catch { return null; }
+}
+function dashActiviteitTekst(dagen){
+  if (dagen === 0) return 'Vandaag';
+  if (dagen === 1) return 'Gisteren';
+  return `${dagen} dagen geleden`;
+}
+function dashOpkomstKlasse(p){ return p>=80?'goed':p>=DASH_OPKOMST_LAAG?'matig':'laag'; }
+
+async function clubDashboardOphalen(teams){
+  return Promise.all(teams.map(async t => {
+    const [spelersSnap, wedstrijdenSnap, presentieSnap] = await Promise.all([
+      getDocs(collection(db,'teams',t.id,'spelers')),
+      getDocs(collection(db,'teams',t.id,'wedstrijden')),
+      getDocs(collection(db,'teams',t.id,'presentie')),
+    ]);
+    const spelersAantal = spelersSnap.size;
+    const wedstrijden = wedstrijdenSnap.docs.map(d => d.data());
+    const presentie = presentieSnap.docs.map(d => d.data());
+
+    let opkomstPct = null;
+    if (presentie.length && spelersAantal){
+      let totAanwezig = 0;
+      for (const p of presentie) totAanwezig += spelersAantal - (p.afwezig||[]).length;
+      opkomstPct = Math.round((totAanwezig / (presentie.length * spelersAantal)) * 100);
+    }
+
+    const activiteiten = [];
+    for (const w of wedstrijden){
+      if (!w.datum) continue;
+      const heeftUitslag = (w.goals||[]).length || analyseWedstrijd(w).kwarten;
+      if (!heeftUitslag) continue;
+      const voor = (w.goals||[]).filter(g => g.type==='voor').length;
+      const tegen = (w.goals||[]).filter(g => g.type==='tegen').length;
+      const ww = voor > tegen ? `won met ${voor}-${tegen} van` : voor < tegen ? `verloor met ${voor}-${tegen} van` : `speelde ${voor}-${tegen} gelijk tegen`;
+      activiteiten.push({
+        soort:'wedstrijd', datum:w.datum,
+        tekst: `${ww} ${w.tegenstander||'onbekend'}`,
+      });
+    }
+    for (const p of presentie){
+      if (!p.datum) continue;
+      const aanwezig = spelersAantal - (p.afwezig||[]).length;
+      activiteiten.push({ soort:'presentie', datum:p.datum, tekst:`presentie: ${aanwezig}/${spelersAantal} aanwezig` });
+    }
+    const laatsteDatum = activiteiten.length ? activiteiten.map(a => a.datum).sort().at(-1) : null;
+
+    return {
+      team:t, spelersAantal, coachesAantal: Object.keys(t.leden||{}).length,
+      wedstrijdenAantal: wedstrijden.length, opkomstPct, laatsteDatum, activiteiten,
+      heeftCategorie: !!t.categorie,
+    };
+  }));
+}
+
+function htmlClubDashboard(teams, dash){
+  if (!teams.length) return `<div class="kaart leeg">Nog geen teams in deze club.<br>Zodra er teams, wedstrijden en trainingen zijn, verschijnt hier een overzicht.</div>`;
+
+  const totSpelers = dash.reduce((s,d) => s + d.spelersAantal, 0);
+  const totCoaches = dash.reduce((s,d) => s + d.coachesAantal, 0);
+  const wedstrijdenWeek = dash.reduce((s,d) => s + d.activiteiten.filter(a => a.soort==='wedstrijd' && dagenSinds(a.datum) <= 7).length, 0);
+
+  const signalen = [];
+  for (const d of dash){
+    const dagen = d.laatsteDatum ? dagenSinds(d.laatsteDatum) : null;
+    if (dagen === null || dagen > DASH_DAGEN_INACTIEF){
+      signalen.push({ team:d.team.naam, ernstig:true,
+        reden: dagen === null ? 'Nog geen presentie of wedstrijd geregistreerd' : `Geen presentie of wedstrijd sinds ${dagen} dagen` });
+    }
+    if (!d.heeftCategorie){
+      signalen.push({ team:d.team.naam, ernstig:false, reden:'Geen categorie ingesteld — speeltijden kloppen mogelijk niet' });
+    }
+    if (d.opkomstPct != null && d.opkomstPct < DASH_OPKOMST_LAAG){
+      signalen.push({ team:d.team.naam, ernstig:false, reden:`Trainingsopkomst ${d.opkomstPct}% — laag` });
+    }
+  }
+  signalen.sort((a,b) => (b.ernstig?1:0) - (a.ernstig?1:0));
+
+  const sortDesc = (S.clubDashSort ?? 'desc') === 'desc';
+  const gesorteerd = dash.map(d => ({...d, dagen: d.laatsteDatum ? dagenSinds(d.laatsteDatum) : Infinity}))
+    .sort((a,b) => sortDesc ? b.dagen - a.dagen : a.dagen - b.dagen);
+
+  const feed = dash.flatMap(d => d.activiteiten.map(a => ({...a, team:d.team.naam})))
+    .sort((a,b) => b.datum.localeCompare(a.datum)).slice(0,8);
+
+  return `
+    <div class="overzicht-blokjes">
+      <div class="ov-blok"><div class="ov-getal">${teams.length}</div><div class="ov-label">teams</div></div>
+      <div class="ov-blok"><div class="ov-getal">${totSpelers}</div><div class="ov-label">spelers</div></div>
+      <div class="ov-blok"><div class="ov-getal">${totCoaches}</div><div class="ov-label">coaches</div></div>
+      <div class="ov-blok ov-wedstrijden"><div class="ov-getal">${wedstrijdenWeek}</div><div class="ov-label">wedstr. 7 dgn</div></div>
+    </div>
+
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">⚠️ Aandacht nodig</div>
+      ${signalen.length ? `
+        <div class="caf-historie">
+          ${signalen.slice(0,8).map(s => `
+            <div class="caf-rij">
+              <span class="caf-rij-datum" style="${s.ernstig?'color:var(--uit)':''}">${esc(s.team)}</span>
+              <span class="caf-rij-reden">${esc(s.reden)}</span>
+            </div>`).join('')}
+        </div>` : `<p style="font-size:13px;color:var(--ink-2)">✅ Alle teams zijn actief en up-to-date.</p>`}
+    </div>
+
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">
+        Teams
+        <button class="actie" id="dashSort" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.3px">Activiteit ${sortDesc?'↓':'↑'}</button>
+      </div>
+      <table class="stat-tabel">
+        <thead><tr><th>Team</th><th>Activiteit</th><th>Opkomst</th><th>Spelers</th></tr></thead>
+        <tbody>${gesorteerd.map(d => `
+          <tr data-dash-team="${d.team.id}" style="cursor:pointer">
+            <td class="naam-cel">${esc(d.team.naam)}</td>
+            <td style="${d.dagen !== Infinity && d.dagen > DASH_DAGEN_INACTIEF ? 'color:var(--uit)' : ''}">${d.laatsteDatum ? dashActiviteitTekst(d.dagen) : '—'}</td>
+            <td class="opkomst-cel ${d.opkomstPct==null?'':dashOpkomstKlasse(d.opkomstPct)}">${d.opkomstPct==null?'—':d.opkomstPct+'%'}</td>
+            <td>${d.spelersAantal}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Recente activiteit</div>
+      ${feed.length ? feed.map(a => `
+        <div class="training-rij">
+          <div class="ico">${a.soort==='wedstrijd'?'⚽':'📋'}</div>
+          <div class="t"><div class="t-titel">${esc(a.team)}</div>
+            <div class="t-meta">${esc(a.tekst)} · ${esc(afgKort(a.datum))}</div></div>
+        </div>`).join('') : `<p style="font-size:13px;color:var(--ink-2)">Nog geen wedstrijden of presentie geregistreerd.</p>`}
+    </div>`;
+}
+
 async function renderClub(){
   if (!S.club) return;
   const v = $('#view-club');
@@ -157,13 +301,14 @@ async function renderClub(){
   if (tab === 'teams')      inhoud = htmlClubTeams(teams, afgelastingen);
   if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
   if (tab === 'videos')     inhoud = htmlClubVideos(teams, videos);
+  if (tab === 'dashboard')  inhoud = htmlClubDashboard(teams, await clubDashboardOphalen(teams));
   if (tab === 'instel')     inhoud = htmlClubInstel(teams, syncStatus);
   v.innerHTML = `
     <div class="kop"><button class="terug" id="naarTeams">‹</button>
       <h1>🏛 ${esc(S.club.naam)}<span class="sub">${Object.keys(S.club.teams||{}).length} teams · clubcode ${esc(S.club.code)}</span></h1></div>
     ${inhoud}
     <nav class="onderbalk">
-      ${[['teams','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="2.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="8.5" r="2.3"/><path d="M15.5 13.4A4.8 4.8 0 0 1 20.5 18"/></svg>','Teams'],['trainingen','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="2.2"/><path d="M9 3.2h6v3H9z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>','Training'],['videos','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.2"/><path d="M16 10l5-3v10l-5-3z"/></svg>','Videos'],['instel','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7.6 1.6 1.6 0 0 0-1.1 1.5V20a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H10a1.6 1.6 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V10a1.6 1.6 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>','Club']]
+      ${[['teams','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="2.8"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="8.5" r="2.3"/><path d="M15.5 13.4A4.8 4.8 0 0 1 20.5 18"/></svg>','Teams'],['trainingen','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="2.2"/><path d="M9 3.2h6v3H9z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></svg>','Training'],['videos','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.2"/><path d="M16 10l5-3v10l-5-3z"/></svg>','Videos'],['dashboard','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10"/><path d="M11 19V5"/><path d="M18 19v-7"/></svg>','Dashboard'],['instel','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7.6 1.6 1.6 0 0 0-1.1 1.5V20a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H10a1.6 1.6 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V10a1.6 1.6 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>','Club']]
         .map(([id,ico,naam]) => `<button data-ctab="${id}" class="${tab===id?'actief':''}"><span class="ico">${ico}</span>${naam}</button>`).join('')}
     </nav>`;
   v.querySelector('#naarTeams').onclick = () => history.back();
@@ -505,6 +650,16 @@ function koppelClubTab(v, tab, teams, trainingen, videos){
       if (!confirm(`Video "${vid.titel || ''}" verwijderen?`)) return;
       await deleteDoc(doc(db,'videos',vid.id));
       meld('Video verwijderd'); renderClub();
+    });
+  }
+  if (tab === 'dashboard'){
+    const sortBtn = v.querySelector('#dashSort');
+    if (sortBtn) sortBtn.onclick = () => {
+      S.clubDashSort = (S.clubDashSort ?? 'desc') === 'desc' ? 'asc' : 'desc';
+      renderClub();
+    };
+    v.querySelectorAll('[data-dash-team]').forEach(tr => tr.onclick = async () => {
+      (await teamsModule()).openTeam(tr.dataset.dashTeam);
     });
   }
   if (tab === 'instel'){
