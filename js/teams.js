@@ -13,6 +13,7 @@ import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, yout
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
+import { tekenPwaBanner } from './pwa.js';
 import {
   openWedstrijd, modalNieuweWedstrijd, htmlStats, renderWedstrijd
 } from './wedstrijd.js';
@@ -138,6 +139,8 @@ export function renderTeams(){
       <button class="uitlog-knop" id="uitloggen" title="Uitloggen"><span>⏻</span></button>
     </div>
 
+    <div id="pwaBanner"></div>
+
     ${toonOverzicht ? `
     <div class="overzicht-blokjes">
       <button class="ov-blok ${aantalOngelezen ? 'ov-actief' : ''}" id="ovTrainingen">
@@ -201,6 +204,8 @@ export function renderTeams(){
   if (ovW) ovW.onclick = () => {
     if (S.teams.length) openTeam(S.teams[0].id, 'wedstrijden');
   };
+
+  tekenPwaBanner();
 }
 
 export function modalNieuwTeam(clubId = null){
@@ -2119,4 +2124,3 @@ function modalPlanDag(it){
     }
   };
 }
-
