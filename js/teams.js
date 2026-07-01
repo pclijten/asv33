@@ -109,6 +109,102 @@ function laadVideosVoorTeams(){
   });
 }
 
+/* ==================== WELKOM-STRIP ====================
+   Klein, dagelijks wisselend blokje in de rode kop van het startscherm:
+   weer bij Aarle-Rixtel (Open-Meteo, geen API-key nodig), de eerstvolgende
+   wedstrijd uit al je eigen teams, en een Cruijff-citaat van de dag.
+   Weer + wedstrijd worden 30 minuten gecachet (S._welkomCache) zodat een
+   her-render door een Firestore-listener niet steeds opnieuw gaat fetchen. */
+const CRUIJFF_QUOTES = [
+  'Voetbal is simpel, maar het moeilijkste wat er is, is simpel voetballen.',
+  'Elk nadeel heb z\'n voordeel.',
+  'Je gaat het pas zien als je het doorhebt.',
+  'Als je niet wint, is het logisch dat je verliest.',
+  'Voordat ik een fout maak, maak ik die fout niet.',
+  'Kwaliteit zonder snelheid is geen kwaliteit. Snelheid zonder kwaliteit is ook geen kwaliteit.',
+  'Een goede trainer wordt geacht een fout op tijd te zien aankomen, en die dus te voorkomen.',
+  'Zonder bal kun je niet winnen.',
+  'Elke tijd heeft zijn eigen wijsheid.',
+  'Waarom moeilijk doen als het makkelijk kan?',
+  'Je moet schieten, anders kun je niet scoren.',
+  'Ieder team dat wint, is een goed team; discussies komen daarna wel.',
+  'Als je zelf de bal hebt, kan de tegenstander niet scoren.',
+  'Ik heb nog nooit een club gezien die met geld op de bank kampioen is geworden.',
+  'Voetballen is heel simpel, maar het simpelste is het moeilijkste wat er is.',
+];
+function cruijffVanVandaag(){
+  const nu = new Date();
+  const start = new Date(nu.getFullYear(), 0, 0);
+  const dagVanJaar = Math.floor((nu - start) / 86400000);
+  return CRUIJFF_QUOTES[dagVanJaar % CRUIJFF_QUOTES.length];
+}
+
+/* WMO-weercode -> emoji + kort label (Open-Meteo) */
+function weerIcoon(code){
+  if (code === 0) return ['☀️','helder'];
+  if ([1,2].includes(code)) return ['🌤️','licht bewolkt'];
+  if (code === 3) return ['☁️','bewolkt'];
+  if ([45,48].includes(code)) return ['🌫️','mist'];
+  if ([51,53,55,56,57].includes(code)) return ['🌦️','motregen'];
+  if ([61,63,65].includes(code)) return ['🌧️','regen'];
+  if ([66,67].includes(code)) return ['🌧️','ijzel'];
+  if ([71,73,75,77].includes(code)) return ['❄️','sneeuw'];
+  if ([80,81,82].includes(code)) return ['🌦️','buien'];
+  if ([85,86].includes(code)) return ['🌨️','sneeuwbuien'];
+  if ([95,96,99].includes(code)) return ['⛈️','onweer'];
+  return ['🌡️',''];
+}
+
+async function weerOphalen(){
+  try {
+    // Aarle-Rixtel
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=51.52&longitude=5.62&current=temperature_2m,weather_code&timezone=Europe%2FAmsterdam';
+    const res = await fetch(url);
+    const data = await res.json();
+    const temp = Math.round(data.current.temperature_2m);
+    const [ico] = weerIcoon(data.current.weather_code);
+    return `${ico} ${temp}°`;
+  } catch(e){ return null; }
+}
+
+async function eerstvolgendeWedstrijd(){
+  const vandaag = new Date().toISOString().slice(0,10);
+  let beste = null;
+  for (const t of S.teams){
+    try {
+      const snap = await getDocs(query(collection(db,'teams',t.id,'wedstrijden'), where('datum','>=',vandaag)));
+      snap.docs.forEach(d => {
+        const w = d.data();
+        if (!w.datum) return;
+        if (!beste || w.datum < beste.datum) beste = { ...w, teamNaam: t.naam };
+      });
+    } catch(e){ /* geen toegang o.i.d., negeren */ }
+  }
+  if (!beste) return null;
+  const thuisuit = beste.thuis ? 'thuis vs' : 'uit bij';
+  return `⚽ ${datumNL(beste.datum)} · ${thuisuit} ${esc(beste.tegenstander || 'onbekend')}`;
+}
+
+function welkomStripInhoud(cache){
+  const delen = [cache.weer, cache.wedstrijd].filter(Boolean);
+  return `${delen.length ? `<div class="welkom-strip">${delen.map(d => `<span class="ws-item">${d}</span>`).join('')}</div>` : ''}
+    <div class="welkom-cruijff">“${esc(cache.quote)}” <span>— Johan Cruijff</span></div>`;
+}
+function welkomStripHtml(){
+  const vers = 30*60*1000;
+  if (S._welkomCache && (Date.now() - S._welkomCache.tijd) < vers) return welkomStripInhoud(S._welkomCache);
+  return `<div class="welkom-cruijff">“${esc(cruijffVanVandaag())}” <span>— Johan Cruijff</span></div>`;
+}
+
+async function welkomStripVullen(){
+  const vers = 30*60*1000; // 30 minuten
+  if (S._welkomCache && (Date.now() - S._welkomCache.tijd) < vers) return; // al vers genoeg, niets doen
+  const [weer, wedstrijd] = await Promise.all([weerOphalen(), eerstvolgendeWedstrijd()]);
+  S._welkomCache = { tijd: Date.now(), weer, wedstrijd, quote: S._welkomCache?.quote || cruijffVanVandaag() };
+  const el = document.getElementById('welkomExtra');
+  if (el) el.innerHTML = welkomStripInhoud(S._welkomCache);
+}
+
 export function renderTeams(){
   const v = $('#view-teams');
   const aantalOngelezen = S.trainingen.filter(t =>
@@ -135,6 +231,7 @@ export function renderTeams(){
       <div class="welkom-tekst">
         <div class="welkom-datum">${esc(vandaag)}</div>
         <h1 class="welkom-groet">Hoi ${esc(voornaamMooi || 'coach')} 👋</h1>
+        <div id="welkomExtra">${welkomStripHtml()}</div>
       </div>
       <button class="uitlog-knop" id="uitloggen" title="Uitloggen"><span>⏻</span></button>
     </div>
@@ -206,6 +303,7 @@ export function renderTeams(){
   };
 
   tekenPwaBanner();
+  welkomStripVullen();
 }
 
 export function modalNieuwTeam(clubId = null){
