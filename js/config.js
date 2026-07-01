@@ -425,6 +425,39 @@ export const GOUDEN_REGELS = [
   'Regels naleven',
 ];
 
+/* ==================== ASV-KOMPAS (§3.1 gouden regels + §3.4 richtlijnen) ====================
+   Korte, niet-verplichte tips die roteren op weeknummer, zodat alle coaches van
+   een team dezelfde tip zien in dezelfde week (uniformiteit, geen leesplicht). */
+export const KOMPAS_TIPS = [
+  {bron:'§3.1', tekst:'Plezier, inzet en samenspel staan voorop — elke training.'},
+  {bron:'§3.1', tekst:'Bouw bewust tijd in voor techniektraining, ook bij de oudere jeugd.'},
+  {bron:'§3.1', tekst:'Veel herhalingen en balcontacten leveren het meeste leerrendement op.'},
+  {bron:'§3.1', tekst:'Stimuleer spelers om beide benen te gebruiken.'},
+  {bron:'§3.1', tekst:'Geef elke speler tijdens oefenvormen een eigen bal.'},
+  {bron:'§3.1', tekst:'Succesbeleving: laat spelers vooral veel kunnen scoren.'},
+  {bron:'§3.1', tekst:'Kies voor kleine partijvormen — meer balcontacten, meer betrokkenheid, meer herhaling.'},
+  {bron:'§3.1', tekst:'Regels naleven hoort bij het leren voetballen — ook op de training.'},
+  {bron:'§3.1', tekst:'Positief coachen werkt beter dan corrigeren op fouten.'},
+  {bron:'§3.4', tekst:'Oefen zoveel mogelijk in wedstrijdvorm — met zo min mogelijk onderbrekingen.'},
+  {bron:'§3.4', tekst:'Techniek is een middel, geen doel op zich. Koppel oefeningen aan een spelsituatie.'},
+  {bron:'§3.4', tekst:'Vereenvoudig het spel (4v4, 6v6, 8v8) om het sneller leerbaar te maken.'},
+  {bron:'§3.4', tekst:'Conditie train je door te voetballen — niet los van de bal.'},
+  {bron:'§3.4', tekst:'Geef ook aanwijzingen over spelinzicht en onderlinge communicatie, niet alleen balvaardigheid.'},
+];
+/* ISO-weeknummer van vandaag, gebruikt om de kompas-tip per week te bepalen. */
+export function isoWeek(d = new Date()){
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dagNr = (dt.getUTCDay() + 6) % 7;
+  dt.setUTCDate(dt.getUTCDate() - dagNr + 3);
+  const eersteDonderdag = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+  const weekNr = 1 + Math.round(((dt - eersteDonderdag) / 86400000 - 3 + ((eersteDonderdag.getUTCDay() + 6) % 7)) / 7);
+  return weekNr;
+}
+export function kompasIndexVoorWeek(week = isoWeek()){ return ((week % KOMPAS_TIPS.length) + KOMPAS_TIPS.length) % KOMPAS_TIPS.length; }
+
+/* Formatie-uitgangspunt van de club (§3.2): 1:4:3:3, omschakelend naar 1:3:4:3 bij balbezit. */
+export const CLUB_FORMATIE_11 = '4-3-3';
+
 /* niveau 1..5 → kleur + label. Index 0 blijft leeg (scores beginnen bij 1). */
 export const NIVEAUS = [
   null,
