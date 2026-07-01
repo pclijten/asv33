@@ -2008,7 +2008,8 @@ function modalSnelBeoordeling(spelerId, bestaande = null){
    (wedstrijd.js, via een dynamische import om een circulaire import met
    teams.js te vermijden — zelfde patroon als elders in de app). */
 export function modalTeamEvaluatie(wedstrijdId){
-  const w = S.wedstrijden.find(x => x.id === wedstrijdId); if (!w) return;
+  const w = S.wedstrijden.find(x => x.id === wedstrijdId);
+  if (!w) return meld('Kon de wedstrijd niet vinden — probeer de pagina te verversen');
   const bestaande = S.teamEvaluaties.find(e => e.wedstrijdId === wedstrijdId) || null;
   const scores = {...(bestaande?.scores || {})};
   let gekozenTags = new Set(bestaande?.tags || []);
