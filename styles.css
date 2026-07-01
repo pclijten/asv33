@@ -600,7 +600,7 @@ textarea.invoer{font-family:inherit;line-height:1.5;resize:vertical;min-height:6
   transition:background .15s ease;
 }
 .maand-kop:hover{ background:rgba(255,255,255,.05); }
-.maand-naam{ font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.3px;color:var(--pitch-ink); }
+.maand-naam{ font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.3px;color:var(--ink); }
 .maand-tel{ font-size:11.5px;color:var(--ink-2);margin-left:auto; }
 .maand-pijl{ font-size:13px;color:var(--ink-2);transition:transform .2s ease;flex-shrink:0; }
 .maand-pijl.open{ transform:rotate(180deg); }
