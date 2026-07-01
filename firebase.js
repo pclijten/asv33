@@ -13,16 +13,16 @@ const firebaseConfig = {
 };
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,
-         sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
-         signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail }
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,         signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
          collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
-         getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId }
+         getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId, increment }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import { getFunctions, httpsCallable }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -41,16 +41,17 @@ try {
 }
 
 const storage = getStorage(app);
+const functions = getFunctions(app, 'europe-west1');
 
 export {
   app, auth, db, storage,
   /* auth */
-  GoogleAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,
-  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail,
+  GoogleAuthProvider, OAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail,
   /* firestore */
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
-  getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId,
+  getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId, increment,
   /* storage */
   sRef, uploadBytes, getDownloadURL, deleteObject,
+  /* functions */
+  functions, httpsCallable,
 };
