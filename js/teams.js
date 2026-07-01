@@ -2176,7 +2176,7 @@ function modalPresentie(bestaande = null){
         <button type="button" data-d="vandaag" class="actief">Vandaag</button>
         <button type="button" data-d="ander">Andere dag</button>
       </div>
-      <input class="invoer" type="date" id="mPresDatumInput" value="${datum}" max="${vandaag}" style="display:none;margin-top:8px">
+      <input class="invoer" type="date" id="mPresDatumInput" value="${datum}" style="display:none;margin-top:8px">
     </div>` : ''}
     <p style="font-size:13px;color:var(--ink-2);margin-bottom:4px;text-transform:capitalize" id="mPresDatumTekst">${esc(datLeesbaar(datum))}</p>
     <p style="font-size:12px;color:var(--warn);margin-bottom:4px;display:none" id="mPresBestaatMelding">Let op: voor deze dag is al presentie geregistreerd — je past de bestaande registratie aan.</p>
