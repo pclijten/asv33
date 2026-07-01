@@ -206,6 +206,72 @@ async function welkomStripVullen(){
   if (el) el.innerHTML = welkomStripInhoud(S._welkomCache);
 }
 
+/* ==================== NOG TE EVALUEREN ====================
+   Tegel op het startscherm met gespeelde wedstrijden (over al je teams heen)
+   die nog geen teamevaluatie hebben. Zelfde cache-aanpak als de welkom-strip:
+   15 minuten geldig, plus meteen lokaal bijgewerkt na "negeren" zodat dat niet
+   op een nieuwe fetch hoeft te wachten. */
+async function nogTeEvaluerenOphalen(){
+  const vandaag = new Date().toISOString().slice(0,10);
+  const open = [];
+  for (const t of S.teams){
+    try {
+      const [wSnap, eSnap] = await Promise.all([
+        getDocs(query(collection(db,'teams',t.id,'wedstrijden'), where('datum','<=',vandaag))),
+        getDocs(collection(db,'teams',t.id,'teamevaluaties')),
+      ]);
+      const geevalueerd = new Set(eSnap.docs.map(d => d.data().wedstrijdId));
+      wSnap.docs.forEach(d => {
+        const w = {id:d.id, ...d.data()};
+        if (w.evaluatieGenegeerd || geevalueerd.has(w.id)) return;
+        const gespeeld = (w.goals||[]).length || analyseWedstrijd(w).kwarten;
+        if (!gespeeld) return;
+        open.push({...w, teamId:t.id, teamNaam:t.naam});
+      });
+    } catch(e){ /* geen toegang o.i.d., dit team overslaan */ }
+  }
+  open.sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
+  return open;
+}
+
+function nogTeEvaluerenHtml(){
+  const items = S._evalCache?.items;
+  if (!items || !items.length) return '';
+  return `
+    <div class="sectie-kop" style="margin-top:4px">📝 Nog te evalueren</div>
+    ${items.map(w => `
+      <div class="lijst-item" data-eval-open="${w.id}" data-eval-team="${w.teamId}" style="cursor:pointer">
+        <div class="team-shirt">⚽</div>
+        <div class="li-tekst"><div class="titel">${esc(w.teamNaam)} – ${esc(w.tegenstander)}</div>
+        <div class="meta">${datumNL(w.datum)}</div></div>
+        <button data-eval-negeer="${w.id}" data-eval-negeer-team="${w.teamId}" title="Negeren" style="background:none;color:var(--ink-2);font-size:18px;padding:6px;flex-shrink:0">✕</button>
+      </div>`).join('')}`;
+}
+
+async function nogTeEvaluerenVullen(){
+  const vers = 15*60*1000;
+  if (S._evalCache && (Date.now() - S._evalCache.tijd) < vers) return;
+  const items = await nogTeEvaluerenOphalen();
+  S._evalCache = { tijd: Date.now(), items };
+  const el = document.getElementById('nogTeEvalueren');
+  if (el){ el.innerHTML = nogTeEvaluerenHtml(); koppelNogTeEvalueren(el); }
+}
+function koppelNogTeEvalueren(el){
+  el.querySelectorAll('[data-eval-open]').forEach(r => r.onclick = () => {
+    S._pendingOpenWedstrijd = r.dataset.evalOpen;
+    openTeam(r.dataset.evalTeam, 'wedstrijden');
+  });
+  el.querySelectorAll('[data-eval-negeer]').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const wid = b.dataset.evalNegeer, tid = b.dataset.evalNegeerTeam;
+    try { await updateDoc(doc(db,'teams',tid,'wedstrijden',wid), {evaluatieGenegeerd:true}); }
+    catch(err){ meld('Negeren mislukt: '+(err.code||err.message)); return; }
+    if (S._evalCache) S._evalCache.items = S._evalCache.items.filter(w => w.id !== wid);
+    const wrap = document.getElementById('nogTeEvalueren');
+    if (wrap){ wrap.innerHTML = nogTeEvaluerenHtml(); koppelNogTeEvalueren(wrap); }
+  });
+}
+
 export function renderTeams(){
   const v = $('#view-teams');
   const aantalOngelezen = S.trainingen.filter(t =>
@@ -250,6 +316,8 @@ export function renderTeams(){
         <div class="ov-label">wedstrijden</div>
       </button>
     </div>` : ''}
+
+    <div id="nogTeEvalueren">${nogTeEvaluerenHtml()}</div>
 
     ${S.clubs.length ? `<div class="sectie-kop" style="margin-top:4px">Clubs die je beheert</div>
       ${S.clubs.map(c => `
@@ -303,8 +371,12 @@ export function renderTeams(){
     if (S.teams.length) openTeam(S.teams[0].id, 'wedstrijden');
   };
 
+  const nogTeEvaluerenEl = v.querySelector('#nogTeEvalueren');
+  if (nogTeEvaluerenEl) koppelNogTeEvalueren(nogTeEvaluerenEl);
+
   tekenPwaBanner();
   welkomStripVullen();
+  nogTeEvaluerenVullen();
 }
 
 export function modalNieuwTeam(clubId = null){
@@ -413,6 +485,15 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
     if (S._pendingNieuweWedstrijd){
       S._pendingNieuweWedstrijd = false;
       modalNieuweWedstrijd();
+    }
+    // vanaf de "nog te evalueren"-tegel op het startscherm: direct naar de
+    // juiste wedstrijd + evaluatiemodal zodra de wedstrijddata geladen is.
+    if (S._pendingOpenWedstrijd){
+      const wid = S._pendingOpenWedstrijd; S._pendingOpenWedstrijd = null;
+      if (S.wedstrijden.some(w => w.id === wid)){
+        openWedstrijd(wid);
+        modalTeamEvaluatie(wid);
+      }
     }
   });
   S.unsub.presentie = onSnapshot(collection(db,'teams',teamId,'presentie'), snap => {
