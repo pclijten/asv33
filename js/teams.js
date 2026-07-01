@@ -934,6 +934,7 @@ function htmlTeamTrainingen(){
   };
   const rijHtml = (p) => {
     const afw = (p.afwezig || []);
+    const aanwezig = Math.max(0, S.spelers.length - afw.length);
     const dat = new Date(p.datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'});
     const datMooi = dat.charAt(0).toUpperCase()+dat.slice(1);
     const afwNamen = afw.length
@@ -949,8 +950,8 @@ function htmlTeamTrainingen(){
         <div class="pr-datum"><span class="pr-dag">${datMooi}</span></div>
         <div class="pr-info">
           ${afw.length
-            ? `<span class="pr-afw">${afw.length} afwezig</span><span class="pr-namen">${afwNamen}</span>`
-            : `<span class="pr-allen">✓ Iedereen aanwezig</span>`}
+            ? `<span class="pr-afw">${aanwezig} aanwezig · ${afw.length} afwezig</span><span class="pr-namen">${afwNamen}</span>`
+            : `<span class="pr-allen">✓ Iedereen aanwezig (${aanwezig})</span>`}
         </div>
         <span class="acties"><button title="Aanpassen">✏️</button></span>
       </div>`;
@@ -971,13 +972,14 @@ function htmlTeamTrainingen(){
       const open = S._presentieOpen.has(ym);
       const toonAlles = S._presentieToonAlles.has(ym);
       const afwTotaal = items.reduce((n,p) => n + (p.afwezig||[]).length, 0);
+      const aanwTotaal = items.reduce((n,p) => n + Math.max(0, S.spelers.length - (p.afwezig||[]).length), 0);
       const zichtbaar = (open && !toonAlles) ? items.slice(0, TOON_PER_MAAND) : items;
       const meer = items.length - TOON_PER_MAAND;
       return `
         <div class="maand-groep">
           <button class="maand-kop" data-maand="${ym}">
             <span class="maand-naam">${maandNaam(ym)}</span>
-            <span class="maand-tel">${items.length} training${items.length>1?'en':''}${afwTotaal?` · ${afwTotaal} afm.`:''}</span>
+            <span class="maand-tel">${items.length} training${items.length>1?'en':''} · ${aanwTotaal} aanw.${afwTotaal?` · ${afwTotaal} afm.`:''}</span>
             <span class="maand-pijl ${open?'open':''}">▾</span>
           </button>
           ${open ? `
