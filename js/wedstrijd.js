@@ -8,7 +8,8 @@ import {
 import {
   FORMATIES, LIJN_NAAM, bouwSlots, slotLijn, catInfo, isToernooi,
   tijdstrafSec, KAART_ICOON, KAART_NAAM,
-  periodeNaam, periodeNrs, periodeLabel, toernooiWnr, periodeOmschrijving
+  periodeNaam, periodeNrs, periodeLabel, toernooiWnr, periodeOmschrijving,
+  CLUB_FORMATIE_11
 } from './config.js';
 import { kwartGespeeld, effectieveLineup, analyseKwart, analyseWedstrijd } from './analyse.js';
 
@@ -1067,7 +1068,8 @@ function modalWedstrijdInstellingen(){
         `<button data-f="${f}" class="${w.format===f?'actief':''}">${f}×${f}</button>`).join('')}</div></div>
     <div class="veldgroep"><label>Formatie (excl. keeper)</label>
       <div class="segment wrap" id="mIFormatie"></div>
-      <p style="font-size:12px;color:var(--ink-2);margin-top:6px">Wijzig je het format, dan past de app de formatie automatisch aan en blijven spelers zoveel mogelijk op hun plek.</p></div>
+      <p style="font-size:12px;color:var(--ink-2);margin-top:6px">Wijzig je het format, dan past de app de formatie automatisch aan en blijven spelers zoveel mogelijk op hun plek.</p>
+      <div id="mIFormatieHint"></div></div>
     <div class="veldgroep"><label>Aanvoerder</label>
       <select class="invoer" id="mIAanvoerder">
         <option value="">— geen aanvoerder gekozen —</option>
@@ -1077,12 +1079,24 @@ function modalWedstrijdInstellingen(){
     <button class="knop vol" id="mIOk">Opslaan</button>`);
 
   let format = w.format, formatie = w.formatie;
+  const toonFormatieHint = () => {
+    const el = $('#mIFormatieHint');
+    if (!el) return;
+    if (format !== '11'){ el.innerHTML = ''; return; }
+    if (formatie === CLUB_FORMATIE_11){
+      el.innerHTML = `<div class="formatie-hint match"><span class="fh-ico">✓</span><span><b>Sluit aan bij de clubvisie (§3.2).</b> Bij balbezit schuift één verdediger in naar het middenveld (1:3:4:3) voor een overtal — steeds een andere speler, zodat iedereen leert opbouwen.</span></div>`;
+    } else {
+      el.innerHTML = `<div class="formatie-hint info"><span class="fh-ico">💡</span><span>Het jeugdbeleidsplan gaat uit van <b>${esc(CLUB_FORMATIE_11)}</b> als basis (§3.2). Kies je bewust voor ${esc(formatie)}? Laat dan de vrije verdediger een opbouwende rol spelen, niet achter de mandekkers.</span></div>`;
+    }
+  };
   const vulFormaties = () => {
     $('#mIFormatie').innerHTML = Object.keys(FORMATIES[format]).map(f =>
       `<button data-f="${f}" class="${formatie===f?'actief':''}">${f}</button>`).join('');
     $$('#mIFormatie button').forEach(b => b.onclick = () => {
       $$('#mIFormatie button').forEach(x=>x.classList.remove('actief')); b.classList.add('actief'); formatie = b.dataset.f;
+      toonFormatieHint();
     });
+    toonFormatieHint();
   };
   vulFormaties();
   $$('#mIFormat button').forEach(b => b.onclick = () => {
