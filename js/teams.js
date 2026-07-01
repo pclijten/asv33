@@ -972,14 +972,13 @@ function htmlTeamTrainingen(){
       const open = S._presentieOpen.has(ym);
       const toonAlles = S._presentieToonAlles.has(ym);
       const afwTotaal = items.reduce((n,p) => n + (p.afwezig||[]).length, 0);
-      const aanwTotaal = items.reduce((n,p) => n + Math.max(0, S.spelers.length - (p.afwezig||[]).length), 0);
       const zichtbaar = (open && !toonAlles) ? items.slice(0, TOON_PER_MAAND) : items;
       const meer = items.length - TOON_PER_MAAND;
       return `
         <div class="maand-groep">
           <button class="maand-kop" data-maand="${ym}">
             <span class="maand-naam">${maandNaam(ym)}</span>
-            <span class="maand-tel">${items.length} training${items.length>1?'en':''} · ${aanwTotaal} aanw.${afwTotaal?` · ${afwTotaal} afm.`:''}</span>
+            <span class="maand-tel">${items.length} training${items.length>1?'en':''}${afwTotaal?` · ${afwTotaal} afm.`:''}</span>
             <span class="maand-pijl ${open?'open':''}">▾</span>
           </button>
           ${open ? `
@@ -991,10 +990,13 @@ function htmlTeamTrainingen(){
     }).join('');
   }
 
+  const alGeregAanwezig = alGeregistreerd ? Math.max(0, S.spelers.length - (alGeregistreerd.afwezig||[]).length) : 0;
+  const alGeregAfwezig = alGeregistreerd ? (alGeregistreerd.afwezig||[]).length : 0;
+
   const presentieSectie = `
     <div class="sectie-kop" style="margin-top:0">📋 Presentie training</div>
     ${alGeregistreerd
-      ? `<div class="kaart" style="background:rgba(226,6,19,.07);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. Tik de regel hieronder aan om aan te passen.</div>`
+      ? `<div class="kaart" style="background:rgba(226,6,19,.07);border-left:3px solid var(--grass);font-size:13px;margin-bottom:10px">Vandaag al geregistreerd. ${alGeregAanwezig} aanwezig en ${alGeregAfwezig} afwezig.</div>`
       : `<button class="knop vol" id="presentieVandaag" style="margin-bottom:12px">✓ Wie is er vandaag?</button>`}
     ${presentieLijst}`;
 
