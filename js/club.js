@@ -49,6 +49,9 @@ export function openClub(clubId){
     if (!snap.exists()){ verlaatClubView(); return; }
     S.club = {id:snap.id, ...snap.data()};
     renderClub();
+  }, (err) => {
+    console.error(`[Cluppie] Listener "club" kon niet lezen (clubId=${clubId}):`, err.code, err.message);
+    if (err.code === 'permission-denied') meld('Geen toegang tot deze club — controleer de Firestore-rules');
   });
   toon('club');
 }
