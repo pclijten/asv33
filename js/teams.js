@@ -10,7 +10,8 @@ import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, yout
   KNVB_SEIZOEN, knvbKalenderVoorTeam,
   NIVEAUS, niveau, niveauKleur, SKILLS, skillDomein,
   LEERCURVE, leercurveRelevant, SNEL_TAGS, snelTag,
-  TEAM_CATEGORIEEN, TEAM_TAGS, teamCategorie } from './config.js';
+  TEAM_CATEGORIEEN, TEAM_TAGS, teamCategorie,
+  KOMPAS_TIPS, isoWeek, kompasIndexVoorWeek } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 import { doSignOut, joinMetCode } from './auth.js';
 import { openClub, modalNieuwClub, modalUitnodig } from './club.js';
@@ -584,7 +585,7 @@ export function renderTeam(){
   v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
     S._beoordeelProfiel = null; S._leenProfiel = null;
     // presentie altijd ingeklapt tonen zodra je (terug) op de Trainingen-tab klikt
-    if (b.dataset.tab === 'trainingen'){ S._presentieOpen = new Set(); S._presentieToonAlles = new Set(); }
+    if (b.dataset.tab === 'trainingen'){ S._presentieOpen = new Set(); S._presentieToonAlles = new Set(); S._kompasIdx = null; }
     S.teamTab = b.dataset.tab; renderTeam();
   });
   koppelTeamTab(v, tab);
@@ -1105,6 +1106,25 @@ function afgelastBannerHtml(a){
     </div>`;
 }
 
+/* ---------- ASV-kompas: rotende tip uit §3.1/§3.4 (zie config.js) ---------- */
+function htmlKompas(){
+  const idx = S._kompasIdx ?? kompasIndexVoorWeek();
+  const t = KOMPAS_TIPS[idx];
+  return `
+    <div class="kompas">
+      <div class="kompas-top">
+        <span class="kompas-label">🧭 ASV-kompas · week ${isoWeek()}</span>
+        <span class="kompas-bron">${esc(t.bron)}</span>
+      </div>
+      <div class="kompas-tekst">${esc(t.tekst)}</div>
+      <div class="kompas-dots">${KOMPAS_TIPS.map((_,i) => `<span class="${i===idx?'actief':''}"></span>`).join('')}</div>
+      <div class="kompas-nav">
+        <button data-kompas="vorige" title="Vorige tip">‹</button>
+        <button data-kompas="volgende" title="Volgende tip">›</button>
+      </div>
+    </div>`;
+}
+
 function htmlTeamTrainingen(){
   const pdfs = S.trainingen.filter(t => (t.teams||[]).includes(S.teamId));
   const vandaag = new Date().toISOString().slice(0,10);
@@ -1258,7 +1278,7 @@ function htmlTeamTrainingen(){
     <div class="sectie-kop">📄 Gedeelde trainingen</div>
     ${pdfLijst}`;
 
-  return afgelastSectie + presentieSectie + pdfSectie;
+  return htmlKompas() + afgelastSectie + presentieSectie + pdfSectie;
 }
 
 /* ---------- Tab: video's ---------- */
@@ -1661,6 +1681,15 @@ function koppelTeamTab(v, tab){
     });
   }
   if (tab === 'trainingen'){
+    // ASV-kompas: handmatig bladeren door de tips (blijft lokaal, reset bij heropenen tab)
+    v.querySelectorAll('[data-kompas]').forEach(b => b.onclick = () => {
+      const huidig = S._kompasIdx ?? kompasIndexVoorWeek();
+      const totaal = KOMPAS_TIPS.length;
+      S._kompasIdx = b.dataset.kompas === 'volgende'
+        ? (huidig + 1) % totaal
+        : (huidig - 1 + totaal) % totaal;
+      renderTeam();
+    });
     // afgelasting doorsturen naar eigen teamgroep
     const afgDeel = v.querySelector('#afgelastDeel');
     if (afgDeel) afgDeel.onclick = () => {
