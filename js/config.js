@@ -449,3 +449,29 @@ export const SNEL_TAGS = [
   {id:'leider',   emoji:'👑', label:'Neemt leiding'},
 ];
 export function snelTag(id){ return SNEL_TAGS.find(t => t.id === id) || null; }
+
+/* ==================== TEAMEVALUATIE (na de wedstrijd) ====================
+   8 categorieën voor de teambeoordeling na een wedstrijd. Waar een categorie
+   overeenkomt met een leercurve-thema (§3.3), leggen we dat verband vast —
+   dat is de schakel voor het automatische trainingsadvies. */
+export const TEAM_CATEGORIEEN = [
+  {id:'inzet',        naam:'Inzet & concentratie'},
+  {id:'samenwerking', naam:'Samenwerking & communicatie'},
+  {id:'taken',         naam:'Taakuitvoering per linie'},
+  {id:'opbouw',        naam:'Opbouw van achteruit',              leercurve:'Positiespel opbouw'},
+  {id:'omschakeling',  naam:'Omschakeling bij balverlies/-winst', leercurve:'Omschakelen balverlies'},
+  {id:'druk',          naam:'Druk zetten & veroveren',            leercurve:'Storen en veroveren'},
+  {id:'plezier',       naam:'Spelplezier'},
+  {id:'coachbaar',     naam:'Coachbaarheid'},
+];
+export function teamCategorie(id){ return TEAM_CATEGORIEEN.find(c => c.id === id) || null; }
+
+/* Snelle 'opvallend'-tags voor de teamevaluatie (los van de speler-tags hierboven). */
+export const TEAM_TAGS = [
+  {id:'samenwerking', emoji:'🤝', label:'Goede samenwerking'},
+  {id:'geluisterd',   emoji:'📣', label:'Goed geluisterd'},
+  {id:'plezier',      emoji:'😄', label:'Veel plezier'},
+  {id:'afspraken',    emoji:'⚠️', label:'Afspraken niet nagekomen'},
+  {id:'sterke2e',     emoji:'🔥', label:'Sterke 2e helft'},
+  {id:'terugval',     emoji:'📉', label:'Terugval na rust'},
+];

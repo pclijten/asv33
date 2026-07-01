@@ -833,6 +833,7 @@ export function renderWedstrijd(){
   const sbRechts = w.thuis ? {naam:tegenNaam, n:tegen, knop:'goalTegen'} : {naam:S.team.naam, n:voor, knop:'goalVoor'};
 
   const confroHtml = bouwConfrontatie(w);
+  const teamEvalBestaand = (S.teamEvaluaties||[]).some(e => e.wedstrijdId === w.id);
 
   const v = $('#view-wedstrijd');
   v.innerHTML = `
@@ -957,6 +958,7 @@ ${confroHtml}
     </details>
 
     <button class="knop vol" id="toonVerslag" style="margin-top:16px">📋 Wedstrijdverslag</button>
+    <button class="knop ${teamEvalBestaand?'licht':'fluo'} vol" id="teamEvalKnop" style="margin-top:10px">${teamEvalBestaand?'✓ Teamevaluatie bijwerken':'📈 Team evalueren'}</button>
     <button class="knop gevaar vol" id="wegWedstrijd" style="margin-top:10px">Wedstrijd verwijderen</button>`;
 
   /* ---- koppelingen ---- */
@@ -978,6 +980,9 @@ ${confroHtml}
   v.querySelector('#goalTegen').onclick = () => registreerGoal({type:'tegen'});
   v.querySelector('#kaartKnop').onclick = modalKaart;
   v.querySelector('#toonVerslag').onclick = modalVerslag;
+  v.querySelector('#teamEvalKnop').onclick = () => {
+    import('./teams.js').then(m => m.modalTeamEvaluatie(w.id));
+  };
   v.querySelectorAll('[data-corrigeer-goal]').forEach(b => b.onclick = e => {
     e.stopPropagation(); modalGoalCorrigeren(Number(b.dataset.corrigeerGoal));
   });
