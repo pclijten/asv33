@@ -1254,6 +1254,12 @@ function htmlHandleiding(){
     </div>
     <div class="hl-geen" id="helpGeen" hidden>Geen onderdeel gevonden voor <b id="helpGeenTerm"></b>. Probeer een ander woord.</div>
 
+    <div class="hl-hoofdstukken" id="helpHoofdstukken">
+      ${[['starten','🚀 Starten'],['plannen','📅 Trainen & plannen'],['wedstrijddag','⚽ Op de wedstrijddag'],['club','🏛 Club & team beheren'],['beoordelen','📈 Beoordelen & evalueren'],['tips','💡 Tips & privacy']]
+        .map(([id,naam]) => `<button data-hlh="${id}">${naam}</button>`).join('')}
+    </div>
+
+    <h4 class="hl-hoofdstuk" id="hlh-starten">🚀 Starten</h4>
     <section class="hl-sec" data-zoek="👋 welkom bij cluppie een app om voor je voetbalteam de opstelling te maken, wissels te beheren, speeltijd eerlijk te verdelen en de wedstrijd te loggen. alles werkt realtime, dus collega-coaches zien direct dezelfde informatie.">
     <h3>👋 Welkom bij Cluppie</h3>
     <p>Een app om voor je voetbalteam de opstelling te maken, wissels te beheren, speeltijd eerlijk te verdelen en de wedstrijd te loggen. Alles werkt realtime, dus collega-coaches zien direct dezelfde informatie.</p>
@@ -1284,6 +1290,7 @@ function htmlHandleiding(){
     <p>Voor een echt app-gevoel: open het menu van je browser en kies <b>"Toevoegen aan beginscherm"</b>. Dan staat Cluppie als icoontje tussen je apps en open je hem met één tik — geen browser meer nodig.</p>
     </section>
 
+    <h4 class="hl-hoofdstuk" id="hlh-plannen">📅 Trainen &amp; plannen</h4>
     <section class="hl-sec" data-zoek="📄 trainingen & 🎬 video's onder het tabblad training vind je de oefenstof voor je team, gedeeld als pdf. onder video staan youtube-links met oefeningen of beelden. elke zondag worden hier de trainingen voor de komende week en eventuele video's klaargezet — kijk er dus aan het begin van de week even in. een 🔴 rood stipje op het tabblad laat zien dat er iets nieuws is.">
     <h3>📄 Trainingen & 🎬 video's</h3>
     <p>Onder het tabblad <b>Training</b> vind je de oefenstof voor je team, gedeeld als PDF. Onder <b>Video</b> staan YouTube-links met oefeningen of beelden.</p>
@@ -1308,6 +1315,7 @@ function htmlHandleiding(){
     <p>Onder ⚙️ <b>Team</b> kun je via <b>"Mijn weergavenaam wijzigen"</b> instellen hoe je in de coachlijst verschijnt. Handig zodat je teamgenoten zien wie wie is.</p>
     </section>
 
+    <h4 class="hl-hoofdstuk" id="hlh-wedstrijddag">⚽ Op de wedstrijddag</h4>
     <section class="hl-sec" data-zoek="🚀 snel beginnen voeg je spelers toe onder het tabblad 👕 — naam en rugnummer is genoeg. maak een nieuwe wedstrijd aan onder 📋. kies competitie of toernooi. sleep spelers van de bank naar het veld of tik ze aan en tik daarna een positie. start de klok ▶ zodra de wedstrijd begint. wissels tijdens het spel worden automatisch gelogd met tijdstip.">
     <h3>🚀 Snel beginnen</h3>
     <ul>
@@ -1403,6 +1411,7 @@ function htmlHandleiding(){
     <div class="tip"><b>Op één scherm:</b> alle wissels en speeltijden lopen over het hele toernooi door, zodat je in wedstrijd 4 ziet wie er bij wedstrijd 1, 2 en 3 al heeft gespeeld.</div>
     </section>
 
+    <h4 class="hl-hoofdstuk" id="hlh-club">🏛 Club &amp; team beheren</h4>
     <section class="hl-sec" data-zoek="🏛 clubs & trainingen delen werk je als hoofdtrainer voor meerdere teams? maak op het startscherm een club aan. daarmee kun je: teams aanmaken die bij jouw club horen (de coaches ervan komen direct in het juiste team). 📥 pdf importeren : upload een pdf met de teamindeling en de app leest de teams en spelers automatisch uit. controleer in de preview, klik "aanmaken" en alle teams + spelers staan klaar. coaches uitnodigen met een persoonlijke link (via whatsapp), zodat ze niet eerst een teamcode hoeven te krijgen. met 🔗 alle uitnodigingen krijg je in één overzicht alle links voor alle teams. pdf-trainingen uploaden en aangeven voor welke teams ze beschikbaar zijn. de trainers zien ze in het 📄 training-tabblad van hun team. met ✏️ pas je de titel, week of de gekoppelde teams later aan, zonder het bestand opnieuw te uploaden. een 🔴 stip op het training-tabblad waarschuwt coaches voor nieuwe, ongelezen trainingen.">
     <h3>🏛 Clubs & trainingen delen</h3>
     <p>Werk je als hoofdtrainer voor meerdere teams? Maak op het startscherm een <b>club</b> aan. Daarmee kun je:</p>
@@ -1435,6 +1444,7 @@ function htmlHandleiding(){
     <p>Onder ⏱ vind je het seizoensoverzicht: speeltijd, doelpunten, aanvoerdersbeurten, keeperbeurten en kaarten per speler. Sorteert vanzelf op meeste speeltijd.</p>
     </section>
 
+    <h4 class="hl-hoofdstuk" id="hlh-beoordelen">📈 Beoordelen &amp; evalueren</h4>
     <section class="hl-sec" data-zoek="📋 spelers beoordelen per speler leg je de ontwikkeling vast. open een speler (tab spelers → tik op de speler) en je vindt daar het ontwikkelprofiel met twee manieren om te beoordelen: ⚡ snel beoordelen — een paar tikken na een wedstrijd of training: een algemeen niveau plus optionele "opvallend"-tags. ideaal om er een gewoonte van te maken. 📋 volledige beoordeling — een periodieke, diepere meting op de vijf ontwikkeldomeinen. hieruit komt het ontwikkelprofiel met balkjes. de vijf domeinen (gebaseerd op het asv'33-jeugdbeleidsplan): te — technisch : balbeheersing, traptechniek, 1v1. ta — tactisch : inzicht, positiespel, keuzes maken. fy — fysiek : snelheid, actiesnelheid, duelkracht. me — mentaal : zelfvertrouwen, spelen onder weerstand. ge — gedrag & beleving : inzet, teamgevoel, plezier. een score loopt van 1 (aandacht) via 3 (prima) tot 5 (uitblinker) . leerpunten (tab leerlijn in het profiel): concrete, observeerbare ontwikkeldoelen die over meerdere wedstrijden doorlopen. vink ze af zodra ze beheerst zijn. de app stelt leerpunten voor die passen bij de leeftijd van het team. historie : een tijdlijn met al je eerdere beoordelingen. tik een item aan om het te bekijken of bij te werken. privacy: beoordelingen en leerpunten zijn coach-only . spelers en ouders zien deze nooit. verwijder je een speler, dan gaan zijn beoordelingen mee weg.">
     <h3>📋 Spelers beoordelen</h3>
     <p>Per speler leg je de ontwikkeling vast. Open een speler (tab <b>Spelers</b> → tik op de speler) en je vindt daar het ontwikkelprofiel met twee manieren om te beoordelen:</p>
@@ -1458,6 +1468,38 @@ function htmlHandleiding(){
     <div class="tip"><b>Privacy:</b> beoordelingen en leerpunten zijn <b>coach-only</b>. Spelers en ouders zien deze nooit. Verwijder je een speler, dan gaan zijn beoordelingen mee weg.</div>
     </section>
 
+    <section class="hl-sec" data-zoek="📈 team evalueren na de wedstrijd naast de beoordeling per speler kun je na elke wedstrijd ook het hele team evalueren. onderaan het wedstrijdscherm, onder het wedstrijdverslag, staat de knop 📈 team evalueren . al een keer ingevuld voor deze wedstrijd? dan heet de knop ✓ teamevaluatie bijwerken en pas je 'm gewoon aan. acht korte vragen, elk met dezelfde kleurbalk als bij spelers (1 aandacht t/m 5 uitblinker): inzet & concentratie, samenwerking & communicatie, taakuitvoering per linie, opbouw van achteruit, omschakeling bij balverlies/-winst, druk zetten & veroveren, spelplezier, coachbaarheid. daarna eventueel een paar tags aantikken (goede samenwerking, veel plezier, afspraken niet nagekomen, enzovoort) en twee optionele tekstvelden: wat ging het beste, en wat is het aandachtspunt voor de volgende training. drie tot vijf minuten werk, alles op één scherm, niets is verplicht behalve de acht kleurbalken.">
+    <h3>📈 Team evalueren na de wedstrijd</h3>
+    <p>Naast de beoordeling per speler kun je na elke wedstrijd ook het <b>hele team</b> evalueren. Onderaan het wedstrijdscherm, onder het wedstrijdverslag, staat de knop <b>📈 Team evalueren</b>.</p>
+    <p>Al een keer ingevuld voor deze wedstrijd? Dan heet de knop <b>✓ Teamevaluatie bijwerken</b> en pas je 'm gewoon aan.</p>
+    <p>Acht korte vragen, elk met dezelfde kleurbalk als bij spelers (1 Aandacht t/m 5 Uitblinker):</p>
+    <ul>
+      <li>Inzet &amp; concentratie</li>
+      <li>Samenwerking &amp; communicatie</li>
+      <li>Taakuitvoering per linie</li>
+      <li>Opbouw van achteruit</li>
+      <li>Omschakeling bij balverlies/-winst</li>
+      <li>Druk zetten &amp; veroveren</li>
+      <li>Spelplezier</li>
+      <li>Coachbaarheid</li>
+    </ul>
+    <p>Daarna eventueel een paar <b>tags</b> aantikken (goede samenwerking, veel plezier, afspraken niet nagekomen, enzovoort) en twee optionele tekstvelden: <b>wat ging het beste</b>, en <b>wat is het aandachtspunt voor de volgende training</b>.</p>
+    <div class="tip"><b>3–5 minuten werk:</b> alles staat op één scherm, tikken in plaats van typen. Niets is verplicht behalve de acht kleurbalken — de tags en tekstvelden mag je overslaan.</div>
+    </section>
+
+    <section class="hl-sec" data-zoek="📊 teamevaluatie-dashboard bekijk je onder het tabblad stats , via het segment 📈 teamevaluatie naast spelers . vier onderdelen: groeicurve — een lijn met de gemiddelde teamontwikkelscore per wedstrijd, zodat je in één oogopslag ziet of het team groeit. categorieën — de acht onderdelen met hun gemiddelde over de laatste vijf wedstrijden, inclusief een pijltje omhoog, gelijk of omlaag. terugkerende aandachtspunten — automatisch signalen zodra hetzelfde onderdeel meerdere wedstrijden op rij het laagst scoort. voorgesteld trainingsthema — een suggestie voor de volgende training, gebaseerd op het onderdeel dat de meeste aandacht vraagt; sluit waar mogelijk aan bij een leercurve-thema uit het jeugdbeleidsplan. tip: na 1 evaluatie zie je alleen een cijfer, vanaf 2 verschijnt de lijn, en de terugkerende aandachtspunten worden pas zichtbaar na een paar wedstrijden — zo voorkom je dat één mindere wedstrijd meteen als patroon wordt gezien.">
+    <h3>📊 Teamevaluatie-dashboard lezen</h3>
+    <p>Alle ingevulde teamevaluaties komen samen onder het tabblad <b>Stats</b>, via het segment <b>📈 Teamevaluatie</b> naast Spelers. Vier onderdelen:</p>
+    <ul>
+      <li><b>Groeicurve</b> — een lijn met de gemiddelde teamontwikkelscore per wedstrijd, zodat je in één oogopslag ziet of het team groeit.</li>
+      <li><b>Categorieën</b> — de acht onderdelen met hun gemiddelde over de laatste vijf wedstrijden, inclusief een pijltje ↗ ↘ → voor de trend.</li>
+      <li><b>Terugkerende aandachtspunten</b> — verschijnt automatisch zodra hetzelfde onderdeel meerdere wedstrijden op rij het laagst scoort.</li>
+      <li><b>Voorgesteld trainingsthema</b> — een suggestie voor de volgende training, gebaseerd op het onderdeel dat nu de meeste aandacht vraagt. Sluit waar mogelijk aan bij een leercurve-thema uit het jeugdbeleidsplan.</li>
+    </ul>
+    <div class="tip"><b>Even geduld bij de start:</b> na 1 evaluatie zie je alleen een cijfer, vanaf 2 verschijnt de lijn. De terugkerende aandachtspunten worden pas zichtbaar na een paar wedstrijden — zo voorkom je dat één mindere wedstrijd meteen als patroon wordt gezien.</div>
+    </section>
+
+    <h4 class="hl-hoofdstuk" id="hlh-tips">💡 Tips &amp; privacy</h4>
     <section class="hl-sec" data-zoek="💡 praktische tips voeg de app als snelkoppeling op je startscherm toe (browsermenu → "toevoegen aan beginscherm") voor app-gevoel. werkt zonder problemen als de telefoon op slot gaat — de klok loopt door op de juiste tijd. slecht bereik langs de lijn? geen probleem: de app werkt offline door en synchroniseert je wijzigingen automatisch zodra er weer verbinding is. met een powerbank langs de lijn ben je verzekerd van een hele wedstrijd.">
     <h3>💡 Praktische tips</h3>
     <ul>
@@ -1467,6 +1509,7 @@ function htmlHandleiding(){
       <li>Met een powerbank langs de lijn ben je verzekerd van een hele wedstrijd.</li>
     </ul>
     </section>
+
 
     <section class="hl-sec" data-zoek="⇄ spelers uitlenen speelt een speler een keer mee met een ander team binnen de club? open zijn profiel (tab spelers → tik op de speler) en kies ⇄ uitlenen aan ander team . je kiest het ontvangende team en de wedstrijddag. de andere coach ziet de speler automatisch vanaf 3 dagen vóór tot 3 dagen ná die dag, onder het kopje "geleend" — daarna verdwijnt hij vanzelf. de ontvangende coach ziet alleen voornaam + voorletter (bijv. "tim b."), de voorkeurspositie, de statistieken en het ontwikkelprofiel. alles read-only. je kunt een uitlening op elk moment intrekken vanaf het spelerprofiel.">
     <h3>⇄ Spelers uitlenen</h3>
@@ -1707,6 +1750,7 @@ function koppelTeamTab(v, tab){
     const geen = v.querySelector('#helpGeen');
     const geenTerm = v.querySelector('#helpGeenTerm');
     const secties = [...v.querySelectorAll('.hl-sec')];
+    const hoofdstukken = [...v.querySelectorAll('.hl-hoofdstuk')];
     const pasToe = () => {
       const term = (S._helpZoek || '').trim().toLowerCase();
       let raak = 0;
@@ -1715,6 +1759,16 @@ function koppelTeamTab(v, tab){
         s.hidden = !treffer;
         if (treffer) raak++;
       }
+      // een hoofdstukkopje verbergen zodra geen van de secties erna (tot het
+      // volgende kopje) nog zichtbaar is
+      hoofdstukken.forEach(h => {
+        let el = h.nextElementSibling, zichtbaar = false;
+        while (el && !el.classList.contains('hl-hoofdstuk')){
+          if (el.classList.contains('hl-sec') && !el.hidden){ zichtbaar = true; break; }
+          el = el.nextElementSibling;
+        }
+        h.hidden = !zichtbaar;
+      });
       if (wis) wis.hidden = !term;
       if (geen){
         geen.hidden = !(term && raak === 0);
@@ -1731,6 +1785,11 @@ function koppelTeamTab(v, tab){
       pasToe();
     };
     pasToe();                                  // pas direct toe (ook bij herstelde term)
+    v.querySelectorAll('[data-hlh]').forEach(b => b.onclick = () => {
+      // eerst een eventuele zoekterm wissen, anders kan het hoofdstuk verborgen zijn
+      if (S._helpZoek){ S._helpZoek = ''; if (inp) inp.value = ''; pasToe(); }
+      v.querySelector('#hlh-'+b.dataset.hlh)?.scrollIntoView({behavior:'smooth', block:'start'});
+    });
   }
   bewaakTerug();
 }
