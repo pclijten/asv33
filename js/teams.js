@@ -502,10 +502,17 @@ function spelerStats(pid){
     if (a.keeper[pid]) keeper += a.keeper[pid];
   }
   const totTr = (S.presentie||[]).length;
-  let aanwezig = 0;
-  for (const sessie of (S.presentie||[])) if (!(sessie.afwezig||[]).includes(pid)) aanwezig++;
+  let aanwezig = 0, blessure = 0, metReden = 0, zonderReden = 0;
+  for (const sessie of (S.presentie||[])){
+    const afw = (sessie.afwezig||[]).includes(pid);
+    if (!afw){ aanwezig++; continue; }
+    const reden = (sessie.afwezigRedenen||{})[pid];
+    if (reden?.type === 'blessure') blessure++;
+    else if (reden?.type === 'reden') metReden++;
+    else zonderReden++;
+  }
   const opkomst = totTr ? Math.round((aanwezig/totTr)*100) : null;
-  return {wedstrijden, tijd, keeper, goals, opkomst, totTr};
+  return {wedstrijden, tijd, keeper, goals, opkomst, totTr, blessure, metReden, zonderReden};
 }
 
 function laatsteVolledig(pid){
@@ -610,6 +617,12 @@ function htmlProfiel(){
         <div class="stat-box"><div class="v">${st.goals}</div><div class="l">Goals</div></div>
         <div class="stat-box"><div class="v">${st.opkomst != null ? st.opkomst+'%' : '—'}</div><div class="l">Training</div></div>
       </div>
+      ${(st.blessure || st.metReden || st.zonderReden) ? `
+      <div class="presentie-uitsplitsing" style="margin:-6px 0 14px">
+        ${st.blessure ? `<span>🩹 ${st.blessure}× geblesseerd</span>` : ''}
+        ${st.metReden ? `<span>📋 ${st.metReden}× met reden</span>` : ''}
+        ${st.zonderReden ? `<span>❔ ${st.zonderReden}× zonder reden</span>` : ''}
+      </div>` : ''}
 
       <div class="kaart">
         <div class="veldlabel" style="margin-top:0">Ontwikkelprofiel${vol ? ` · ${datumNL(vol.datum)}` : ''}</div>
@@ -642,6 +655,18 @@ function htmlProfiel(){
         <div class="veldlabel" style="margin-top:0">Tijdlijn</div>
         ${eigen.length ? eigen.map(b => htmlTijdlijnItem(b)).join('')
           : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">Nog geen beoordelingen vastgelegd.</p>`}
+      </div>
+      <div class="kaart">
+        <div class="veldlabel" style="margin-top:0">Presentie training</div>
+        ${S.presentie.length ? S.presentie.map(ses => {
+          const afw = (ses.afwezig||[]).includes(p.id);
+          const reden = (ses.afwezigRedenen||{})[p.id];
+          const statusTxt = !afw ? 'Aanwezig'
+            : reden?.type === 'blessure' ? '🩹 Geblesseerd'
+            : reden?.type === 'reden' ? `📋 Met reden${reden.notitie ? ' · '+esc(reden.notitie) : ''}`
+            : '❔ Zonder reden';
+          return `<div class="presentie-hist-rij"><span>${datumNL(ses.datum)}</span><span class="phr-status ${afw?'afw':'aanw'}">${statusTxt}</span></div>`;
+        }).join('') : `<p style="font-size:13px;color:var(--ink-2);padding:6px 0">Nog geen presentie geregistreerd.</p>`}
       </div>` : ''}`;
 }
 
@@ -912,7 +937,12 @@ function htmlTeamTrainingen(){
     const dat = new Date(p.datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'});
     const datMooi = dat.charAt(0).toUpperCase()+dat.slice(1);
     const afwNamen = afw.length
-      ? afw.map(id => { const sp = S.spelers.find(s => s.id === id); return sp ? esc(sp.naam) : null; }).filter(Boolean).join(', ')
+      ? afw.map(id => {
+          const sp = S.spelers.find(s => s.id === id); if (!sp) return null;
+          const reden = (p.afwezigRedenen||{})[id];
+          const icoon = reden?.type === 'blessure' ? ' 🩹' : reden?.type === 'reden' ? ' 📋' : '';
+          return esc(sp.naam) + icoon;
+        }).filter(Boolean).join(', ')
       : '';
     return `
       <div class="presentie-rij" data-presentie="${p.id}" style="cursor:pointer">
@@ -2100,55 +2130,135 @@ function modalMijnNaam(){
 
 /* ---------- Presentie registreren / aanpassen ----------
    Iedereen staat standaard op AANWEZIG. De coach tikt alleen de afwezigen aan.
-   We slaan alleen de lijst met afwezige speler-id's op (compact). */
+   Bij een nieuwe registratie (bestaande=null) kan de datum gekozen worden
+   (standaard vandaag). Voor afwezige spelers kan optioneel een reden
+   aangevinkt worden: geblesseerd of "met reden" (+ vrije notitie). Geen van
+   beide aangevinkt = "zonder reden". */
 function modalPresentie(bestaande = null){
   if (!S.spelers.length) return meld('Voeg eerst spelers toe onder het tabblad Spelers');
-  const datum = bestaande ? bestaande.datum : new Date().toISOString().slice(0,10);
-  const afwezig = new Set(bestaande ? (bestaande.afwezig || []) : []);
-  const datLeesbaar = new Date(datum+'T12:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+  const vandaag = new Date().toISOString().slice(0,10);
+  let datum = bestaande ? bestaande.datum : vandaag;
+  let afwezig = new Set(bestaande ? (bestaande.afwezig || []) : []);
+  let redenen = bestaande ? JSON.parse(JSON.stringify(bestaande.afwezigRedenen || {})) : {};
+  const kanDatumWijzigen = !bestaande;
 
-  const rijen = S.spelers.map(p => `
-    <button class="pres-speler ${afwezig.has(p.id)?'afwezig':'aanwezig'}" data-pid="${p.id}">
-      <span class="pres-shirt">${esc(p.nummer ?? '·')}</span>
-      <span class="pres-naam">${esc(p.naam)}</span>
-      <span class="pres-status">${afwezig.has(p.id)?'Afwezig':'Aanwezig'}</span>
-    </button>`).join('');
+  const datLeesbaar = (d) => {
+    const s = new Date(d+'T12:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+    return s.charAt(0).toUpperCase()+s.slice(1);
+  };
+
+  const rijenHtml = () => S.spelers.map(p => {
+    const isAfw = afwezig.has(p.id);
+    const reden = redenen[p.id];
+    return `
+    <div class="pres-speler ${isAfw?'afwezig':'aanwezig'}">
+      <button type="button" class="pres-speler-kop" data-toggle="${p.id}">
+        <span class="pres-shirt">${esc(p.nummer ?? '·')}</span>
+        <span class="pres-naam">${esc(p.naam)}</span>
+        <span class="pres-status">${isAfw?'Afwezig':'Aanwezig'}</span>
+      </button>
+      ${isAfw ? `
+      <div class="pres-reden-rij">
+        <button type="button" class="pres-reden-chip ${reden?.type==='blessure'?'actief':''}" data-reden="blessure" data-pid="${p.id}">🩹 Geblesseerd</button>
+        <button type="button" class="pres-reden-chip ${reden?.type==='reden'?'actief':''}" data-reden="reden" data-pid="${p.id}">📋 Met reden</button>
+      </div>
+      ${reden?.type==='reden' ? `<input class="invoer pres-reden-notitie" data-pid="${p.id}" placeholder="Bijv. ziek, vakantie, school (optioneel)" value="${esc(reden.notitie||'')}">` : ''}
+      ` : ''}
+    </div>`;
+  }).join('');
 
   openModal(`
     <h2>Presentie training</h2>
-    <p style="font-size:13px;color:var(--ink-2);margin-bottom:4px;text-transform:capitalize">${esc(datLeesbaar)}</p>
+    ${kanDatumWijzigen ? `
+    <div class="veldgroep" style="margin-bottom:10px">
+      <label>Datum</label>
+      <div class="segment" id="mPresDatumSeg">
+        <button type="button" data-d="vandaag" class="actief">Vandaag</button>
+        <button type="button" data-d="ander">Andere dag</button>
+      </div>
+      <input class="invoer" type="date" id="mPresDatumInput" value="${datum}" max="${vandaag}" style="display:none;margin-top:8px">
+    </div>` : ''}
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:4px;text-transform:capitalize" id="mPresDatumTekst">${esc(datLeesbaar(datum))}</p>
+    <p style="font-size:12px;color:var(--warn);margin-bottom:4px;display:none" id="mPresBestaatMelding">Let op: voor deze dag is al presentie geregistreerd — je past de bestaande registratie aan.</p>
     <p style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px">Iedereen staat op <b>aanwezig</b>. Tik wie er <b>niet</b> is.</p>
-    <div class="pres-lijst">${rijen}</div>
+    <div class="pres-lijst" id="mPresLijst">${rijenHtml()}</div>
     <div class="rij" style="margin-top:14px">
       ${bestaande ? '<button class="knop licht vol" id="mPresWeg" style="color:var(--uit)">Verwijderen</button>' : ''}
       <button class="knop vol" id="mPresOk">Opslaan</button>
     </div>`);
 
-  // aan/uit tikken
-  $$('.pres-speler').forEach(b => b.onclick = () => {
-    const id = b.dataset.pid;
-    if (afwezig.has(id)){ afwezig.delete(id); b.classList.remove('afwezig'); b.classList.add('aanwezig'); b.querySelector('.pres-status').textContent = 'Aanwezig'; }
-    else { afwezig.add(id); b.classList.remove('aanwezig'); b.classList.add('afwezig'); b.querySelector('.pres-status').textContent = 'Afwezig'; }
-  });
+  const koppelRijen = () => {
+    $$('[data-toggle]').forEach(b => b.onclick = () => {
+      const id = b.dataset.toggle;
+      if (afwezig.has(id)){ afwezig.delete(id); delete redenen[id]; }
+      else afwezig.add(id);
+      $('#mPresLijst').innerHTML = rijenHtml();
+      koppelRijen();
+    });
+    $$('.pres-reden-chip').forEach(b => b.onclick = () => {
+      const id = b.dataset.pid, type = b.dataset.reden;
+      const huidig = redenen[id];
+      if (huidig && huidig.type === type) delete redenen[id];
+      else redenen[id] = {type, notitie: huidig?.notitie || ''};
+      $('#mPresLijst').innerHTML = rijenHtml();
+      koppelRijen();
+    });
+    $$('.pres-reden-notitie').forEach(inp => inp.oninput = () => {
+      const id = inp.dataset.pid;
+      if (redenen[id]) redenen[id].notitie = inp.value;
+    });
+  };
+  koppelRijen();
+
+  const werkMeldingBij = () => {
+    const bestaandRecord = S.presentie.find(p => p.datum === datum);
+    $('#mPresBestaatMelding').style.display = (bestaandRecord && !bestaande) ? '' : 'none';
+  };
+
+  const zetDatum = (nieuweDatum) => {
+    datum = nieuweDatum;
+    $('#mPresDatumTekst').textContent = datLeesbaar(datum);
+    const bestaandRecord = S.presentie.find(p => p.datum === datum);
+    afwezig = new Set(bestaandRecord ? (bestaandRecord.afwezig || []) : []);
+    redenen = bestaandRecord ? JSON.parse(JSON.stringify(bestaandRecord.afwezigRedenen || {})) : {};
+    $('#mPresLijst').innerHTML = rijenHtml();
+    koppelRijen();
+    werkMeldingBij();
+  };
+
+  if (kanDatumWijzigen){
+    werkMeldingBij();
+    const seg = $('#mPresDatumSeg'), input = $('#mPresDatumInput');
+    seg.querySelectorAll('button').forEach(b => b.onclick = () => {
+      seg.querySelectorAll('button').forEach(x=>x.classList.remove('actief'));
+      b.classList.add('actief');
+      if (b.dataset.d === 'vandaag'){ input.style.display = 'none'; zetDatum(vandaag); }
+      else {
+        input.style.display = '';
+        input.value = datum;
+        input.focus();
+        if (input.showPicker){ try { input.showPicker(); } catch(e){} }
+      }
+    });
+    input.onchange = () => { if (input.value) zetDatum(input.value); };
+  }
 
   $('#mPresOk').onclick = async () => {
     const knop = $('#mPresOk'); knop.disabled = true; knop.textContent = 'Opslaan...';
     const data = {
       datum,
       afwezig: Array.from(afwezig),
+      afwezigRedenen: redenen,
       aantalAanwezig: S.spelers.length - afwezig.size,
       aantalSpelers: S.spelers.length,
       door: S.user.displayName || S.user.email || '',
       gewijzigd: serverTimestamp(),
     };
     try {
+      const zelfde = S.presentie.find(p => p.datum === datum);
       if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'presentie',bestaande.id), data);
-      else {
-        // bestaat er al een registratie voor deze datum? Dan die bijwerken i.p.v. dubbel.
-        const zelfde = S.presentie.find(p => p.datum === datum);
-        if (zelfde) await updateDoc(doc(db,'teams',S.teamId,'presentie',zelfde.id), data);
-        else await addDoc(collection(db,'teams',S.teamId,'presentie'), {...data, gemaakt: serverTimestamp()});
-      }
+      else if (zelfde) await updateDoc(doc(db,'teams',S.teamId,'presentie',zelfde.id), data);
+      else await addDoc(collection(db,'teams',S.teamId,'presentie'), {...data, gemaakt: serverTimestamp()});
       sluitModal();
       meld(afwezig.size ? `${afwezig.size} afwezig genoteerd` : 'Iedereen aanwezig genoteerd');
     } catch(e){
