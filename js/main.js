@@ -1,7 +1,7 @@
 import { auth, onAuthStateChanged } from './firebase.js';
 import { S, $, initModalSluiten, meld, initTerugknop } from './state.js';
 import {
-  initAuthUI, checkUitnodiging, handelPendingJoin, verwerkDeeplink
+  initAuthUI, checkUitnodiging, handelPendingJoin, verwerkDeeplink, registreerLogin
 } from './auth.js';
 import { startTeams, openTeam, renderTeam, verlaatTeamView } from './teams.js';
 import { openClub, verlaatClubView } from './club.js';
@@ -26,6 +26,7 @@ onAuthStateChanged(auth, async user => {
     $('#uitnodiging').style.display = 'none';
     $('#app').style.display = '';
     startTeams();
+    registreerLogin();
 
     /* openstaande teamkoppeling (uit uitnodiging) afhandelen */
     const t = await handelPendingJoin();

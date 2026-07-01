@@ -5,7 +5,7 @@ import {
   functions, httpsCallable
 } from './firebase.js';
 import {
-  S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs
+  S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs, initialen
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam, youtubeId, youtubeThumb, youtubeWatch } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
@@ -202,7 +202,7 @@ async function clubDashboardOphalen(teams){
   }));
 }
 
-function htmlClubDashboard(teams, dash){
+function htmlClubDashboard(teams, dash, gebruik){
   if (!teams.length) return `<div class="kaart leeg">Nog geen teams in deze club.<br>Zodra er teams, wedstrijden en trainingen zijn, verschijnt hier een overzicht.</div>`;
 
   const totSpelers = dash.reduce((s,d) => s + d.spelersAantal, 0);
@@ -277,6 +277,134 @@ function htmlClubDashboard(teams, dash){
           <div class="t"><div class="t-titel">${esc(a.team)}</div>
             <div class="t-meta">${esc(a.tekst)} · ${esc(afgKort(a.datum))}</div></div>
         </div>`).join('') : `<p style="font-size:13px;color:var(--ink-2)">Nog geen wedstrijden of presentie geregistreerd.</p>`}
+    </div>
+
+    ${htmlClubGebruik(gebruik)}`;
+}
+
+/* ==================== GEBRUIKSSTATISTIEKEN (logins) ====================
+   Wie hoort bij deze club? Coaches van alle teams + club-admins. Alleen
+   logins van die uid's tellen mee, zodat het overzicht per club klopt. */
+function clubRelevanteUids(teams){
+  const set = new Set(Object.keys(S.club.admins || {}));
+  for (const t of teams) for (const uid of Object.keys(t.leden||{})) set.add(uid);
+  return set;
+}
+
+/* logins van de laatste ~26 weken in één keer ophalen (dekt dag/week/maand-
+   weergave zonder opnieuw te hoeven lezen bij het wisselen van periode),
+   plus de gebruikers-samenvatting (naam, laatste login, totaal aantal). */
+async function clubGebruikOphalen(teams){
+  const relevantUids = clubRelevanteUids(teams);
+  if (!relevantUids.size) return { logins:[], gebruikers:[] };
+
+  const vanaf = new Date(Date.now() - 185*24*3600*1000).toISOString().slice(0,10);
+  const loginsSnap = await getDocs(query(collection(db,'logins'), where('datum','>=',vanaf)));
+  const logins = loginsSnap.docs.map(d => d.data()).filter(l => relevantUids.has(l.uid));
+
+  const ids = [...relevantUids];
+  const gebruikers = [];
+  for (let i = 0; i < ids.length; i += 30){
+    const chunk = ids.slice(i, i+30);
+    const snap = await getDocs(query(collection(db,'gebruikers'), where(documentId(), 'in', chunk)));
+    snap.docs.forEach(d => gebruikers.push({id:d.id, ...d.data()}));
+  }
+  gebruikers.sort((a,b) => (b.aantalLogins||0) - (a.aantalLogins||0));
+
+  return { logins, gebruikers };
+}
+
+/* ISO-weeknummer als sleutel 'YYYY-Www' */
+function isoWeekKey(datumStr){
+  const d = new Date(datumStr+'T12:00');
+  d.setDate(d.getDate() + 4 - (d.getDay()||7));
+  const jan1 = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil((((d - jan1) / 86400000) + 1)/7);
+  return `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
+}
+function maandKey(datumStr){ return datumStr.slice(0,7); }
+
+function dashGebruikGroepen(logins){
+  const perDag = {}, perWeek = {}, perMaand = {};
+  for (const l of logins){
+    if (!l.datum || !l.uid) continue;
+    (perDag[l.datum] ||= new Set()).add(l.uid);
+    (perWeek[isoWeekKey(l.datum)] ||= new Set()).add(l.uid);
+    (perMaand[maandKey(l.datum)] ||= new Set()).add(l.uid);
+  }
+  return { perDag, perWeek, perMaand };
+}
+
+function laatsteDagen(n){
+  const out = [];
+  for (let i=n-1;i>=0;i--) out.push(new Date(Date.now()-i*86400000).toISOString().slice(0,10));
+  return out;
+}
+function laatsteWeken(n){
+  const nu = new Date();
+  const dag = (nu.getDay()+6)%7; // maandag = 0
+  const maandagDeze = new Date(nu); maandagDeze.setDate(nu.getDate()-dag);
+  const out = [];
+  for (let i=n-1;i>=0;i--){
+    const maandag = new Date(maandagDeze); maandag.setDate(maandagDeze.getDate()-i*7);
+    out.push(isoWeekKey(maandag.toISOString().slice(0,10)));
+  }
+  return out;
+}
+function laatsteMaanden(n){
+  const nu = new Date(); const out = [];
+  for (let i=n-1;i>=0;i--){
+    const d = new Date(nu.getFullYear(), nu.getMonth()-i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  return out;
+}
+function dashTijdKort(ts){
+  if (!ts) return '—';
+  try {
+    const d = ts.seconds ? new Date(ts.seconds*1000) : new Date(ts);
+    return afgKort(d.toISOString().slice(0,10));
+  } catch { return '—'; }
+}
+
+function htmlClubGebruik(gebruik){
+  const { perDag, perWeek, perMaand } = dashGebruikGroepen(gebruik.logins);
+  const periode = S.clubDashPeriode || 'dag';
+  const data = periode === 'dag'
+    ? laatsteDagen(14).map(k => ({ label: afgKort(k), n: perDag[k]?.size || 0 }))
+    : periode === 'week'
+    ? laatsteWeken(8).map(k => ({ label: k.slice(5), n: perWeek[k]?.size || 0 }))
+    : laatsteMaanden(6).map(k => ({ label: new Date(k+'-01T12:00').toLocaleDateString('nl-NL',{month:'short',year:'2-digit'}), n: perMaand[k]?.size || 0 }));
+  const max = Math.max(1, ...data.map(d => d.n));
+
+  return `
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Gebruik van de app</div>
+      <div class="segment" id="gebruikPeriodeTabs" style="margin-bottom:14px">
+        ${[['dag','Dag'],['week','Week'],['maand','Maand']].map(([id,naam]) =>
+          `<button data-periode="${id}" class="${periode===id?'actief':''}">${naam}</button>`).join('')}
+      </div>
+      ${data.map(d => `
+        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px">
+          <span style="width:56px;flex-shrink:0;color:var(--ink-2)">${esc(d.label)}</span>
+          <span style="flex:1;height:14px;background:var(--surface-2);border-radius:7px;overflow:hidden">
+            <span style="display:block;height:100%;width:${Math.round((d.n/max)*100)}%;background:var(--accent);border-radius:7px"></span>
+          </span>
+          <span style="width:22px;text-align:right;font-weight:700">${d.n}</span>
+        </div>`).join('')}
+      <p style="font-size:11px;color:var(--ink-2);margin-top:8px">Aantal unieke coaches dat inlogde per ${periode==='dag'?'dag':periode==='week'?'week':'maand'}.</p>
+    </div>
+
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">Meest actieve gebruikers</div>
+      ${gebruik.gebruikers.length ? gebruik.gebruikers.slice(0,10).map(g => `
+        <div class="lid-rij">
+          <div class="lid-avatar">${esc(initialen(g.naam || g.email || '?'))}</div>
+          <div class="lid-naam">${esc(g.naam || g.email || 'Onbekend')}
+            <div style="font-size:12px;color:var(--ink-2);font-weight:500;margin-top:1px">${g.email?esc(g.email)+' · ':''}laatst: ${dashTijdKort(g.laatsteLogin)}</div>
+          </div>
+          <div style="font-family:'Barlow Condensed';font-weight:700;font-size:18px;color:var(--accent);flex-shrink:0">${g.aantalLogins||0}</div>
+        </div>`).join('') : `<p style="font-size:13px;color:var(--ink-2)">Nog geen logins geregistreerd.</p>`}
     </div>`;
 }
 
@@ -301,7 +429,11 @@ async function renderClub(){
   if (tab === 'teams')      inhoud = htmlClubTeams(teams, afgelastingen);
   if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
   if (tab === 'videos')     inhoud = htmlClubVideos(teams, videos);
-  if (tab === 'dashboard')  inhoud = htmlClubDashboard(teams, await clubDashboardOphalen(teams));
+  if (tab === 'dashboard'){
+    const dash = await clubDashboardOphalen(teams);
+    const gebruik = await clubGebruikOphalen(teams);
+    inhoud = htmlClubDashboard(teams, dash, gebruik);
+  }
   if (tab === 'instel')     inhoud = htmlClubInstel(teams, syncStatus);
   v.innerHTML = `
     <div class="kop"><button class="terug" id="naarTeams">‹</button>
@@ -660,6 +792,9 @@ function koppelClubTab(v, tab, teams, trainingen, videos){
     };
     v.querySelectorAll('[data-dash-team]').forEach(tr => tr.onclick = async () => {
       (await teamsModule()).openTeam(tr.dataset.dashTeam);
+    });
+    v.querySelectorAll('[data-periode]').forEach(b => b.onclick = () => {
+      S.clubDashPeriode = b.dataset.periode; renderClub();
     });
   }
   if (tab === 'instel'){

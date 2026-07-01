@@ -1,7 +1,7 @@
 import {
   auth, db, GoogleAuthProvider, OAuthProvider, signInWithPopup, signOut,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail,
-  collection, doc, getDocs, updateDoc, query, where
+  collection, doc, addDoc, setDoc, getDocs, updateDoc, query, where, serverTimestamp, increment
 } from './firebase.js';
 import { S, $, meld } from './state.js';
 
@@ -148,6 +148,36 @@ async function wachtwoordVergeten(adresRuw){
 }
 
 export function doSignOut(){ signOut(auth); }
+
+/* ====================================================================
+   LOGIN-REGISTRATIE — voor het gebruiksoverzicht op het clubdashboard.
+   Schrijft hooguit één keer per kalenderdag per apparaat (via localStorage,
+   dus geen extra Firestore-read nodig om te bepalen of het al gebeurd is).
+   - logins/{autoId}: één document per gebruiker per dag dat hij inlogt
+   - gebruikers/{uid}: samenvatting (naam, laatste login, totaal aantal logins)
+     voor het "meest actieve gebruikers"-lijstje, zonder de hele logins-
+     collectie te hoeven doorlezen.
+==================================================================== */
+const LS_LOGINLOG = 'opstelling_login_log_datum';
+
+export async function registreerLogin(){
+  if (!S.user) return;
+  const vandaag = new Date().toISOString().slice(0,10);
+  try { if (localStorage.getItem(LS_LOGINLOG) === vandaag) return; } catch(e){}
+  const naam = S.user.displayName || (S.user.email ? S.user.email.split('@')[0] : '') || 'Coach';
+  const email = S.user.email || '';
+  try {
+    await addDoc(collection(db,'logins'), {
+      uid: S.user.uid, naam, email, datum: vandaag, tijd: serverTimestamp(),
+    });
+    await setDoc(doc(db,'gebruikers',S.user.uid), {
+      naam, email, laatsteLogin: serverTimestamp(), aantalLogins: increment(1),
+    }, { merge: true });
+    try { localStorage.setItem(LS_LOGINLOG, vandaag); } catch(e){}
+  } catch(e){
+    console.warn('Login registreren mislukt:', e);
+  }
+}
 
 /* koppel de ingelogde gebruiker aan een team op basis van de teamcode */
 export async function joinMetCode(code, naam = null){
