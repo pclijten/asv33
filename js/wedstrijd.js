@@ -315,6 +315,9 @@ export function openWedstrijd(wid){
     S.wedstrijd = data;
     renderWedstrijd();
     if (aangevuld) bewaarWedstrijd();
+  }, (err) => {
+    console.error(`[Cluppie] Listener "wedstrijd" kon niet lezen (teamId=${S.teamId}, wid=${wid}):`, err.code, err.message);
+    if (err.code === 'permission-denied') meld('Geen toegang tot deze wedstrijd — controleer de Firestore-rules');
   });
   toon('wedstrijd');
 }
