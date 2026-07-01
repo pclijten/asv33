@@ -1790,6 +1790,7 @@ function modalSnelBeoordeling(spelerId, bestaande = null){
     <textarea class="invoer" id="mSnNotitie" rows="2" placeholder="Bijv. durfde aan de bal te komen...">${esc(bestaande?.notities?.algemeen||'')}</textarea>
 
     <button class="knop vol fluo" id="mSnOk" style="margin-top:12px">${bestaande?'Bijwerken':'Opslaan'}</button>
+    ${S._snelRonde ? `<button class="knop licht vol" id="mSnSkip" style="margin-top:8px">Speler overslaan (niet aanwezig) →</button>` : ''}
     ${bestaande?`<button class="knop vol gevaar" id="mSnWeg" style="margin-top:8px">Verwijderen</button>`:''}`);
 
   const updatePos = () => {
@@ -1842,6 +1843,8 @@ function modalSnelBeoordeling(spelerId, bestaande = null){
     await deleteDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id));
     sluitModal(); renderTeam();
   };
+  const skipBtn = $('#mSnSkip');
+  if (skipBtn) skipBtn.onclick = () => { sluitModal(); volgendeSnelRonde(); };
 }
 
 /* --- Snelle ronde: hele selectie aflopen --- */
