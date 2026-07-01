@@ -833,7 +833,7 @@ export function renderWedstrijd(){
   const sbRechts = w.thuis ? {naam:tegenNaam, n:tegen, knop:'goalTegen'} : {naam:S.team.naam, n:voor, knop:'goalVoor'};
 
   const confroHtml = bouwConfrontatie(w);
-  const teamEvalBestaand = (S.teamEvaluaties||[]).some(e => e.wedstrijdId === w.id);
+  const teamEvalBestaand = (S.teamEvaluaties||[]).some(e => e.wedstrijdId === S.wedstrijdId);
 
   const v = $('#view-wedstrijd');
   v.innerHTML = `
@@ -981,7 +981,7 @@ ${confroHtml}
   v.querySelector('#kaartKnop').onclick = modalKaart;
   v.querySelector('#toonVerslag').onclick = modalVerslag;
   v.querySelector('#teamEvalKnop').onclick = () => {
-    import('./teams.js').then(m => m.modalTeamEvaluatie(w.id));
+    import('./teams.js').then(m => m.modalTeamEvaluatie(S.wedstrijdId));
   };
   v.querySelectorAll('[data-corrigeer-goal]').forEach(b => b.onclick = e => {
     e.stopPropagation(); modalGoalCorrigeren(Number(b.dataset.corrigeerGoal));
