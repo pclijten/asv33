@@ -467,6 +467,17 @@ textarea.invoer{font-family:inherit;line-height:1.5;resize:vertical;min-height:6
   color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;
   font-size:27px;line-height:1.05;text-transform:uppercase;letter-spacing:.4px;margin:0;
 }
+.welkom-strip{ display:flex;flex-wrap:wrap;gap:6px;margin-top:9px; }
+.ws-item{
+  background:rgba(255,255,255,.16);color:#fff;font-size:12.5px;font-weight:600;
+  padding:4px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:4px;
+  white-space:nowrap;
+}
+.welkom-cruijff{
+  color:rgba(255,255,255,.88);font-size:12px;font-style:italic;line-height:1.4;
+  margin-top:8px;max-width:280px;
+}
+.welkom-cruijff span{ opacity:.75;font-style:normal;font-weight:600; }
 .welkom-kop .terug{ color:rgba(255,255,255,.7);position:relative;z-index:1; }
 .uitlog-knop{
   position:relative;z-index:1;flex-shrink:0;
