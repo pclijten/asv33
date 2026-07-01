@@ -33,6 +33,10 @@ const NAV_ICON = {
 /* ==================== TEAMS-OVERZICHT ==================== */
 export function startTeams(){
   stopUnsubs('teams','clubs','gelezen');
+  const meldFout = (naam) => (err) => {
+    console.error(`[Cluppie] Listener "${naam}" kon niet lezen:`, err.code, err.message);
+    if (err.code === 'permission-denied') meld(`Geen toegang tot "${naam}" — controleer de Firestore-rules`);
+  };
   const q1 = query(collection(db,'teams'), where('leden.'+S.user.uid, '==', true));
   S.unsub.teams = onSnapshot(q1, snap => {
     S.teams = snap.docs.map(d => ({id:d.id, ...d.data()}))
@@ -40,19 +44,19 @@ export function startTeams(){
     if (!S.teamId && !S.clubId) renderTeams();
     laadTrainingenVoorTeams();
     laadVideosVoorTeams();
-  });
+  }, meldFout('teams'));
   const q2 = query(collection(db,'clubs'), where('admins.'+S.user.uid, '==', true));
   S.unsub.clubs = onSnapshot(q2, snap => {
     S.clubs = snap.docs.map(d => ({id:d.id, ...d.data()}))
                        .sort((a,b) => (a.naam||'').localeCompare(b.naam||''));
     if (!S.teamId && !S.clubId) renderTeams();
-  });
+  }, meldFout('clubs'));
   const q3 = query(collection(db,'gebruikers',S.user.uid,'gelezen'));
   S.unsub.gelezen = onSnapshot(q3, snap => {
     S.trainingenGelezen = {};
     snap.docs.forEach(d => S.trainingenGelezen[d.id] = true);
     if (S.team) renderTeam();
-  });
+  }, meldFout('gelezen'));
   renderTeams(); toon('teams');
 }
 
@@ -466,17 +470,21 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   S._presentieOpen = new Set();
   S._presentieToonAlles = new Set();
   stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','teamevaluaties');
+  const luisterfout = (naam) => (err) => {
+    console.error(`[Cluppie] Listener "${naam}" kon niet lezen (teamId=${teamId}):`, err.code, err.message);
+    if (err.code === 'permission-denied') meld(`Geen toegang tot "${naam}" — controleer de Firestore-rules`);
+  };
   S.unsub.team = onSnapshot(doc(db,'teams',teamId), snap => {
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
     if (S.team.club && !S.unsub.uitleningen) startUitleningenListener(teamId);
     if (!S.wedstrijdId) renderTeam();
-  });
+  }, luisterfout('team'));
   S.unsub.spelers = onSnapshot(collection(db,'teams',teamId,'spelers'), snap => {
     S.spelers = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (a.nummer ?? 999) - (b.nummer ?? 999) || a.naam.localeCompare(b.naam));
     if (!S.wedstrijdId) renderTeam(); else renderWedstrijd();
-  });
+  }, luisterfout('spelers'));
   S.unsub.wedstrijden = onSnapshot(collection(db,'teams',teamId,'wedstrijden'), snap => {
     S.wedstrijden = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
@@ -495,23 +503,23 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
         modalTeamEvaluatie(wid);
       }
     }
-  });
+  }, luisterfout('wedstrijden'));
   S.unsub.presentie = onSnapshot(collection(db,'teams',teamId,'presentie'), snap => {
     S.presentie = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (b.datum||'').localeCompare(a.datum||''));
     if (!S.wedstrijdId && S.teamTab === 'trainingen') renderTeam();
-  });
+  }, luisterfout('presentie'));
   S.unsub.planning = onSnapshot(collection(db,'teams',teamId,'planning'), snap => {
     S.planning = snap.docs.map(d => ({id:d.id, ...d.data()}));
     if (!S.wedstrijdId && S.teamTab === 'planning') renderTeam();
-  });
+  }, luisterfout('planning'));
   // Eigen listener voor beoordelingen — los van de wedstrijd-listener, zodat
   // updates van een andere coach niet wegvallen (zie listener-architectuur).
   S.unsub.beoordelingen = onSnapshot(collection(db,'teams',teamId,'beoordelingen'), snap => {
     S.beoordelingen = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (b.datum||'').localeCompare(a.datum||'') || (b.gemaaktMs||0) - (a.gemaaktMs||0));
     if (!S.wedstrijdId && (S.teamTab === 'spelers' || S._beoordeelProfiel)) renderTeam();
-  });
+  }, luisterfout('beoordelingen'));
   // Teamevaluaties (na de wedstrijd) — eigen listener, zodat het dashboard in
   // de Stats-tab en de "team evalueren"-knop op het wedstrijdscherm beide
   // realtime dezelfde data zien, ook als een collega-coach 'm net invulde.
@@ -519,7 +527,7 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
     S.teamEvaluaties = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (a.datum||'').localeCompare(b.datum||''));
     if (!S.wedstrijdId && S.teamTab === 'stats') renderTeam();
-  });
+  }, luisterfout('teamevaluaties'));
   toon('team');
 }
 
@@ -532,7 +540,7 @@ function startUitleningenListener(teamId){
     S.uitleningenUit = alle.filter(u => u.vanTeam === teamId);
     S.uitleningenIn  = alle.filter(u => u.naarTeam === teamId);
     if (!S.wedstrijdId && (S.teamTab === 'spelers' || S._beoordeelProfiel)) renderTeam();
-  });
+  }, (err) => console.error(`[Cluppie] Listener "uitleningen" kon niet lezen (clubId=${clubId}):`, err.code, err.message));
 }
 export function verlaatTeamView(){
   stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','uitleningen','teamevaluaties');
