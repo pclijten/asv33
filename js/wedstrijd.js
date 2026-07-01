@@ -174,7 +174,7 @@ export function modalNieuweWedstrijd(){
     <div class="rij">
       <div class="veldgroep" id="mWThuisWrap"><label>Thuis of uit</label>
         <div class="segment" id="mWThuis"><button data-t="1" class="actief">Thuis</button><button data-t="0">Uit</button></div></div>
-      <div class="veldgroep"><label>Format</label>
+      <div class="veldgroep"><label>Aantal spelers</label>
         <div class="segment" id="mWFormat">${['4','6','8','9','11'].map(f =>
           `<button data-f="${f}" class="${format===f?'actief':''}">${f}</button>`).join('')}</div></div>
     </div>
@@ -1054,7 +1054,7 @@ function modalWedstrijdInstellingen(){
       <div class="veldgroep"><label>Datum</label><input class="invoer" type="date" id="mIDatum" value="${esc(w.datum)}"></div>
       <div class="veldgroep"><label>Minuten per periode</label><input class="invoer" id="mIDuur" inputmode="decimal" value="${esc(w.kwartduur)}"></div>
     </div>
-    <div class="veldgroep"><label>Format</label>
+    <div class="veldgroep"><label>Aantal spelers</label>
       <div class="segment" id="mIFormat">${['4','6','8','9','11'].map(f =>
         `<button data-f="${f}" class="${w.format===f?'actief':''}">${f}×${f}</button>`).join('')}</div></div>
     <div class="veldgroep"><label>Formatie (excl. keeper)</label>
