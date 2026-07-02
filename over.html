@@ -257,7 +257,7 @@
 <div class="topbar">
   <div class="wrap">
     <div class="brand"><span class="dot"></span> Cluppie</div>
-    <a href="#starten" class="btn btn-primary">Start met Cluppie</a>
+    <a href="index.html" class="btn btn-primary cta-login">Inloggen</a>
   </div>
 </div>
 
@@ -268,7 +268,7 @@
       <h1>De jeugdopleiding,<br>digitaal <span>op orde</span>.</h1>
       <p class="lead">Cluppie is de app waarmee trainers van ASV'33 opstellingen maken, wedstrijden evalueren en de ontwikkeling van hun team volgen — gebouwd rond het jeugdbeleidsplan van de club.</p>
       <div class="hero-cta">
-        <a href="#starten" class="btn btn-primary">Start met Cluppie</a>
+        <a href="index.html" class="btn btn-primary cta-login">Inloggen</a>
         <a href="#functies" class="btn btn-ghost">Bekijk wat het kan</a>
       </div>
       <p class="hero-note">Voor trainers, coördinatoren en de technische commissie van ASV'33.</p>
@@ -556,7 +556,7 @@
     <div class="cta-blok reveal">
       <h2>Ontwikkeling die je kunt zien groeien.</h2>
       <p>Cluppie staat klaar voor jouw team.</p>
-      <a href="https://cluppieasv33.nl" class="btn btn-primary">Open Cluppie</a>
+      <a href="index.html" class="btn btn-primary cta-login">Inloggen bij Cluppie</a>
     </div>
   </div>
 </section>
@@ -564,7 +564,7 @@
 <footer>
   <div class="wrap footer-grid">
     <div class="footer-slogan">Cluppie — Opleiden met overzicht</div>
-    <div class="footer-meta">Een initiatief van ASV'33 · Vragen? Neem contact op met Paul · <a href="https://cluppieasv33.nl">cluppieasv33.nl</a></div>
+    <div class="footer-meta">Een initiatief van ASV'33 · Vragen? Neem contact op met Paul · <a href="index.html" class="cta-login">cluppieasv.nl</a></div>
   </div>
 </footer>
 
@@ -573,6 +573,12 @@
     entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
   }, {threshold:.12});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  /* voordat we naar index.html gaan: onthouden dat de intro is gezien,
+     anders stuurt de gate daar ons meteen weer hierheen terug. */
+  document.querySelectorAll('.cta-login').forEach(a=>{
+    a.addEventListener('click', ()=>{ try{ localStorage.setItem('cluppieIntroGezien','1'); }catch(e){} });
+  });
 </script>
 
 </body>
