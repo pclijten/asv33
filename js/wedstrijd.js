@@ -9,7 +9,7 @@ import {
   FORMATIES, LIJN_NAAM, bouwSlots, slotLijn, catInfo, isToernooi,
   tijdstrafSec, KAART_ICOON, KAART_NAAM,
   periodeNaam, periodeNrs, periodeLabel, toernooiWnr, periodeOmschrijving,
-  CLUB_FORMATIE_11
+  CLUB_FORMATIE_11, doelSuggesties
 } from './config.js';
 import { kwartGespeeld, effectieveLineup, analyseKwart, analyseWedstrijd } from './analyse.js';
 
@@ -845,9 +845,11 @@ export function renderWedstrijd(){
       <h1>${isToernooi(w)
         ? '🏆 '+esc(w.tegenstander)
         : (w.thuis ? esc(S.team.naam)+' – '+esc(w.tegenstander) : esc(w.tegenstander)+' – '+esc(S.team.naam))}
-      <span class="sub">${datumNL(w.datum)} · ${isToernooi(w) ? w.toernooi.wedstrijden+' wedstrijden · ' : ''}${esc(w.formatie)}</span></h1>
-      <button class="terug" id="wInstellingen" title="Wedstrijdinstellingen">⚙️</button></div>
-    ${w.doel ? `<div class="kaart" style="background:rgba(226,6,19,.08);border-left:3px solid var(--grass);font-size:13.5px;color:var(--ink);padding:9px 12px;margin-bottom:10px"><b>🎯 Doel:</b> ${esc(w.doel)}</div>` : ''}
+      <span class="sub">${datumNL(w.datum)} · ${isToernooi(w) ? w.toernooi.wedstrijden+' wedstrijden · ' : ''}<span id="subFormatieKlik" style="text-decoration:underline dotted;cursor:pointer">${esc(w.formatie)}</span></span></h1>
+      <button class="terug" id="wInstellingen" title="Wedstrijd aanpassen">⚙️</button></div>
+    <div class="kaart doelbanner" id="doelBanner" style="${w.doel
+      ? 'background:rgba(226,6,19,.08);border-left:3px solid var(--grass)'
+      : 'background:var(--surface-2);border-left:3px dashed var(--line-d)'};font-size:13.5px;color:${w.doel?'var(--ink)':'var(--ink-2)'};padding:9px 12px;margin-bottom:10px;cursor:pointer">${w.doel ? `<b>🎯 Doel:</b> ${esc(w.doel)}` : '🎯 Nog geen wedstrijddoel gezet — tik om er een te kiezen'}</div>
 ${confroHtml}
     <div class="scorebord">
       <button class="sb-goal" id="${sbLinks.knop}" title="Doelpunt ${esc(sbLinks.naam)}">⚽</button>
@@ -967,7 +969,9 @@ ${confroHtml}
 
   /* ---- koppelingen ---- */
   v.querySelector('#naarTeam').onclick = () => history.back();
-  v.querySelector('#wInstellingen').onclick = modalWedstrijdInstellingen;
+  v.querySelector('#wInstellingen').onclick = modalWedstrijdMenu;
+  v.querySelector('#doelBanner').onclick = () => modalDoelNotitie(false);
+  v.querySelector('#subFormatieKlik').onclick = (e) => { e.stopPropagation(); modalSpeelwijze(false); };
   v.querySelectorAll('[data-kwart]').forEach(b => b.onclick = () => {
     S.kwart = b.dataset.kwart; S.geselecteerd = null;
     const nr = Number(S.kwart);
@@ -1049,20 +1053,61 @@ ${confroHtml}
 }
 
 /* ==================== WEDSTRIJDINSTELLINGEN & SELECTIE ==================== */
-function modalWedstrijdInstellingen(){
+function modalWedstrijdMenu(){
   const w = S.wedstrijd;
   openModal(`
-    <h2>Wedstrijdinstellingen</h2>
+    <h2>Wedstrijd aanpassen</h2>
+    <p style="font-size:11.5px;color:var(--ink-2);margin:2px 0 14px">Tip: doel en formatie kun je ook direct aantikken op het wedstrijdscherm.</p>
+    <div class="menu-item" id="mMenuBasis">
+      <span class="mi-ico">📝</span>
+      <span class="mi-tekst"><span class="mi-titel">Basisgegevens</span><span class="mi-sub">${isToernooi(w) ? 'Naam toernooi' : 'Tegenstander'}, datum, speeltijd, aanvoerder</span></span>
+      <span class="mi-pijl">›</span></div>
+    <div class="menu-item" id="mMenuSpeelwijze">
+      <span class="mi-ico">⚽</span>
+      <span class="mi-tekst"><span class="mi-titel">Speelwijze & formatie</span><span class="mi-sub">Aantal spelers, opstelling · §3.2</span></span>
+      <span class="mi-pijl">›</span></div>
+    <div class="menu-item" id="mMenuDoel">
+      <span class="mi-ico">🎯</span>
+      <span class="mi-tekst"><span class="mi-titel">Doel & notitie</span><span class="mi-sub">Wedstrijddoel, scouting-notitie · §3.3</span></span>
+      <span class="mi-pijl">›</span></div>`);
+  $('#mMenuBasis').onclick = () => modalBasisgegevens(true);
+  $('#mMenuSpeelwijze').onclick = () => modalSpeelwijze(true);
+  $('#mMenuDoel').onclick = () => modalDoelNotitie(true);
+}
+
+function modalBasisgegevens(vanuitMenu){
+  const w = S.wedstrijd;
+  openModal(`
+    ${vanuitMenu ? `<span class="terugnaarmenu" id="mBTerug">‹ Terug naar menu</span>` : ''}
+    <h2>Basisgegevens</h2>
     <div class="veldgroep"><label>${isToernooi(w) ? 'Naam toernooi' : 'Tegenstander'}</label>
       <input class="invoer" id="mITegen" value="${esc(w.tegenstander)}"></div>
-    <div class="veldgroep"><label>🎯 Wedstrijddoel</label>
-      <input class="invoer" id="mIDoel" value="${esc(w.doel||'')}" placeholder="Bijv. opbouw van achteruit, durven schieten"></div>
-    <div class="veldgroep"><label>📝 Notitie</label>
-      <textarea class="invoer" id="mINotitie" rows="3" placeholder="Bijv. sterke counter, druk zetten op hun nr. 7. Zichtbaar bij de volgende keer tegen deze tegenstander.">${esc(w.notitie||'')}</textarea></div>
     <div class="rij">
       <div class="veldgroep"><label>Datum</label><input class="invoer" type="date" id="mIDatum" value="${esc(w.datum)}"></div>
       <div class="veldgroep"><label>Minuten per periode</label><input class="invoer" id="mIDuur" inputmode="decimal" value="${esc(w.kwartduur)}"></div>
     </div>
+    <div class="veldgroep"><label>Aanvoerder</label>
+      <select class="invoer" id="mIAanvoerder">
+        <option value="">— geen aanvoerder gekozen —</option>
+        ${(w.selectie||[]).map(pid => speler(pid)).filter(Boolean)
+          .map(p => `<option value="${p.id}" ${w.aanvoerder===p.id?'selected':''}>${esc(spelerNr(p.id))} · ${esc(p.naam)}</option>`).join('')}
+      </select></div>
+    <button class="knop vol" id="mBOk">Opslaan</button>`);
+  if (vanuitMenu) $('#mBTerug').onclick = modalWedstrijdMenu;
+  $('#mBOk').onclick = () => {
+    w.tegenstander = $('#mITegen').value.trim() || w.tegenstander;
+    w.datum = $('#mIDatum').value || w.datum;
+    w.kwartduur = parseFloat(($('#mIDuur').value||'').replace(',','.')) || w.kwartduur;
+    w.aanvoerder = $('#mIAanvoerder').value || null;
+    sluitModal(); bewaarWedstrijd(); renderWedstrijd();
+  };
+}
+
+function modalSpeelwijze(vanuitMenu){
+  const w = S.wedstrijd;
+  openModal(`
+    ${vanuitMenu ? `<span class="terugnaarmenu" id="mSTerug">‹ Terug naar menu</span>` : ''}
+    <h2>Speelwijze</h2>
     <div class="veldgroep"><label>Aantal spelers</label>
       <div class="segment" id="mIFormat">${['4','6','8','9','11'].map(f =>
         `<button data-f="${f}" class="${w.format===f?'actief':''}">${f}×${f}</button>`).join('')}</div></div>
@@ -1070,13 +1115,8 @@ function modalWedstrijdInstellingen(){
       <div class="segment wrap" id="mIFormatie"></div>
       <p style="font-size:12px;color:var(--ink-2);margin-top:6px">Wijzig je het format, dan past de app de formatie automatisch aan en blijven spelers zoveel mogelijk op hun plek.</p>
       <div id="mIFormatieHint"></div></div>
-    <div class="veldgroep"><label>Aanvoerder</label>
-      <select class="invoer" id="mIAanvoerder">
-        <option value="">— geen aanvoerder gekozen —</option>
-        ${(w.selectie||[]).map(pid => speler(pid)).filter(Boolean)
-          .map(p => `<option value="${p.id}" ${w.aanvoerder===p.id?'selected':''}>${esc(spelerNr(p.id))} · ${esc(p.naam)}</option>`).join('')}
-      </select></div>
-    <button class="knop vol" id="mIOk">Opslaan</button>`);
+    <button class="knop vol" id="mSOk">Opslaan</button>`);
+  if (vanuitMenu) $('#mSTerug').onclick = modalWedstrijdMenu;
 
   let format = w.format, formatie = w.formatie;
   const toonFormatieHint = () => {
@@ -1106,14 +1146,7 @@ function modalWedstrijdInstellingen(){
     vulFormaties();
   });
 
-  $('#mIOk').onclick = () => {
-    w.tegenstander = $('#mITegen').value.trim() || w.tegenstander;
-    w.doel = $('#mIDoel').value.trim();
-    w.notitie = $('#mINotitie').value.trim();
-    w.datum = $('#mIDatum').value || w.datum;
-    w.kwartduur = parseFloat(($('#mIDuur').value||'').replace(',','.')) || w.kwartduur;
-    const aanv = $('#mIAanvoerder').value;
-    w.aanvoerder = aanv || null;
+  $('#mSOk').onclick = () => {
     if (format !== w.format || formatie !== w.formatie){
       const nieuweIds = new Set(bouwSlots(format, formatie).map(s => s.id));
       for (const kk of Object.values(w.kwarten)){
@@ -1122,6 +1155,29 @@ function modalWedstrijdInstellingen(){
       }
       w.format = format; w.formatie = formatie;
     }
+    sluitModal(); bewaarWedstrijd(); renderWedstrijd();
+  };
+}
+
+function modalDoelNotitie(vanuitMenu){
+  const w = S.wedstrijd;
+  openModal(`
+    ${vanuitMenu ? `<span class="terugnaarmenu" id="mDTerug">‹ Terug naar menu</span>` : ''}
+    <h2>🎯 Wedstrijddoel</h2>
+    <div class="veldgroep">
+      <input class="invoer" id="mIDoel" value="${esc(w.doel||'')}" placeholder="Bijv. opbouw van achteruit, durven schieten">
+      <div class="doel-suggesties" id="mIDoelSug">
+        ${doelSuggesties(S.team?.categorie).map(s => `<button type="button" data-doelsug="${esc(s)}">${esc(s)}</button>`).join('')}
+      </div>
+      <p style="font-size:11px;color:var(--ink-2);margin-top:5px">💡 Suggesties op basis van de leercurve (§3.3) voor ${esc(S.team?.categorie||'dit team')} — tik om over te nemen, of typ je eigen doel.</p></div>
+    <div class="veldgroep"><label>📝 Notitie</label>
+      <textarea class="invoer" id="mINotitie" rows="3" placeholder="Bijv. sterke counter, druk zetten op hun nr. 7. Zichtbaar bij de volgende keer tegen deze tegenstander.">${esc(w.notitie||'')}</textarea></div>
+    <button class="knop vol" id="mDOk">Opslaan</button>`);
+  if (vanuitMenu) $('#mDTerug').onclick = modalWedstrijdMenu;
+  $$('#mIDoelSug [data-doelsug]').forEach(b => b.onclick = () => { $('#mIDoel').value = b.dataset.doelsug; });
+  $('#mDOk').onclick = () => {
+    w.doel = $('#mIDoel').value.trim();
+    w.notitie = $('#mINotitie').value.trim();
     sluitModal(); bewaarWedstrijd(); renderWedstrijd();
   };
 }
