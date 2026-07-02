@@ -1374,22 +1374,22 @@ function htmlHandleiding(){
     <p>Een app om voor je voetbalteam de opstelling te maken, wissels te beheren, speeltijd eerlijk te verdelen en de wedstrijd te loggen. Alles werkt realtime, dus collega-coaches zien direct dezelfde informatie.</p>
     </section>
 
-    <section class="hl-sec" data-zoek="🔑 de eerste keer inloggen je hoeft niets te installeren. je opent de app gewoon in je browser en logt in op de manier die jij prettig vindt: met google of microsoft — één tik en je bent binnen. met e-mail en wachtwoord — vul je e-mailadres en een zelfgekozen wachtwoord in. bestaat je account nog niet? dan wordt het automatisch aangemaakt. de volgende keer kom je met diezelfde gegevens direct terug als dezelfde coach. wachtwoord vergeten? tik op "wachtwoord vergeten?" onder de inlogknop — je krijgt dan een mailtje om een nieuw wachtwoord in te stellen.">
+    <section class="hl-sec" data-zoek="🔑 de eerste keer inloggen je hoeft niets te installeren. je opent de app gewoon in je browser en logt in op de manier die jij prettig vindt: met google — één tik en je bent binnen. met e-mail en wachtwoord — vul je e-mailadres en een zelfgekozen wachtwoord in. bestaat je account nog niet? dan wordt het automatisch aangemaakt. de volgende keer kom je met diezelfde gegevens direct terug als dezelfde coach. wachtwoord vergeten? tik op "wachtwoord vergeten?" onder de inlogknop — je krijgt dan een mailtje om een nieuw wachtwoord in te stellen.">
     <h3>🔑 De eerste keer inloggen</h3>
     <p>Je hoeft niets te installeren. Je opent de app gewoon in je browser en logt in op de manier die jij prettig vindt:</p>
     <ul>
-      <li><b>Met Google of Microsoft</b> — één tik en je bent binnen.</li>
+      <li><b>Met Google</b> — één tik en je bent binnen.</li>
       <li><b>Met e-mail en wachtwoord</b> — vul je e-mailadres en een zelfgekozen wachtwoord in. Bestaat je account nog niet? Dan wordt het automatisch aangemaakt. De volgende keer kom je met diezelfde gegevens direct terug als dezelfde coach.</li>
     </ul>
     <div class="tip"><b>Wachtwoord vergeten?</b> Tik op "Wachtwoord vergeten?" onder de inlogknop — je krijgt dan een mailtje om een nieuw wachtwoord in te stellen.</div>
     </section>
 
-    <section class="hl-sec" data-zoek="🔗 aansluiten bij je team je coach of de clubbeheerder stuurt je een persoonlijke uitnodigingslink (vaak via whatsapp). zo werkt het: tik op de link. je ziet een welkomstscherm met de naam van je team. log in (google, microsoft of e-mail) — en je zit meteen in het juiste team. geen link gekregen? vraag je coach om de teamcode (bijv. asvjo11-1) en vul die in op het inlogscherm.">
+    <section class="hl-sec" data-zoek="🔗 aansluiten bij je team je coach of de clubbeheerder stuurt je een persoonlijke uitnodigingslink (vaak via whatsapp). zo werkt het: tik op de link. je ziet een welkomstscherm met de naam van je team. log in (google of e-mail) — en je zit meteen in het juiste team. geen link gekregen? vraag je coach om de teamcode (bijv. asvjo11-1) en vul die in op het inlogscherm.">
     <h3>🔗 Aansluiten bij je team</h3>
     <p>Je coach of de clubbeheerder stuurt je een <b>persoonlijke uitnodigingslink</b> (vaak via WhatsApp). Zo werkt het:</p>
     <ul>
       <li>Tik op de link. Je ziet een welkomstscherm met de naam van je team.</li>
-      <li>Log in (Google, Microsoft of e-mail) — en je zit meteen in het juiste team.</li>
+      <li>Log in (Google of e-mail) — en je zit meteen in het juiste team.</li>
       <li>Geen link gekregen? Vraag je coach om de <b>teamcode</b> (bijv. ASVJO11-1) en vul die in op het inlogscherm.</li>
     </ul>
     </section>

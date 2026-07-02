@@ -1,12 +1,12 @@
 import {
-  auth, db, GoogleAuthProvider, OAuthProvider, signInWithPopup, signOut,
+  auth, db, GoogleAuthProvider, signInWithPopup, signOut,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail,
   collection, doc, addDoc, setDoc, getDocs, updateDoc, query, where, serverTimestamp, increment
 } from './firebase.js';
 import { S, $, meld } from './state.js';
 
 /* ====================================================================
-   AANMELD-FLOW — Google, Microsoft of e-mail+wachtwoord.
+   AANMELD-FLOW — Google of e-mail+wachtwoord.
 
    - Alle drie geven een STABIELE identiteit (vaste uid), dus opnieuw
      inloggen maakt geen dubbele coach meer aan.
@@ -29,12 +29,6 @@ export function getPendingTeamInfo(){ return pendingTeamInfo; }
 function bewaarCode(){
   if (pendingTeamInfo){ try { localStorage.setItem(LS_CODE, pendingTeamInfo.code); } catch(e){} }
 }
-function microsoftProvider(){
-  const p = new OAuthProvider('microsoft.com');
-  p.setCustomParameters({ prompt: 'select_account' });
-  return p;
-}
-
 /* ---------- knoppen koppelen (één keer, bij opstart) ---------- */
 export function initAuthUI(){
   // ===== Inlogscherm =====
@@ -42,11 +36,6 @@ export function initAuthUI(){
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
     catch(e){ meldLoginFout(e); }
   });
-  $('#microsoftLogin').addEventListener('click', async () => {
-    try { await signInWithPopup(auth, microsoftProvider()); }
-    catch(e){ meldLoginFout(e); }
-  });
-
   // e-mail + wachtwoord (form-submit vangt klik én Enter af)
   $('#mailLoginForm').addEventListener('submit', e => {
     e.preventDefault();
@@ -61,11 +50,6 @@ export function initAuthUI(){
   $('#uitnodigGoogle').addEventListener('click', async () => {
     bewaarCode();
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch(e){ meldLoginFout(e); }
-  });
-  $('#uitnodigMicrosoft').addEventListener('click', async () => {
-    bewaarCode();
-    try { await signInWithPopup(auth, microsoftProvider()); }
     catch(e){ meldLoginFout(e); }
   });
   $('#uitnodigForm').addEventListener('submit', e => {
@@ -207,7 +191,6 @@ export async function checkUitnodiging(){
       $('#uitnodigTitel').textContent = 'Uitnodiging ongeldig';
       $('#uitnodigSubtitel').textContent = 'Deze link werkt niet meer. Controleer of je de volledige link hebt, of vraag een nieuwe aan je coach.';
       $('#uitnodigGoogle').style.display = 'none';
-      $('#uitnodigMicrosoft').style.display = 'none';
       $('#uitnodigForm').style.display = 'none';
       pendingTeamInfo = null;
     } else {
