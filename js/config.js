@@ -458,6 +458,46 @@ export function kompasIndexVoorWeek(week = isoWeek()){ return ((week % KOMPAS_TI
 /* Formatie-uitgangspunt van de club (§3.2): 1:4:3:3, omschakelend naar 1:3:4:3 bij balbezit. */
 export const CLUB_FORMATIE_11 = '4-3-3';
 
+/* ==================== WEDSTRIJDDOEL-SUGGESTIES (§3.1 t/m §3.4) ====================
+   Korte, concrete voorbeelden per leeftijdsband, aansluitend op de leercurve (§3.3),
+   de gouden regels (§3.1) en de gewenste speelwijze (§3.2). Puur als inspiratie bij
+   het invullen van het vrije 🎯 Wedstrijddoel-veld — nooit verplicht, altijd overschrijfbaar. */
+const DOEL_SUGGESTIES_BANDEN = [
+  {tot:9,  teksten:[
+    'Iedereen probeert minstens 1x een 1-tegen-1',
+    'Na balverovering meteen naar het doel dribbelen',
+    'Een actie proberen met het zwakke been',
+    'Iedereen minstens 1x een doelpoging',
+  ]},
+  {tot:12, teksten:[
+    'Bij balbezit rustig opbouwen van achteruit',
+    'Direct druk zetten binnen 5 seconden na balverlies',
+    'Voorkomen dat de tegenstander je 1-tegen-1 passeert',
+    'Positiespel: steeds een passlijn aanbieden',
+  ]},
+  {tot:15, teksten:[
+    'Voorzetten geven vanaf de zijkant',
+    'Snel omschakelen bij balwinst — meteen vooruit denken',
+    'Tegenstander naar de zijlijn dwingen bij verdedigen',
+    'Bewust omschakelen bij balverlies: direct terugzakken of aftroeven',
+  ]},
+  {tot:99, teksten:[
+    'Bij balbezit een verdediger laten inschuiven naar het middenveld',
+    'Compact blijven staan — linies dicht bij elkaar',
+    'Constant coachen van je medespelers',
+    'Bewust balverlies voorkomen in de opbouw',
+  ]},
+];
+/* geeft 3 roterende suggesties terug, passend bij de categorie van het team. */
+export function doelSuggesties(categorie, n = 3){
+  const lft = leeftijdVanCategorie(categorie);
+  const band = DOEL_SUGGESTIES_BANDEN.find(b => lft <= b.tot) || DOEL_SUGGESTIES_BANDEN[DOEL_SUGGESTIES_BANDEN.length-1];
+  const start = isoWeek() % band.teksten.length;
+  const uit = [];
+  for (let i = 0; i < Math.min(n, band.teksten.length); i++) uit.push(band.teksten[(start+i) % band.teksten.length]);
+  return uit;
+}
+
 /* niveau 1..5 → kleur + label. Index 0 blijft leeg (scores beginnen bij 1). */
 export const NIVEAUS = [
   null,
