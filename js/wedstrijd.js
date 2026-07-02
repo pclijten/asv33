@@ -383,8 +383,11 @@ function tikKlok(){
 function modalPlanWissel(){
   const k = huidigKwart();
   const l = effectieveLineup(k);
-  const veldSpelers = Object.values(l).filter(pid => speler(pid));
-  const bankSpelers = (S.wedstrijd.selectie||[]).filter(pid => !Object.values(l).includes(pid) && speler(pid));
+  const gepland = k.plan || [];
+  const geplandIn = new Set(gepland.map(p => p.in));
+  const geplandUit = new Set(gepland.map(p => p.uit));
+  const veldSpelers = Object.values(l).filter(pid => speler(pid) && !geplandUit.has(pid));
+  const bankSpelers = (S.wedstrijd.selectie||[]).filter(pid => !Object.values(l).includes(pid) && speler(pid) && !geplandIn.has(pid));
   if (!veldSpelers.length) return meld('Zet eerst een opstelling neer voor deze periode');
   if (!bankSpelers.length) return meld('Er staat niemand op de bank om in te brengen');
   const optie = pid => `<option value="${pid}">${esc(spelerNr(pid))} · ${esc(spelerNaam(pid))}</option>`;
