@@ -2,6 +2,21 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
+<script>
+/* Landingspagina-gate: wie de app al geïnstalleerd heeft (standalone), al eerder
+   is doorgeklikt, of via een specifieke link komt (bv. ?team=CODE uitnodiging),
+   gaat direct naar het inlogscherm. Nieuwe browserbezoekers zien eerst over.html. */
+(function(){
+  try{
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    var algezien = localStorage.getItem('cluppieIntroGezien') === '1';
+    var heeftParams = location.search.length > 0;
+    if (!standalone && !algezien && !heeftParams){
+      location.replace('over.html');
+    }
+  } catch(e){ /* localStorage geblokkeerd o.i.d. — dan gewoon het inlogscherm tonen */ }
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0e1116">
 <title>Cluppie — Coach je team</title>
@@ -19,6 +34,7 @@
     <img src="icons/icon-192.png" alt="ASV'33" class="login-logo">
     <h1>Cluppie</h1>
     <p>Maak per kwart je opstelling, sleep wissels het veld in en zie precies wie hoeveel speelt.</p>
+    <a href="over.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin:2px 0 18px;padding:7px 13px;border-radius:99px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.8);font-size:12.5px;font-weight:600;text-decoration:none">ℹ️ Meer over Cluppie</a>
     <button class="knop fluo vol" id="googleLogin">Inloggen met Google</button>
     <button class="knop licht vol" id="microsoftLogin" style="margin-top:8px">Inloggen met Microsoft</button>
     <div class="of"><span>of met e-mail</span></div>
@@ -30,9 +46,6 @@
       <button class="knop fluo vol" id="wwLoginOk" type="submit">Inloggen</button>
       <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:8px;line-height:1.5">Nog geen account? Vul je e-mail en een wachtwoord in — het account wordt dan automatisch aangemaakt. <button type="button" id="wwVergeten" style="color:var(--fluo);text-decoration:underline;font-weight:600">Wachtwoord vergeten?</button></p>
     </form>
-    <p style="text-align:center;margin-top:18px;font-size:12px">
-      <a href="over.html" target="_blank" rel="noopener" style="color:rgba(255,255,255,.45);text-decoration:underline">Meer over Cluppie →</a>
-    </p>
   </div>
 </div>
 
@@ -40,6 +53,7 @@
   <div class="bord">
     <h1 id="uitnodigTitel">Welkom!</h1>
     <p id="uitnodigSubtitel">Je bent uitgenodigd als coach. Log in om aan te sluiten.</p>
+    <a href="over.html" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;margin:2px 0 16px;padding:7px 13px;border-radius:99px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.8);font-size:12.5px;font-weight:600;text-decoration:none">ℹ️ Meer over Cluppie</a>
     <div style="text-align:left;margin-top:6px">
       <button class="knop fluo vol" id="uitnodigGoogle">Aansluiten met Google</button>
       <button class="knop licht vol" id="uitnodigMicrosoft" style="margin-top:8px">Aansluiten met Microsoft</button>
@@ -53,9 +67,6 @@
         <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:8px;line-height:1.5">Nog geen account? Vul je e-mail en een wachtwoord in — het account wordt automatisch aangemaakt.</p>
       </form>
       <p style="font-size:11.5px;color:rgba(255,255,255,.45);margin-top:14px;line-height:1.5;text-align:center">Niet de juiste persoon? <button id="uitnodigAnders" style="color:var(--fluo);text-decoration:underline;font-weight:600">Gebruik een ander account</button></p>
-      <p style="text-align:center;margin-top:14px;font-size:12px">
-        <a href="over.html" target="_blank" rel="noopener" style="color:rgba(255,255,255,.45);text-decoration:underline">Meer over Cluppie →</a>
-      </p>
     </div>
   </div>
 </div>
