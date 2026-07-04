@@ -267,6 +267,7 @@ export function modalNieuweWedstrijd(){
       goals: [],
       kaarten: [],
       kwarten,
+      seizoen: S.huidigSeizoen,
       gemaakt: serverTimestamp(),
     });
     const ref = await addDoc(collection(db,'teams',S.teamId,'wedstrijden'), w);
@@ -737,8 +738,11 @@ function kopieerVorigKwart(){
 /* ==================== STATISTIEK-TAB ==================== */
 export function htmlStats(){
   if (!S.spelers.length) return `<div class="kaart leeg">Voeg eerst spelers toe.</div>`;
+  const alleSeizoenen = S.statsSeizoen === 'alles';
+  const wedstrijdenLijst = alleSeizoenen ? S.wedstrijden : S.wedstrijden.filter(w => w.seizoen === S.statsSeizoen);
+  const presentieLijst = alleSeizoenen ? (S.presentie||[]) : (S.presentie||[]).filter(p => p.seizoen === S.statsSeizoen);
   const tot = {tijd:{}, keeper:{}, lijn:{}, wedstrijden:{}, goals:{}, geel:{}, rood:{}, tijd_:{}, aanv:{}};
-  for (const w of S.wedstrijden){
+  for (const w of wedstrijdenLijst){
     for (const g of (w.goals||[])) if (g.type==='voor' && g.pid) tot.goals[g.pid] = (tot.goals[g.pid]||0) + 1;
     for (const c of (w.kaarten||[])){
       if (c.auto) continue;
@@ -763,12 +767,12 @@ export function htmlStats(){
   const heeftData = Object.keys(tot.tijd).length > 0;
 
   // Opkomst training: aanwezig = niet in de afwezig-lijst van een sessie
-  const totTrainingen = (S.presentie || []).length;
+  const totTrainingen = presentieLijst.length;
   const opkomst = {};
   if (totTrainingen){
     for (const p of S.spelers){
       let aanwezig = 0;
-      for (const sessie of S.presentie){
+      for (const sessie of presentieLijst){
         if (!(sessie.afwezig || []).includes(p.id)) aanwezig++;
       }
       opkomst[p.id] = Math.round((aanwezig / totTrainingen) * 100);

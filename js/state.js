@@ -18,7 +18,7 @@ export const S = {
   clubs:[], club:null, clubId:null, clubTab:'teams', clubTrainBouw:'onder', clubDashSort:'desc', clubDashPeriode:'dag', clubTeams:[], clubTrainingen:[],
   trainingen:[], trainingenGelezen:{}, videos:[], presentie:[],
   beoordelingen:[], _beoordeelProfiel:null, _profielTab:'overzicht',
-  teamEvaluaties:[], statsSubTab:'spelers',
+  teamEvaluaties:[], statsSubTab:'spelers', huidigSeizoen:null, statsSeizoen:null,
   planning:[], _planningFilter:'alles', _planningDichteMaanden:null,
   uitleningenUit:[], uitleningenIn:[], _leenProfiel:null,
   unsub:{}, klokInterval:null, saveTimer:null, lokaalTot:0,

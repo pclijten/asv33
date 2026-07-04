@@ -7,7 +7,7 @@ import {
   openModal, sluitModal, toon, stopUnsubs, uurMin, bewaakTerug
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
-  KNVB_SEIZOEN, knvbKalenderVoorTeam,
+  KNVB_SEIZOEN, SEIZOEN_FALLBACK, knvbKalenderVoorTeam,
   NIVEAUS, niveau, niveauKleur, SKILLS, skillDomein,
   LEERCURVE, leercurveRelevant, SNEL_TAGS, snelTag,
   TEAM_CATEGORIEEN, TEAM_TAGS, teamCategorie,
@@ -470,7 +470,7 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   // presentie altijd ingeklapt openen bij elke teamopening (alle maanden dicht)
   S._presentieOpen = new Set();
   S._presentieToonAlles = new Set();
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','teamevaluaties');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','teamevaluaties','seizoen');
   const luisterfout = (naam) => (err) => {
     console.error(`[Cluppie] Listener "${naam}" kon niet lezen (teamId=${teamId}):`, err.code, err.message);
     if (err.code === 'permission-denied') meld(`Geen toegang tot "${naam}" — controleer de Firestore-rules`);
@@ -479,6 +479,8 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
     if (!snap.exists()){ verlaatTeamView(); return; }
     S.team = {id:snap.id, ...snap.data()};
     if (S.team.club && !S.unsub.uitleningen) startUitleningenListener(teamId);
+    if (S.team.club && !S.unsub.seizoen) startSeizoenListener(teamId);
+    if (!S.team.club) S.huidigSeizoen = SEIZOEN_FALLBACK; // los team zonder club: geen seizoenbeheer
     if (!S.wedstrijdId) renderTeam();
   }, luisterfout('team'));
   S.unsub.spelers = onSnapshot(collection(db,'teams',teamId,'spelers'), snap => {
@@ -532,6 +534,18 @@ export function openTeam(teamId, beginTab = 'trainingen', opties = {}){
   toon('team');
 }
 
+/* Houdt S.huidigSeizoen synchroon met clubs/{clubId}.huidigSeizoen, zodat elk
+   nieuw document (wedstrijd, presentie, beoordeling, teamevaluatie) bij het
+   aanmaken automatisch het juiste seizoen-label krijgt. Zonder veld (nog geen
+   "Nieuw seizoen starten" gebruikt) valt terug op SEIZOEN_FALLBACK. */
+function startSeizoenListener(teamId){
+  const clubId = S.team?.club;
+  if (!clubId){ S.huidigSeizoen = SEIZOEN_FALLBACK; return; }
+  if (S.unsub.seizoen){ S.unsub.seizoen(); delete S.unsub.seizoen; }
+  S.unsub.seizoen = onSnapshot(doc(db,'clubs',clubId), snap => {
+    S.huidigSeizoen = snap.data()?.huidigSeizoen || SEIZOEN_FALLBACK;
+  }, (err) => console.error(`[Cluppie] Listener "seizoen" kon niet lezen (clubId=${clubId}):`, err.code, err.message));
+}
 function startUitleningenListener(teamId){
   const clubId = S.team?.club;
   if (!clubId){ return; }              // los team zonder club: geen uitleningen
@@ -544,7 +558,7 @@ function startUitleningenListener(teamId){
   }, (err) => console.error(`[Cluppie] Listener "uitleningen" kon niet lezen (clubId=${clubId}):`, err.code, err.message));
 }
 export function verlaatTeamView(){
-  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','uitleningen','teamevaluaties');
+  stopUnsubs('team','spelers','wedstrijden','presentie','planning','beoordelingen','uitleningen','teamevaluaties','seizoen');
   S.teamId = null; S.team = null; S.spelers = []; S.wedstrijden = []; S.planning = [];
   S.uitleningenUit = []; S.uitleningenIn = []; S.teamEvaluaties = [];
   renderTeams(); toon('teams');
@@ -1655,6 +1669,9 @@ function koppelTeamTab(v, tab){
     v.querySelectorAll('[data-statsmodus]').forEach(b => b.onclick = () => {
       S.statsSubTab = b.dataset.statsmodus; renderTeam();
     });
+    v.querySelectorAll('[data-seizoenfilter]').forEach(b => b.onclick = () => {
+      S.statsSeizoen = b.dataset.seizoenfilter; renderTeam();
+    });
   }
   if (tab === 'planning'){
     const eigenBtn = v.querySelector('#planEigenDag');
@@ -2021,6 +2038,7 @@ function modalSnelBeoordeling(spelerId, bestaande = null){
       tags:[...gekozenTags], notities:{algemeen:$('#mSnNotitie').value.trim()},
       door:deelnemer(), gemaaktMs:Date.now(),
     };
+    if (!bestaande) data.seizoen = S.huidigSeizoen;
     try {
       if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id), data);
       else await addDoc(collection(db,'teams',S.teamId,'beoordelingen'), data);
@@ -2095,6 +2113,7 @@ export function modalTeamEvaluatie(wedstrijdId){
       notitieGoed:$('#mTeGoed').value.trim(), notitieAandacht:$('#mTeAandacht').value.trim(),
       door:deelnemer(), gemaaktMs:Date.now(),
     };
+    if (!bestaande) data.seizoen = S.huidigSeizoen;
     try {
       if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'teamevaluaties',bestaande.id), data);
       else await addDoc(collection(db,'teams',S.teamId,'teamevaluaties'), data);
@@ -2233,9 +2252,25 @@ function htmlTeamEvaluatieDashboard(){
     </div>` : ''}`;
 }
 
+/* Alle seizoenen die voorkomen in de wedstrijden/presentie van dit team,
+   plus het huidige seizoen (ook als er nog geen data voor is), nieuwste eerst. */
+function seizoenenLijst(){
+  const set = new Set();
+  if (S.huidigSeizoen) set.add(S.huidigSeizoen);
+  for (const w of (S.wedstrijden||[])) if (w.seizoen) set.add(w.seizoen);
+  for (const p of (S.presentie||[])) if (p.seizoen) set.add(p.seizoen);
+  return [...set].sort((a,b) => (parseInt(b)||0) - (parseInt(a)||0));
+}
 function htmlStatsTab(){
+  if (!S.statsSeizoen) S.statsSeizoen = S.huidigSeizoen || 'alles';
   const modus = S.statsSubTab || 'spelers';
+  const seizoenen = seizoenenLijst();
   return `
+    ${seizoenen.length ? `
+    <div class="segment" id="statsSeizoen" style="margin-bottom:10px">
+      ${seizoenen.map(sz => `<button data-seizoenfilter="${esc(sz)}" class="${S.statsSeizoen===sz?'actief':''}">${esc(sz)}</button>`).join('')}
+      <button data-seizoenfilter="alles" class="${S.statsSeizoen==='alles'?'actief':''}">Alle</button>
+    </div>` : ''}
     <div class="segment" id="statsModus" style="margin-bottom:14px">
       <button data-statsmodus="spelers" class="${modus==='spelers'?'actief':''}">Spelers</button>
       <button data-statsmodus="evaluatie" class="${modus==='evaluatie'?'actief':''}">📈 Teamevaluatie</button>
@@ -2297,6 +2332,7 @@ function modalVolledigeBeoordeling(spelerId, bestaande = null){
       bron:{type:'los', label:$('#mVbMoment').value.trim() || 'Periodieke meting'},
       scores, notities, door:deelnemer(), gemaaktMs:Date.now(),
     };
+    if (!bestaande) data.seizoen = S.huidigSeizoen;
     try {
       if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'beoordelingen',bestaande.id), data);
       else await addDoc(collection(db,'teams',S.teamId,'beoordelingen'), data);
@@ -2758,7 +2794,7 @@ function modalPresentie(bestaande = null){
       const zelfde = S.presentie.find(p => p.datum === datum);
       if (bestaande) await updateDoc(doc(db,'teams',S.teamId,'presentie',bestaande.id), data);
       else if (zelfde) await updateDoc(doc(db,'teams',S.teamId,'presentie',zelfde.id), data);
-      else await addDoc(collection(db,'teams',S.teamId,'presentie'), {...data, gemaakt: serverTimestamp()});
+      else await addDoc(collection(db,'teams',S.teamId,'presentie'), {...data, gemaakt: serverTimestamp(), seizoen: S.huidigSeizoen});
       sluitModal();
       meld(afwezig.size ? `${afwezig.size} afwezig genoteerd` : 'Iedereen aanwezig genoteerd');
     } catch(e){

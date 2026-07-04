@@ -16,7 +16,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,         signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-         collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
+         collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch,
          getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId, increment }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject }
@@ -48,7 +48,7 @@ export {
   /* auth */
   GoogleAuthProvider, OAuthProvider, signInWithPopup, signInAnonymously, updateProfile, signOut, onAuthStateChanged,  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, fetchSignInMethodsForEmail,
   /* firestore */
-  collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
+  collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch,
   getDoc, getDocs, query, where, onSnapshot, serverTimestamp, documentId, increment,
   /* storage */
   sRef, uploadBytes, getDownloadURL, deleteObject,

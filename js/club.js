@@ -1,13 +1,13 @@
 import {
   db, storage, collection, doc, addDoc, deleteDoc, updateDoc, deleteField, getDoc, setDoc, getDocs,
-  query, where, onSnapshot, serverTimestamp, documentId,
+  query, where, onSnapshot, serverTimestamp, documentId, writeBatch,
   sRef, uploadBytes, getDownloadURL, deleteObject,
   functions, httpsCallable
 } from './firebase.js';
 import {
   S, $, $$, esc, meld, nieuweCode, teamCode, clubAfkorting, openModal, sluitModal, toon, stopUnsubs, initialen
 } from './state.js';
-import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam, youtubeId, youtubeThumb, youtubeWatch } from './config.js';
+import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam, youtubeId, youtubeThumb, youtubeWatch, SEIZOEN_FALLBACK } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
 
 /* drempels voor het clubdashboard ("aandacht nodig") */
@@ -590,6 +590,7 @@ function htmlClubVideos(teams, videos){
 
 function htmlClubInstel(teams = [], syncStatus = {}){
   const admins = Object.values(S.club.adminsInfo || {}).map(a => esc(a.naam)).join(', ');
+  const huidigSeizoen = S.club.huidigSeizoen || SEIZOEN_FALLBACK;
 
   // --- voetbal.nl-koppeling: token per team ---
   const syncTijd = (ts) => {
@@ -639,6 +640,18 @@ function htmlClubInstel(teams = [], syncStatus = {}){
 
   return `
     <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">📅 Seizoen</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--ink-2);margin-bottom:2px">Huidig seizoen</div>
+          <div class="cond" style="font-weight:700;font-size:22px">${esc(huidigSeizoen)}</div>
+        </div>
+        <button class="knop fluo" id="btnNieuwSeizoen">Nieuw seizoen starten →</button>
+      </div>
+      <p style="font-size:12px;color:var(--ink-2);line-height:1.5;margin-top:10px">Nieuwe wedstrijden, trainingen, beoordelingen en teamevaluaties van alle teams tellen vanaf dat moment mee voor het nieuwe seizoen. Oude data blijft bewaard en is terug te zien via het seizoenfilter in de statistieken (⏱).</p>
+      <button class="knop licht vol" id="migreerSeizoen" style="margin-top:10px">🗂️ Migreer bestaande data naar dit seizoen</button>
+    </div>
+    <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Club-uitnodiging</div>
       <p style="font-size:13.5px;color:var(--ink-2)">Stuur deze link naar mede-admins. Zij worden dan ook beheerder van de club.</p>
       <div class="uitnodig-link" id="clubLink">${esc(location.origin + location.pathname + '?club=' + S.club.code)}</div>
@@ -650,6 +663,85 @@ function htmlClubInstel(teams = [], syncStatus = {}){
     </div>
     ${voetbalBlok}
     <button class="knop gevaar vol" id="verwijderClub">Club opheffen</button>`;
+}
+
+/* Stelt op basis van het huidige seizoen-label (bijv. "2025/'26") het
+   volgende seizoen voor (bijv. "2026/'27"), als startpunt in de modal. */
+function volgendSeizoen(huidig){
+  const m = /^(\d{4})/.exec(huidig || '');
+  const jaar = m ? Number(m[1]) + 1 : new Date().getFullYear();
+  return `${jaar}/'${String(jaar+1).slice(-2)}`;
+}
+
+/* ---------- Nieuw seizoen starten ----------
+   Alleen clubs/{clubId}.huidigSeizoen wordt bijgewerkt. Nieuwe documenten
+   (wedstrijden, presentie, beoordelingen, teamevaluaties) van alle teams
+   krijgen dit label vanaf hun eerstvolgende aanmaak-moment (zie teams.js/
+   wedstrijd.js: die lezen S.huidigSeizoen, dat live meeluistert met dit veld).
+   Bestaande data verandert hier niet — daarvoor is de migratieknop. */
+function modalNieuwSeizoen(){
+  const huidig = S.club.huidigSeizoen || SEIZOEN_FALLBACK;
+  const voorstel = volgendSeizoen(huidig);
+  openModal(`
+    <h2>Nieuw seizoen starten</h2>
+    <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px">Je huidige seizoen is <b>${esc(huidig)}</b>. Vanaf bevestigen loggen nieuwe wedstrijden, trainingen, beoordelingen en teamevaluaties van alle teams onder het nieuwe seizoen. Oude data blijft gewoon bewaard en is terug te zien via het seizoenfilter in de statistieken.</p>
+    <div class="veldgroep"><label>Nieuw seizoen</label>
+      <input class="invoer" id="mSeizoenNaam" value="${esc(voorstel)}" autocomplete="off" style="text-align:center;font-weight:700"></div>
+    <div class="rij" style="margin-top:6px">
+      <button class="knop licht vol" id="mSeizoenAnnuleer">Annuleren</button>
+      <button class="knop vol" id="mSeizoenOk">Bevestigen</button>
+    </div>`);
+  $('#mSeizoenAnnuleer').onclick = () => sluitModal();
+  $('#mSeizoenOk').onclick = async () => {
+    const nieuw = $('#mSeizoenNaam').value.trim();
+    if (!nieuw) return meld('Vul een seizoensnaam in');
+    const knop = $('#mSeizoenOk'); knop.disabled = true; knop.textContent = 'Bezig...';
+    try {
+      await updateDoc(doc(db,'clubs',S.clubId), { huidigSeizoen: nieuw });
+      sluitModal();
+      meld(`Seizoen ${nieuw} gestart ✓`);
+      renderClub();
+    } catch(e){
+      knop.disabled = false; knop.textContent = 'Bevestigen';
+      meld('Opslaan mislukt: ' + (e.code || e.message));
+    }
+  };
+}
+
+/* ---------- Eenmalige migratie: bestaande data labelen ----------
+   Loopt over wedstrijden/presentie/beoordelingen/teamevaluaties van alle
+   teams van de club en zet seizoen = huidig clubseizoen op elk document dat
+   nog geen seizoen-veld heeft. Documenten die al een label hebben (van ná
+   deze feature) worden overgeslagen. Mag zo vaak gedraaid worden als nodig. */
+async function migreerSeizoenData(teams){
+  if (!teams.length) return meld('Geen teams om te migreren');
+  const doel = S.club.huidigSeizoen || SEIZOEN_FALLBACK;
+  if (!confirm(`Alle bestaande wedstrijden, trainingen, beoordelingen en teamevaluaties zonder seizoen-label worden gelabeld als "${doel}". Doorgaan?`)) return;
+  const knop = $('#migreerSeizoen');
+  const origTekst = knop ? knop.textContent : '';
+  if (knop){ knop.disabled = true; knop.textContent = 'Bezig met migreren...'; }
+  const subcollecties = ['wedstrijden','presentie','beoordelingen','teamevaluaties'];
+  let batch = writeBatch(db);
+  let inBatch = 0, totaal = 0;
+  try {
+    for (const t of teams){
+      for (const sub of subcollecties){
+        const snap = await getDocs(collection(db,'teams',t.id,sub));
+        for (const d of snap.docs){
+          if (d.data().seizoen) continue;
+          batch.update(d.ref, { seizoen: doel });
+          inBatch++; totaal++;
+          if (inBatch >= 450){ await batch.commit(); batch = writeBatch(db); inBatch = 0; }
+        }
+      }
+    }
+    if (inBatch > 0) await batch.commit();
+    meld(totaal ? `${totaal} bestaande items gelabeld als ${doel}` : 'Alles was al gelabeld');
+  } catch(e){
+    meld('Migreren mislukt: ' + (e.code || e.message));
+  } finally {
+    if (knop){ knop.disabled = false; knop.textContent = origTekst || '🗂️ Migreer bestaande data naar dit seizoen'; }
+  }
 }
 
 /* ---------- Clubbrede afgelasting ---------- */
@@ -801,6 +893,10 @@ function koppelClubTab(v, tab, teams, trainingen, videos){
     });
   }
   if (tab === 'instel'){
+    const nieuwSeizoenBtn = v.querySelector('#btnNieuwSeizoen');
+    if (nieuwSeizoenBtn) nieuwSeizoenBtn.onclick = () => modalNieuwSeizoen();
+    const migreerBtn = v.querySelector('#migreerSeizoen');
+    if (migreerBtn) migreerBtn.onclick = () => migreerSeizoenData(teams);
     v.querySelector('#kopieerClubLink').onclick = async () => {
       try { await navigator.clipboard.writeText($('#clubLink').textContent); meld('Link gekopieerd'); }
       catch { meld('Link: ' + $('#clubLink').textContent); }

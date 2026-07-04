@@ -167,6 +167,11 @@ export function youtubeWatch(id){ return `https://www.youtube.com/watch?v=${id}`
    t: wd=wedstrijddag, beker, inhaal, vrij. l=label, n=opmerking (optioneel).
    pup=O7-O12, jun=O13-O19, sen=Senioren/Vrouwen, mei=Meiden MO13-MO20. */
 export const KNVB_SEIZOEN = "2026/'27";
+
+/* Standaardwaarde voor clubs/{clubId}.huidigSeizoen zolang de beheerder nog
+   niet op "Nieuw seizoen starten" heeft gedrukt (zie club.js/teams.js). Dit is
+   los van KNVB_SEIZOEN hierboven, dat alleen de KNVB-speeldagenkalender labelt. */
+export const SEIZOEN_FALLBACK = "2025/'26";
 export const KNVB_KALENDER = {
   pup: [
     {d:'2026-08-16',t:'vrij',l:'Vrij',n:'Schoolvakanties N t/m 16 aug'},
