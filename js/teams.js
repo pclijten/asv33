@@ -9,7 +9,7 @@ import {
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, youtubeId, youtubeThumb, youtubeWatch,
   KNVB_SEIZOEN, SEIZOEN_FALLBACK, knvbKalenderVoorTeam,
   NIVEAUS, niveau, niveauKleur, SKILLS, skillDomein,
-  LEERCURVE, leercurveRelevant, SNEL_TAGS, snelTag,
+  LEERCURVE, leercurveRelevant, leercurveThema, SNEL_TAGS, snelTag,
   TEAM_CATEGORIEEN, TEAM_TAGS, teamCategorie,
   KOMPAS_TIPS, isoWeek, kompasIndexVoorWeek } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
@@ -888,6 +888,7 @@ function htmlLeerlijn(p){
       <div class="veldlabel" style="margin-top:0">Leerpunten</div>
       ${lp.length ? lp.map(l => {
         const d = skillDomein(l.domein);
+        const thema = leercurveThema(l.tekst);
         return `
         <div class="leerpunt ${l.klaar?'klaar':''}">
           <button class="lp-check ${l.klaar?'klaar':''}" data-lp-toggle="${l.id}">${l.klaar?'✓':''}</button>
@@ -895,6 +896,7 @@ function htmlLeerlijn(p){
             <div class="lp-domein">${d ? esc(d.naam) : 'Algemeen'}</div>
             <div class="t">${esc(l.tekst)}</div>
             <div class="d">${l.klaar ? 'Afgerond op '+datumNL(l.klaarOp||l.sinds)+' 🎉' : 'Sinds '+datumNL(l.sinds)}</div>
+            ${thema ? `<div style="font-size:11px;color:var(--accent);font-weight:700;margin-top:3px;cursor:pointer" data-thema-info="${esc(thema.thema)}">ℹ️ Achtergrond &amp; tips bekijken</div>` : ''}
           </div>
           <button class="lp-weg" data-lp-weg="${l.id}" title="Verwijderen">🗑</button>
         </div>`;
@@ -1130,13 +1132,64 @@ function htmlKompas(){
         <span class="kompas-label">🧭 ASV-kompas · week ${isoWeek()}</span>
         <span class="kompas-bron">${esc(t.bron)}</span>
       </div>
-      <div class="kompas-tekst">${esc(t.tekst)}</div>
+      <div class="kompas-tekst" data-kompas-info style="cursor:pointer">${esc(t.tekst)} <span style="opacity:.55;font-size:11px">ℹ️</span></div>
       <div class="kompas-dots">${KOMPAS_TIPS.map((_,i) => `<span class="${i===idx?'actief':''}"></span>`).join('')}</div>
       <div class="kompas-nav">
         <button data-kompas="vorige" title="Vorige tip">‹</button>
         <button data-kompas="volgende" title="Volgende tip">›</button>
       </div>
     </div>`;
+}
+
+/* ==================== LEERCURVE/KOMPAS-INFOSCHERMEN ====================
+   Gedeelde onderbladen die de achtergrond (jeugdbeleidsplan) en concrete
+   verbetertips tonen voor een leercurve-thema (§3.3) of een losse
+   ASV-kompas-tip (§3.1/§3.4). Overal waar de app nu al een thema of tip
+   toont, opent dit dezelfde soort blad — zie de aanroepen bij het
+   trainingsthema-advies, de leerpunt-kiezer, de Leerlijn-tab en het kompas. */
+function htmlThemaInfoBlad(t, metTerug){
+  const d = skillDomein(t.domein);
+  return `
+    ${metTerug ? `<button class="knop licht vol" id="mThemaTerug" style="margin-bottom:14px">← Terug naar leerpunt</button>` : ''}
+    <h2>${esc(t.thema)}</h2>
+    <p style="font-size:11.5px;color:var(--ink-2);margin-bottom:14px">Leercurve-thema · vanaf <b>O${t.vanaf}</b> · domein <b>${esc(d?.naam || t.domein)}</b></p>
+    <div class="sectie-kop" style="margin-top:0">Achtergrond</div>
+    <p style="font-size:13.5px;line-height:1.6">${esc(t.info.achtergrond)}</p>
+    <div class="sectie-kop">Tips om dit te verbeteren</div>
+    ${t.info.tips.map((tip,i) => `
+      <div style="display:flex;gap:10px;padding:9px 0;${i===0?'border-top:none':'border-top:1px solid var(--line-d)'}">
+        <div style="width:20px;height:20px;border-radius:50%;background:var(--surface-2);color:var(--ink-2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</div>
+        <div style="font-size:13px;line-height:1.5">${esc(tip)}</div>
+      </div>`).join('')}
+    <div class="badge" style="margin-top:14px">Jeugdbeleidsplan §3.1 · §3.2 · §3.3</div>`;
+}
+function htmlKompasInfoBlad(t){
+  return `
+    <h2>Achtergrond</h2>
+    <p style="font-size:11.5px;color:var(--ink-2);margin-bottom:6px">ASV-kompas · ${esc(t.bron)}</p>
+    <p style="font-size:13.5px;line-height:1.6;font-style:italic;margin-bottom:14px">"${esc(t.tekst)}"</p>
+    <div class="sectie-kop" style="margin-top:0">Waarom dit werkt</div>
+    <p style="font-size:13.5px;line-height:1.6">${esc(t.info.achtergrond)}</p>
+    <div class="sectie-kop">Concreet</div>
+    ${t.info.tips.map((tip,i) => `
+      <div style="display:flex;gap:10px;padding:9px 0;${i===0?'border-top:none':'border-top:1px solid var(--line-d)'}">
+        <div style="width:20px;height:20px;border-radius:50%;background:var(--surface-2);color:var(--ink-2);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${i+1}</div>
+        <div style="font-size:13px;line-height:1.5">${esc(tip)}</div>
+      </div>`).join('')}
+    <div class="badge" style="margin-top:14px">Jeugdbeleidsplan ${esc(t.bron)}</div>`;
+}
+/* terugFn optioneel: als de info-knop vanuit een modal met invoer komt (bijv.
+   leerpunt toevoegen), geven we een weg terug zonder de invoer te verliezen. */
+function toonThemaInfo(themaNaam, terugFn = null){
+  const t = leercurveThema(themaNaam);
+  if (!t || !t.info) return;
+  openModal(htmlThemaInfoBlad(t, !!terugFn));
+  if (terugFn){ const b = $('#mThemaTerug'); if (b) b.onclick = () => terugFn(); }
+}
+function toonKompasInfo(idx){
+  const t = KOMPAS_TIPS[idx];
+  if (!t || !t.info) return;
+  openModal(htmlKompasInfoBlad(t));
 }
 
 function htmlTeamTrainingen(){
@@ -1672,6 +1725,7 @@ function koppelTeamTab(v, tab){
     v.querySelectorAll('[data-seizoenfilter]').forEach(b => b.onclick = () => {
       S.statsSeizoen = b.dataset.seizoenfilter; renderTeam();
     });
+    v.querySelectorAll('[data-thema-info]').forEach(el => el.onclick = () => toonThemaInfo(el.dataset.themaInfo));
   }
   if (tab === 'planning'){
     const eigenBtn = v.querySelector('#planEigenDag');
@@ -1698,6 +1752,9 @@ function koppelTeamTab(v, tab){
     });
   }
   if (tab === 'trainingen'){
+    // ASV-kompas: tik op de tekst voor achtergrond/tips
+    const kompasTekst = v.querySelector('[data-kompas-info]');
+    if (kompasTekst) kompasTekst.onclick = () => toonKompasInfo(S._kompasIdx ?? kompasIndexVoorWeek());
     // ASV-kompas: handmatig bladeren door de tips (blijft lokaal, reset bij heropenen tab)
     v.querySelectorAll('[data-kompas]').forEach(b => b.onclick = () => {
       const huidig = S._kompasIdx ?? kompasIndexVoorWeek();
@@ -1800,6 +1857,7 @@ function koppelTeamTab(v, tab){
     v.querySelectorAll('[data-lp-nieuw]').forEach(b => b.onclick = () => modalLeerpunt(b.dataset.lpNieuw));
     v.querySelectorAll('[data-lp-toggle]').forEach(b => b.onclick = () => toggleLeerpunt(b.dataset.lpToggle));
     v.querySelectorAll('[data-lp-weg]').forEach(b => b.onclick = () => verwijderLeerpunt(b.dataset.lpWeg));
+    v.querySelectorAll('[data-thema-info]').forEach(el => el.onclick = () => toonThemaInfo(el.dataset.themaInfo));
     v.querySelectorAll('[data-open-beoordeling]').forEach(b => b.onclick = () => {
       const bo = S.beoordelingen.find(x => x.id === b.dataset.openBeoordeling);
       if (bo?.soort === 'volledig') modalVolledigeBeoordeling(bo.spelerId, bo);
@@ -2243,12 +2301,13 @@ function htmlTeamEvaluatieDashboard(){
     </div>
 
     ${adviesCat ? `
-    <div class="kaart" style="background:linear-gradient(150deg,var(--accent),var(--grass-2));border:none">
+    <div class="kaart" ${adviesCat.leercurve?`data-thema-info="${esc(adviesCat.leercurve)}" style="background:linear-gradient(150deg,var(--accent),var(--grass-2));border:none;cursor:pointer"`:`style="background:linear-gradient(150deg,var(--accent),var(--grass-2));border:none"`}>
       <div style="color:rgba(255,255,255,.85);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">💡 Voorgesteld trainingsthema</div>
-      <div style="color:#fff;font-family:'Barlow Condensed';font-weight:700;font-size:19px;text-transform:uppercase;margin-bottom:4px">${esc(adviesCat.leercurve || adviesCat.naam)}</div>
+      <div style="color:#fff;font-family:'Barlow Condensed';font-weight:700;font-size:19px;text-transform:uppercase;margin-bottom:4px">${esc(adviesCat.leercurve || adviesCat.naam)}${adviesCat.leercurve?' <span style="font-size:14px;opacity:.85">›</span>':''}</div>
       <div style="color:rgba(255,255,255,.9);font-size:12.5px;line-height:1.5">${adviesCat.leercurve
         ? `Leercurve-thema uit het jeugdbeleidsplan (§3.3) — sluit direct aan op "${esc(adviesCat.naam)}", het onderdeel dat nu aandacht vraagt.`
         : `"${esc(adviesCat.naam)}" vraagt nu de meeste aandacht — geen apart leercurve-thema, wel een mooi gespreksonderwerp voor de volgende training.`}</div>
+      ${adviesCat.leercurve?`<div style="color:rgba(255,255,255,.75);font-size:11px;margin-top:8px;font-weight:600">Tik voor achtergrond en oefentips →</div>`:''}
     </div>` : ''}`;
 }
 
@@ -2348,7 +2407,7 @@ function modalVolledigeBeoordeling(spelerId, bestaande = null){
 }
 
 /* --- Leerpunten (array op spelerdoc) --- */
-function modalLeerpunt(spelerId){
+function modalLeerpunt(spelerId, voorlopigeTekst = ''){
   const p = speler(spelerId); if (!p) return;
   const cat = S.team.categorie || '';
   let domein = 'TA';
@@ -2366,17 +2425,17 @@ function modalLeerpunt(spelerId){
       ${themas.map(t => {
         const d = skillDomein(t.domein);
         return `<button class="lc-thema ${t.rel?'rel':''}" data-thema="${esc(t.thema)}" data-dom="${t.domein}" title="${esc(d?.naam||'')}${t.rel?'':' · vanaf O'+t.vanaf}">
-          <span class="lc-dot" style="background:${t.rel?'var(--n5)':'var(--line-d)'}"></span>${esc(t.thema)}</button>`;
+          <span class="lc-dot" style="background:${t.rel?'var(--n5)':'var(--line-d)'}"></span>${esc(t.thema)}<span data-thema-info="${esc(t.thema)}" title="Achtergrond en tips" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.15);font-size:10px;font-weight:700;margin-left:1px">ℹ</span></button>`;
       }).join('')}
     </div>
-    <p style="font-size:11px;color:var(--ink-2);margin:2px 0 12px">🟢 = hoort bij deze leeftijd volgens het jeugdbeleidsplan. Overige thema's blijven kiesbaar.</p>
+    <p style="font-size:11px;color:var(--ink-2);margin:2px 0 12px">🟢 = hoort bij deze leeftijd volgens het jeugdbeleidsplan. Tik ℹ voor achtergrond en oefentips.</p>
 
     <div class="veldlabel">Domein</div>
     <div class="segment klein-seg" id="mLpDom">${SKILLS.map(d =>
       `<button data-d="${d.id}" class="${d.id==='TA'?'actief':''}" title="${esc(d.naam)}">${d.id}</button>`).join('')}</div>
 
     <div class="veldgroep"><label>Leerpunt</label>
-      <textarea class="invoer" id="mLpTekst" rows="3" placeholder="Bijv. eerder het hoofd omhoog vóór de aanname"></textarea></div>
+      <textarea class="invoer" id="mLpTekst" rows="3" placeholder="Bijv. eerder het hoofd omhoog vóór de aanname">${esc(voorlopigeTekst)}</textarea></div>
     <button class="knop vol fluo" id="mLpOk">Toevoegen</button>`);
 
   const zetDomein = (d) => { domein = d; $$('#mLpDom [data-d]').forEach(x => x.classList.toggle('actief', x.dataset.d===d)); };
@@ -2386,6 +2445,11 @@ function modalLeerpunt(spelerId){
     zetDomein(b.dataset.dom);
     $$('#mLpCurve .lc-thema').forEach(x => x.classList.toggle('gekozen', x===b));
   });
+  $$('#mLpCurve [data-thema-info]').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const behouden = $('#mLpTekst').value;
+    toonThemaInfo(el.dataset.themaInfo, () => modalLeerpunt(spelerId, behouden));
+  }));
   $('#mLpTekst').focus();
   $('#mLpOk').onclick = async () => {
     const tekst = $('#mLpTekst').value.trim();
