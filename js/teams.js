@@ -1723,9 +1723,12 @@ function koppelTeamTab(v, tab){
       S.statsSubTab = b.dataset.statsmodus; renderTeam();
     });
     v.querySelectorAll('[data-seizoenfilter]').forEach(b => b.onclick = () => {
-      S.statsSeizoen = b.dataset.seizoenfilter; renderTeam();
+      S.statsSeizoen = b.dataset.seizoenfilter; S._histAlles = false; renderTeam();
     });
     v.querySelectorAll('[data-thema-info]').forEach(el => el.onclick = () => toonThemaInfo(el.dataset.themaInfo));
+    v.querySelectorAll('[data-open-teameval]').forEach(el => el.onclick = () => modalTeamEvaluatie(el.dataset.openTeameval));
+    const histMeerBtn = v.querySelector('[data-hist-toon-meer]');
+    if (histMeerBtn) histMeerBtn.onclick = () => { S._histAlles = true; renderTeam(); };
   }
   if (tab === 'planning'){
     const eigenBtn = v.querySelector('#planEigenDag');
@@ -2200,10 +2203,43 @@ function teamEvalLaagsteCategorie(ev){
   return laagste;
 }
 
+/* Historie: alle ingevulde teamevaluaties van dit team (gefilterd op het
+   gekozen seizoen), nieuw → oud, met een mini kleurenstrip per categorie.
+   Standaard tonen we de laatste 6; "Toon eerdere" onthoudt S._histAlles
+   zodat de knop niet telkens terugklapt bij een re-render. */
+function htmlTeamEvalHistorie(evalsOudNieuw){
+  const evals = [...evalsOudNieuw].reverse(); // nieuw → oud
+  const LIMIET = 6;
+  const getoond = S._histAlles ? evals : evals.slice(0, LIMIET);
+  const rest = evals.length - getoond.length;
+
+  const rij = ev => {
+    const gem = teamEvalGemiddelde(ev);
+    return `
+    <button class="hist-item" data-open-teameval="${ev.wedstrijdId}">
+      <div class="hist-cijfer" style="background:${gem?niveauKleur(Math.round(gem)):'var(--surface-2)'}">${gem?gem.toFixed(1).replace('.',','):'—'}</div>
+      <div class="hist-tekst">
+        <div class="hist-titel">${esc(ev.tegenstander||'Onbekend')}</div>
+        <div class="hist-datum">${datumNL(ev.datum)}</div>
+        <div class="hist-strip">${TEAM_CATEGORIEEN.map(c => `<span style="background:${ev.scores?.[c.id]?niveauKleur(ev.scores[c.id]):'var(--surface-2)'}"></span>`).join('')}</div>
+      </div>
+      <div class="hist-pijl">›</div>
+    </button>`;
+  };
+
+  return `
+    <div class="kaart">
+      <div class="sectie-kop" style="margin-top:0">🗂️ Historie · al je evaluaties</div>
+      ${getoond.map(rij).join('')}
+      ${rest > 0 ? `<button class="hist-meer" data-hist-toon-meer>Toon ${rest} eerdere wedstrijd${rest===1?'':'en'}</button>` : ''}
+    </div>`;
+}
+
 function htmlTeamEvaluatieDashboard(){
-  const evals = S.teamEvaluaties; // oud → nieuw
+  const alleSeizoenen = S.statsSeizoen === 'alles';
+  const evals = alleSeizoenen ? S.teamEvaluaties : S.teamEvaluaties.filter(e => e.seizoen === S.statsSeizoen); // oud → nieuw
   if (!evals.length){
-    return `<div class="kaart leeg">Nog geen teamevaluaties.<br>Vul na de eerstvolgende wedstrijd "Team evalueren" in op het wedstrijdscherm — daarna verschijnt hier de groeicurve.</div>`;
+    return `<div class="kaart leeg">Nog geen teamevaluaties${alleSeizoenen?'':' dit seizoen'}.<br>Vul na de eerstvolgende wedstrijd "Team evalueren" in op het wedstrijdscherm — daarna verschijnt hier de groeicurve.</div>`;
   }
   const laatste = evals[evals.length-1];
   const vorige = evals.length > 1 ? evals[evals.length-2] : null;
@@ -2269,6 +2305,8 @@ function htmlTeamEvaluatieDashboard(){
         <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="var(--line-d)" stroke-width="1"/>
       </svg>` : `<p style="font-size:12.5px;color:var(--ink-2)">Nog minstens 2 evaluaties nodig voor een lijn.</p>`}
     </div>
+
+    ${htmlTeamEvalHistorie(evals)}
 
     <div class="kaart">
       <div class="sectie-kop" style="margin-top:0">Categorieën · laatste ${Math.min(5,evals.length)} wedstrijden</div>
