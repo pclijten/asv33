@@ -602,6 +602,50 @@ textarea.invoer{font-family:inherit;line-height:1.5;resize:vertical;min-height:6
 .opkomst-cel.matig{ color:#C8860A; }
 .opkomst-cel.laag{ color:var(--uit); }
 
+/* ==================== CLUBBREDE EVALUATIES (admin) ==================== */
+.heat-wrap{overflow-x:auto;margin:0 -4px}
+.heat-tabel{border-collapse:separate;border-spacing:3px;width:100%;min-width:560px}
+.heat-tabel th{font-size:10px;font-weight:600;color:var(--ink-2);text-align:center;padding:0 2px 8px;vertical-align:bottom;line-height:1.2;max-width:56px}
+.heat-tabel th.teamkop{text-align:left;font-size:11.5px;color:var(--ink);text-transform:uppercase;font-family:'Barlow Condensed';letter-spacing:.3px;padding-bottom:8px}
+.heat-tabel td{text-align:center;padding:0}
+.heat-tabel td.teamnaam{text-align:left;font-size:12.5px;font-weight:600;padding-right:8px;white-space:nowrap}
+.heat-tabel td.teamnaam .n{font-size:10.5px;color:var(--ink-2);font-weight:500;display:block;margin-top:1px}
+.heat-cel{width:100%;aspect-ratio:1/1;min-width:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:12px;color:rgba(0,0,0,.55);cursor:pointer;border:1px solid rgba(255,255,255,.06)}
+.heat-cel.leeg{background:var(--surface-2);color:var(--ink-2);opacity:.5;cursor:default}
+.heat-trend{width:26px;text-align:center;font-size:13px;color:var(--ink-2)}
+.heat-trend.op{color:var(--ok)}
+.heat-trend.neer{color:var(--warn)}
+.heat-legenda{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;font-size:11px;color:var(--ink-2)}
+.heat-legenda .stip{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:4px}
+
+.sig-rij{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair)}
+.sig-rij:last-child{border-bottom:none}
+.sig-stip{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.sig-titel{font-weight:600;font-size:13.5px}
+.sig-sub{font-size:12px;color:var(--ink-2);margin-top:2px;line-height:1.4}
+.sig-teams{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.sig-teams span{background:var(--surface-2);color:var(--ink-2);font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:99px}
+
+.domein-rij{padding:12px 0;border-bottom:1px solid var(--hair)}
+.domein-rij:last-child{border-bottom:none}
+.domein-rij-kop{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;cursor:pointer}
+.domein-rij-naam{font-weight:600;font-size:14px}
+.domein-rij-n{font-size:11.5px;color:var(--ink-2);margin-left:6px;font-weight:500}
+.domein-rij-pijl{font-size:12px;color:var(--ink-2);transition:transform .15s;display:inline-block}
+.domein-rij-pijl.open{transform:rotate(90deg)}
+.domein-balkjes{display:flex;gap:6px}
+.domein-balk{flex:1;text-align:center}
+.domein-balk .label{font-size:9.5px;color:var(--ink-2);font-weight:700;margin-bottom:4px;letter-spacing:.3px}
+.domein-balk .buis{height:38px;width:100%;background:var(--surface-2);border-radius:5px;display:flex;align-items:flex-end;overflow:hidden}
+.domein-balk .vulling{width:100%;border-radius:0 0 5px 5px}
+.domein-balk .waarde{font-size:11px;font-weight:700;margin-top:4px;font-family:'Barlow Condensed'}
+.domein-spelerlijst{margin-top:10px;padding-top:10px;border-top:1px dashed var(--hair);display:none}
+.domein-spelerlijst.open{display:block}
+.domein-speler-rij{display:flex;align-items:center;gap:10px;padding:7px 0}
+.domein-speler-rij .naam{flex:1;font-size:12.5px;font-weight:600}
+.mini-dom{display:flex;gap:3px}
+.mini-dom span{width:16px;height:16px;border-radius:4px;font-size:8px;display:flex;align-items:center;justify-content:center;font-weight:700;color:rgba(0,0,0,.5)}
+
 /* Maand-groepen in de presentie-historie */
 .maand-groep{ margin-bottom:8px; }
 .maand-kop{
@@ -995,6 +1039,18 @@ body{ background:var(--bg); color:var(--ink); }
 .lp-domein{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
 .lp-weg{flex-shrink:0;font-size:14px;opacity:.5;background:none;border:none;color:var(--ink-2)}
 .leerpunt.klaar .lp-tekst .t{text-decoration:line-through;color:var(--ink-2)}
+
+/* teamevaluatie: historie per wedstrijd */
+.hist-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:10px 0;border-bottom:1px solid var(--hair)}
+.hist-item:last-child{border-bottom:none}
+.hist-cijfer{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:15px;color:rgba(0,0,0,.6)}
+.hist-tekst{flex:1;min-width:0}
+.hist-titel{font-size:13.5px;font-weight:600}
+.hist-datum{font-size:11px;color:var(--ink-2);font-weight:600}
+.hist-strip{display:flex;gap:2px;margin-top:5px}
+.hist-strip span{width:10px;height:5px;border-radius:2px}
+.hist-pijl{font-size:14px;color:var(--ink-2);flex-shrink:0}
+.hist-meer{display:block;width:100%;text-align:center;background:none;border:none;color:var(--accent);font-weight:600;font-size:13px;padding:10px 0 2px}
 
 /* tijdlijn */
 .tijdlijn-item{display:flex;gap:11px;margin-bottom:12px;width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:0}
