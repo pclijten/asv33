@@ -15,7 +15,7 @@ export const S = {
   spelers:[], wedstrijden:[],
   wedstrijd:null, wedstrijdId:null, kwart:'1',
   teamTab:'wedstrijden', geselecteerd:null,
-  clubs:[], club:null, clubId:null, clubTab:'teams', clubTrainBouw:'onder', clubDashSort:'desc', clubDashPeriode:'dag', clubTeams:[], clubTrainingen:[],
+  clubs:[], club:null, clubId:null, clubTab:'teams', clubTrainBouw:'onder', clubDashSort:'desc', clubDashPeriode:'dag', clubDashModus:'overzicht', clubEvalModus:'teams', clubTeams:[], clubTrainingen:[],
   trainingen:[], trainingenGelezen:{}, videos:[], presentie:[],
   beoordelingen:[], _beoordeelProfiel:null, _profielTab:'overzicht',
   teamEvaluaties:[], statsSubTab:'spelers', huidigSeizoen:null, statsSeizoen:null,
