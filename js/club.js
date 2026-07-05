@@ -9,6 +9,7 @@ import {
 } from './state.js';
 import { CATEGORIEEN, CATEGORIEEN_MEIDEN, catInfo, BOUWEN, bouwVanCategorie, bouwNaam, youtubeId, youtubeThumb, youtubeWatch, SEIZOEN_FALLBACK } from './config.js';
 import { analyseWedstrijd } from './analyse.js';
+import { clubEvaluatiesOphalen, htmlClubEvaluaties, koppelClubEvaluaties } from './club-evaluaties.js';
 
 /* drempels voor het clubdashboard ("aandacht nodig") */
 const DASH_DAGEN_INACTIEF = 14;
@@ -432,10 +433,22 @@ async function renderClub(){
   if (tab === 'teams')      inhoud = htmlClubTeams(teams, afgelastingen);
   if (tab === 'trainingen') inhoud = htmlClubTrainingen(teams, trainingen);
   if (tab === 'videos')     inhoud = htmlClubVideos(teams, videos);
+  let clubEvalData = null;
   if (tab === 'dashboard'){
-    const dash = await clubDashboardOphalen(teams);
-    const gebruik = await clubGebruikOphalen(teams);
-    inhoud = htmlClubDashboard(teams, dash, gebruik);
+    const dashModus = S.clubDashModus || 'overzicht';
+    const segment = `
+      <div class="segment" id="clubDashModus" style="margin-bottom:14px">
+        <button data-dashmodus="overzicht" class="${dashModus==='overzicht'?'actief':''}">Overzicht</button>
+        <button data-dashmodus="evaluaties" class="${dashModus==='evaluaties'?'actief':''}">📈 Evaluaties</button>
+      </div>`;
+    if (dashModus === 'evaluaties'){
+      clubEvalData = await clubEvaluatiesOphalen(teams);
+      inhoud = segment + htmlClubEvaluaties(clubEvalData);
+    } else {
+      const dash = await clubDashboardOphalen(teams);
+      const gebruik = await clubGebruikOphalen(teams);
+      inhoud = segment + htmlClubDashboard(teams, dash, gebruik);
+    }
   }
   if (tab === 'instel')     inhoud = htmlClubInstel(teams, syncStatus);
   v.innerHTML = `
@@ -448,6 +461,10 @@ async function renderClub(){
     </nav>`;
   v.querySelector('#naarTeams').onclick = () => history.back();
   v.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { S.clubTab = b.dataset.ctab; renderClub(); });
+  v.querySelectorAll('[data-dashmodus]').forEach(b => b.onclick = () => { S.clubDashModus = b.dataset.dashmodus; renderClub(); });
+  if (tab === 'dashboard' && S.clubDashModus === 'evaluaties' && clubEvalData){
+    koppelClubEvaluaties(v, clubEvalData, () => renderClub());
+  }
   koppelClubTab(v, tab, teams, trainingen, videos);
 }
 
