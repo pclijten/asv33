@@ -1,0 +1,350 @@
+/**
+ * Cloud Functions voor Cluppie / ASV'33
+ * ======================================
+ * voetbal.nl-wedstrijdsync via de Sportlink iCal-teamlink.
+ *
+ * Twee ingangen, één gedeelde kern (syncAlleTeams):
+ *   - syncVoetbalNl : geplande functie, draait elke nacht.
+ *   - syncNu        : callable functie, aangeroepen door de "Sync nu"-knop in de app.
+ *
+ * Ontwerpprincipes:
+ *   - voetbal.nl is de bron van waarheid voor wedstrijd-METADATA
+ *     (datum, tijd, tegenstander, thuis/uit, locatie).
+ *   - De OPSTELLING blijft altijd behouden: velden als kwarten, selectie, goals,
+ *     kaarten worden bij een bestaande wedstrijd NOOIT aangeraakt.
+ *   - Idempotent via de unieke voetbal.nl-MatchID: opnieuw draaien levert geen
+ *     duplicaten op en overschrijft geen handwerk aan de opstelling.
+ *   - Het seizoen-label (zie SEIZOEN_FALLBACK hieronder) wordt — net als in de
+ *     app — ALLEEN gezet bij het aanmaken van een nieuwe wedstrijd, nooit bij
+ *     een metadata-update van een bestaande. Zo verspringt een al gesyncte
+ *     wedstrijd niet per ongeluk van seizoen.
+ *
+ * De tokens staan afgeschermd in clubs/{clubId}/geheim/{teamId}.icalToken.
+ * Deze functie draait met admin-rechten en mag daar dus bij.
+ */
+
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { setGlobalOptions } from 'firebase-functions/v2';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { logger } from 'firebase-functions';
+
+initializeApp();
+const db = getFirestore();
+
+// Europa-regio (lagere latency, data dichter bij huis).
+setGlobalOptions({ region: 'europe-west1', maxInstances: 5 });
+
+/* Zelfde standaardwaarde als SEIZOEN_FALLBACK in js/config.js aan de
+   clientkant. Deze twee codebases delen geen bestanden, dus hou ze
+   handmatig gelijk als je "Nieuw seizoen starten" gebruikt in de app —
+   die schrijft clubs/{clubId}.huidigSeizoen, en dat leest deze functie
+   hieronder gewoon live uit; deze constante is alleen de terugval
+   zolang dat veld nog nooit gezet is. */
+const SEIZOEN_FALLBACK = "2025/'26";
+
+/* ====================================================================
+   1. iCAL OPHALEN
+   ==================================================================== */
+
+/** Haalt de ruwe iCal-tekst op. Accepteert een volledige URL (Google Agenda e.d.)
+ *  of een Sportlink-token (dan bouwen we de Sportlink-URL zelf). */
+async function fetchIcalVan({ icalUrl, icalToken }) {
+  let url;
+  if (icalUrl) {
+    url = icalUrl;
+  } else if (icalToken) {
+    url = `https://data.sportlink.com/ical-team?token=${encodeURIComponent(icalToken)}`;
+  } else {
+    throw new Error('Geen koppeling (url of token) ingesteld');
+  }
+  const res = await fetch(url, { headers: { 'User-Agent': 'Cluppie-sync/1.0' } });
+  if (!res.ok) {
+    throw new Error(`iCal-fetch mislukte (HTTP ${res.status})`);
+  }
+  return await res.text();
+}
+
+/* ====================================================================
+   2. iCAL PARSEN  →  lijst wedstrijden
+   --------------------------------------------------------------------
+   LET OP: dit is de enige sectie die afhangt van het exacte VEVENT-formaat
+   van Sportlink. Tot we één echt VEVENT-voorbeeld hebben gezien, is de
+   veld-mapping hieronder een beargumenteerde aanname op basis van het
+   bekende Voetbal Datacentre-formaat. Markeringen met TODO geven aan wat
+   we verifiëren zodra we een gevulde kalender hebben.
+   ==================================================================== */
+
+/** Vouwt iCal "line folding" uit: vervolgregels beginnen met spatie/tab. */
+function unfold(tekst) {
+  return tekst.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
+}
+
+/** Splitst de iCal in losse VEVENT-blokken. */
+function splitEvents(ical) {
+  const blokken = [];
+  const re = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
+  let m;
+  while ((m = re.exec(ical)) !== null) blokken.push(m[1]);
+  return blokken;
+}
+
+/** Leest één property-waarde uit een VEVENT-blok (bv. SUMMARY, DTSTART). */
+function prop(blok, naam) {
+  // matcht "NAAM" eventueel met parameters (NAAM;TZID=...:waarde)
+  const re = new RegExp(`(?:^|\\n)${naam}(?:;[^:\\n]*)?:(.*)`, 'i');
+  const m = blok.match(re);
+  return m ? m[1].trim() : '';
+}
+
+/** iCal-datum (bv. 20251018T140000 of 20251018) → 'YYYY-MM-DD' + 'HH:MM'. */
+function parseDatumTijd(waarde) {
+  const m = waarde.match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
+  if (!m) return { datum: '', tijd: '' };
+  const [, jaar, maand, dag, uur, min] = m;
+  return {
+    datum: `${jaar}-${maand}-${dag}`,
+    tijd: uur ? `${uur}:${min}` : '',
+  };
+}
+
+/**
+ * Zet één VEVENT-blok om naar een wedstrijd-object.
+ * Geeft null terug als het blok geen bruikbare wedstrijd is.
+ *
+ * TODO (verifiëren met echt voorbeeld):
+ *  - Exacte vorm van SUMMARY: vermoedelijk "Thuisclub - Uitclub".
+ *  - Waar de MatchID staat: vermoedelijk in UID (bv. "9656197@voetbal.nl").
+ *  - Of LOCATION het veld/accommodatie bevat.
+ */
+function eventNaarWedstrijd(blok, teamNaam, clubNaam) {
+  const uid = prop(blok, 'UID');
+  const summary = prop(blok, 'SUMMARY');
+  const location = prop(blok, 'LOCATION');
+  const dtstart = prop(blok, 'DTSTART');
+  if (!summary || !dtstart) return null;
+
+  const { datum, tijd } = parseDatumTijd(dtstart);
+  if (!datum) return null;
+
+  // MatchID uit de UID halen (voetbal.nl: "9656197@..."). Geen herkenbare
+  // voetbal.nl-MatchID? Gebruik dan de hele UID als unieke sleutel — zo werkt
+  // ook een Google-agenda-iCal (test) idempotent, zonder duplicaten.
+  const voorAt = uid.split('@')[0]?.trim();
+  const matchId = (voorAt && /^\d+$/.test(voorAt)) ? voorAt : (uid.trim() || null);
+
+  // Thuis/uit + tegenstander bepalen uit "Thuis - Uit".
+  // We matchen op de clubnaam (of teamnaam) om te zien of wij thuis spelen.
+  let thuis = true;
+  let tegenstander = summary;
+  const delen = summary.split(/\s+-\s+/);
+  if (delen.length === 2) {
+    const [links, rechts] = delen.map((s) => s.trim());
+    const wijZijn = (naam) =>
+      clubNaam && naam.toLowerCase().includes(clubNaam.toLowerCase().split(/['\s]/)[0]);
+    if (wijZijn(links)) {
+      thuis = true;
+      tegenstander = rechts;
+    } else if (wijZijn(rechts)) {
+      thuis = false;
+      tegenstander = links;
+    } else {
+      // konden onszelf niet herkennen: neem rechts als tegenstander, markeer thuis onbekend
+      thuis = true;
+      tegenstander = rechts || links;
+    }
+  }
+
+  return {
+    bron: 'voetbalnl',
+    matchId,
+    datum,
+    tijd,
+    tegenstander,
+    thuis,
+    locatie: location || '',
+  };
+}
+
+/** Parset de volledige iCal-tekst naar een lijst wedstrijd-objecten. */
+function parseIcal(icalRuw, teamNaam, clubNaam) {
+  const ical = unfold(icalRuw);
+  const events = splitEvents(ical);
+  const wedstrijden = [];
+  for (const blok of events) {
+    const w = eventNaarWedstrijd(blok, teamNaam, clubNaam);
+    if (w) wedstrijden.push(w);
+  }
+  return wedstrijden;
+}
+
+/* ====================================================================
+   3. UPSERT naar Firestore  (opstelling blijft behouden)
+   ==================================================================== */
+
+/**
+ * Schrijft de gesyncte wedstrijden naar teams/{teamId}/wedstrijden.
+ * - Bestaat een wedstrijd al (zelfde matchId): werk ALLEEN de metadata bij.
+ *   De opstelling-velden (kwarten, selectie, goals, kaarten, formatie...)
+ *   én het seizoen-label blijven onaangeroerd.
+ * - Bestaat hij nog niet: maak een nieuw wedstrijd-document met lege
+ *   opstelling én het huidige seizoen-label.
+ * Geeft een telling terug { aangemaakt, bijgewerkt }.
+ * @param {string} huidigSeizoen  clubs/{clubId}.huidigSeizoen (of de terugval)
+ */
+async function upsertWedstrijden(teamId, gesynced, huidigSeizoen) {
+  const col = db.collection('teams').doc(teamId).collection('wedstrijden');
+
+  // bestaande voetbal.nl-wedstrijden ophalen, geïndexeerd op matchId
+  const bestaandeSnap = await col.where('bron', '==', 'voetbalnl').get();
+  const bestaandPerMatch = new Map();
+  bestaandeSnap.forEach((d) => {
+    const data = d.data();
+    if (data.matchId) bestaandPerMatch.set(data.matchId, d.id);
+  });
+
+  let aangemaakt = 0;
+  let bijgewerkt = 0;
+  const batch = db.batch();
+
+  for (const w of gesynced) {
+    if (!w.matchId) continue;
+    const bestaatId = bestaandPerMatch.get(w.matchId);
+    if (bestaatId) {
+      // ALLEEN metadata bijwerken — opstelling én seizoen-label met rust laten.
+      batch.update(col.doc(bestaatId), {
+        datum: w.datum,
+        tijd: w.tijd,
+        tegenstander: w.tegenstander,
+        thuis: w.thuis,
+        locatie: w.locatie,
+        laatsteSync: FieldValue.serverTimestamp(),
+      });
+      bijgewerkt++;
+    } else {
+      // Nieuwe wedstrijd: metadata + lege opstelling-structuur + seizoen-label.
+      batch.set(col.doc(), {
+        type: 'normaal',
+        bron: 'voetbalnl',
+        matchId: w.matchId,
+        datum: w.datum,
+        tijd: w.tijd,
+        tegenstander: w.tegenstander,
+        thuis: w.thuis,
+        locatie: w.locatie,
+        seizoen: huidigSeizoen,
+        // lege opstelling-velden zodat de wedstrijd meteen bruikbaar is
+        selectie: [],
+        goals: [],
+        kaarten: [],
+        gemaakt: FieldValue.serverTimestamp(),
+        laatsteSync: FieldValue.serverTimestamp(),
+      });
+      aangemaakt++;
+    }
+  }
+
+  await batch.commit();
+  return { aangemaakt, bijgewerkt };
+}
+
+/* ====================================================================
+   4. GEDEELDE KERN: sync alle teams van alle clubs (of één club)
+   ==================================================================== */
+
+/**
+ * Loopt over de teams met een opgeslagen token en synct elk team.
+ * @param {string|null} alleenClubId  beperk tot één club (handmatige sync), of null voor alles.
+ */
+async function syncAlleTeams(alleenClubId = null) {
+  const clubsSnap = alleenClubId
+    ? [await db.collection('clubs').doc(alleenClubId).get()]
+    : (await db.collection('clubs').get()).docs;
+
+  const rapport = [];
+
+  for (const clubDoc of clubsSnap) {
+    if (!clubDoc.exists) continue;
+    const clubId = clubDoc.id;
+    const club = clubDoc.data();
+    const clubNaam = club.naam || '';
+    const huidigSeizoen = club.huidigSeizoen || SEIZOEN_FALLBACK;
+    const teamIds = Object.keys(club.teams || {});
+
+    for (const teamId of teamIds) {
+      // koppeling ophalen uit de afgeschermde subcollectie
+      const geheimRef = db.collection('clubs').doc(clubId).collection('geheim').doc(teamId);
+      const geheimSnap = await geheimRef.get();
+      const geheim = geheimSnap.exists ? geheimSnap.data() : null;
+      const icalUrl = geheim?.icalUrl || null;
+      const icalToken = geheim?.icalToken || null;
+      if (!icalUrl && !icalToken) continue; // geen koppeling voor dit team
+
+      const teamSnap = await db.collection('teams').doc(teamId).get();
+      const teamNaam = teamSnap.exists ? teamSnap.data().naam : '';
+
+      try {
+        const ical = await fetchIcalVan({ icalUrl, icalToken });
+        const wedstrijden = parseIcal(ical, teamNaam, clubNaam);
+        const { aangemaakt, bijgewerkt } = await upsertWedstrijden(teamId, wedstrijden, huidigSeizoen);
+
+        // syncstatus terugschrijven naar het geheim-document (voor de UI)
+        await geheimRef.set(
+          {
+            laatsteSync: FieldValue.serverTimestamp(),
+            laatsteAantal: wedstrijden.length,
+            laatsteFout: null,
+          },
+          { merge: true }
+        );
+
+        rapport.push({ teamId, teamNaam, gevonden: wedstrijden.length, aangemaakt, bijgewerkt });
+        logger.info(`Sync ${teamNaam}: ${wedstrijden.length} gevonden, ${aangemaakt} nieuw, ${bijgewerkt} bijgewerkt`);
+      } catch (e) {
+        await geheimRef.set(
+          { laatsteSync: FieldValue.serverTimestamp(), laatsteFout: String(e.message || e) },
+          { merge: true }
+        );
+        rapport.push({ teamId, teamNaam, fout: String(e.message || e) });
+        logger.error(`Sync ${teamNaam} mislukt: ${e.message || e}`);
+      }
+    }
+  }
+
+  return rapport;
+}
+
+/* ====================================================================
+   5. INGANGEN
+   ==================================================================== */
+
+/** Nachtelijke sync: elke dag om 03:00 Europe/Amsterdam. */
+export const syncVoetbalNl = onSchedule(
+  { schedule: '0 3 * * *', timeZone: 'Europe/Amsterdam' },
+  async () => {
+    const rapport = await syncAlleTeams(null);
+    logger.info('Nachtelijke sync klaar', { teams: rapport.length });
+  }
+);
+
+/** Handmatige sync vanuit de app ("Sync nu"-knop). Alleen voor club-admins. */
+export const syncNu = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Log eerst in.');
+
+  const clubId = request.data?.clubId;
+  if (!clubId) throw new HttpsError('invalid-argument', 'clubId ontbreekt.');
+
+  // controleer dat de aanroeper club-admin is
+  const clubSnap = await db.collection('clubs').doc(clubId).get();
+  if (!clubSnap.exists) throw new HttpsError('not-found', 'Club bestaat niet.');
+  const admins = clubSnap.data().admins || {};
+  if (admins[uid] !== true) {
+    throw new HttpsError('permission-denied', 'Alleen een club-admin mag synchroniseren.');
+  }
+
+  const rapport = await syncAlleTeams(clubId);
+  const totaal = rapport.reduce((n, r) => n + (r.gevonden || 0), 0);
+  return { ok: true, totaalWedstrijden: totaal, perTeam: rapport };
+});
