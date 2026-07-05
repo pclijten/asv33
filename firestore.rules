@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===== Hulpfuncties =====
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isBeheerder() {
+      return signedIn() && request.auth.token.email == 'pclijten@gmail.com';
+    }
+    function isTeamMember(teamId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/teams/$(teamId))
+             .data.leden[request.auth.uid] == true;
+    }
+    function isClubAdmin(clubId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/clubs/$(clubId))
+             .data.admins[request.auth.uid] == true;
+    }
+    // Controleert dat een wijziging ALLEEN het eigen lidmaatschap toevoegt
+    // (leden + ledenInfo) en verder niets aan het document verandert.
+    function voegtZichzelfToe() {
+      return signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['leden', 'ledenInfo'])
+        && request.resource.data.leden[request.auth.uid] == true;
+    }
+    // ===== Teams =====
+    match /teams/{teamId} {
+      allow read: if signedIn();
+      allow create: if isBeheerder();
+      allow update: if (signedIn() && resource.data.leden[request.auth.uid] == true)
+                    || voegtZichzelfToe();
+      allow delete: if signedIn() && resource.data.leden[request.auth.uid] == true;
+
+      // ----- Blessures: gezondheidsgegevens (AVG art. 9) -----
+      // Expliciet blok, NIET leunend op de wildcard hieronder, zodat deze
+      // bijzonder gevoelige data altijd uitsluitend voor team-coaches is —
+      // ook als de wildcard ooit ruimer zou worden gemaakt.
+      // Lezen/schrijven/verwijderen: alleen een coach (lid) van dit team.
+      // Delete is bewust toegestaan: nodig voor een AVG-inzage-/verwijderverzoek.
+      match /blessures/{blessureId} {
+        allow read:   if isTeamMember(teamId);
+        allow create: if isTeamMember(teamId)
+                      && request.resource.data.spelerId is string
+                      && request.resource.data.ernst is string;
+        allow update: if isTeamMember(teamId);
+        allow delete: if isTeamMember(teamId);
+      }
+
+      match /{sub=**} {
+        allow read, write: if isTeamMember(teamId);
+      }
+    }
+    // ===== Clubs =====
+    match /clubs/{clubId} {
+      allow read: if signedIn();
+      allow create: if isBeheerder();
+      allow update: if (signedIn() && resource.data.admins[request.auth.uid] == true)
+                    || (signedIn()
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['leden', 'ledenInfo'])
+                        && request.resource.data.leden[request.auth.uid] == true);
+      allow delete: if signedIn() && resource.data.admins[request.auth.uid] == true;
+      // Afgelast-historie: iedere ingelogde gebruiker mag de stats lezen;
+      // alleen club-admins mogen een afgelasting wegschrijven of verwijderen.
+      match /afgelastingen/{afgId} {
+        allow read: if signedIn();
+        allow write: if isClubAdmin(clubId);
+      }
+      // Geheime tokens (voetbal.nl-koppeling): ALLEEN club-admins mogen lezen/schrijven.
+      // De Cloud Function draait met admin-rechten en omzeilt deze regels sowieso.
+      // Hierdoor is de iCal-token nergens leesbaar voor gewone gebruikers.
+      match /geheim/{teamId} {
+        allow read, write: if isClubAdmin(clubId);
+      }
+      // Uitleningen: een speler die tijdelijk aan een ander clubteam wordt uitgeleend.
+      // Lezen mag de coach van het bron- OF ontvangende team (en club-admins).
+      // Aanmaken mag alleen de coach van het bron-team, en alleen voor zijn eigen team.
+      // Intrekken/wijzigen mag de coach van het bron-team of een club-admin.
+      match /uitleningen/{leenId} {
+        allow read: if isTeamMember(resource.data.vanTeam)
+                    || isTeamMember(resource.data.naarTeam)
+                    || isClubAdmin(clubId);
+        allow create: if isTeamMember(request.resource.data.vanTeam);
+        allow update, delete: if isTeamMember(resource.data.vanTeam)
+                              || isClubAdmin(clubId);
+      }
+    }
+    // ===== Trainingen =====
+    match /trainingen/{trainingId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && isClubAdmin(request.resource.data.club);
+      allow update, delete: if signedIn() && isClubAdmin(resource.data.club);
+    }
+    // ===== Video's (YouTube-links) =====
+    match /videos/{videoId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && isClubAdmin(request.resource.data.club);
+      allow update, delete: if signedIn() && isClubAdmin(resource.data.club);
+    }
+    // ===== Logins (gebruiksstatistieken voor het clubdashboard) =====
+    // Iedereen mag bij het inloggen precies één eigen logindocument aanmaken
+    // (uid moet gelijk zijn aan de ingelogde gebruiker). Lezen — nodig voor
+    // de "gebruik van de app"-grafiek op het clubdashboard — is voorbehouden
+    // aan de hoofdbeheerder. Wijzigen/verwijderen kan niemand: logins zijn
+    // een append-only logboek.
+    match /logins/{loginId} {
+      allow read: if isBeheerder();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+    // ===== Gebruikers (samenvatting per account) =====
+    // gebruikers/{userId}: naam, laatste login, totaal aantal logins — voor
+    // het "meest actieve gebruikers"-lijstje op het clubdashboard.
+    // Elke gebruiker mag alleen zijn eigen samenvatting schrijven; lezen mag
+    // de gebruiker zelf of de hoofdbeheerder.
+    match /gebruikers/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isBeheerder());
+      allow write: if signedIn() && request.auth.uid == userId;
+
+      // Gelezen-status per training (bestond al) — ongewijzigd.
+      match /gelezen/{trainingId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+    }
+  }
+}
